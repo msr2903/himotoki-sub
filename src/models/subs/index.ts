@@ -1,15 +1,17 @@
-import { createStore, createEvent, createEffect, UnitValue, StoreValue } from "effector";
+import { createStore, createEvent, createEffect, combine, UnitValue, StoreValue } from "effector";
 import { resync } from "subtitle";
 
 import {
   convertJapaneseSubsFallback,
   convertJapaneseSubsWithLocalSplit,
 } from "@src/utils/convertRawSubs";
+import { himotokiTokenToWordTranslation, type HimotokiToken } from "@src/utils/himotokiTypes";
+import { knownKeyOf } from "@src/shared/knownWords";
 import { $video } from "@src/models/videos";
 import { getCurrentSubs } from "@src/utils/getCurrentSubs";
 import type { Captions, TSub } from "../types";
 import type Service from "@src/streamings/service";
-import { $autoPause } from "../settings";
+import { $autoPause, $knownWords } from "../settings";
 
 export const ES_CUSTOM_SUB_LABEL = "custom";
 export const $rawSubs = createStore<Captions>([]);
@@ -94,6 +96,31 @@ export const updateCurrentSecondarySubsFx = createEffect<
 export const $loopedCue = createStore<TSub | null>(null);
 export const loopedCueSet = createEvent<TSub | null>();
 
+/**
+ * Per-video coverage: the known-word key of each distinct word surface in the loaded subtitles.
+ * Resolved once via a batch dictionary lookup so stats/i+1 can be derived cheaply as known words change.
+ */
+export const $coverageKeys = createStore<Record<string, string | null>>({});
+export const computeCoverageFx = createEffect<TSub[], Record<string, string | null>>(async (subs) => {
+  const surfaces = new Set<string>();
+  for (const sub of subs) {
+    for (const item of sub.items) {
+      if (item.type === "word") surfaces.add(item.cleanedText || item.text);
+    }
+  }
+  const list = [...surfaces];
+  if (!list.length) return {};
+  const resp = await chrome.runtime.sendMessage({ type: "himotokiLookupBatch", surfaces: list });
+  const results = (resp?.ok && resp.data?.available && Array.isArray(resp.data.results) ? resp.data.results : []) as HimotokiToken[];
+  const map: Record<string, string | null> = {};
+  list.forEach((surface, i) => {
+    const token = results[i];
+    const best = token ? himotokiTokenToWordTranslation(token, "en") : null;
+    map[surface] = best ? knownKeyOf(best) : null;
+  });
+  return map;
+});
+
 /** Whether the local sentence breakdown panel is open (toggled with B). */
 export const $sentenceOpen = createStore<boolean>(false);
 export const sentenceToggled = createEvent<void>();
@@ -107,3 +134,34 @@ export const subsResyncFx = createEffect<
   { rawSubs: Captions; subsDelay: StoreValue<typeof $subsDelay>; delay: number },
   Captions
 >(({ rawSubs, subsDelay, delay }) => resync(rawSubs, (delay - subsDelay) * 1000));
+
+
+/** Live coverage stats for the loaded video, derived from resolved keys + the known-word set. */
+export const $videoStats = combine(
+  $coverageKeys,
+  $knownWords,
+  $subs,
+  (keys, known, subs) => {
+    const uniqueKeys = new Set<string>();
+    for (const key of Object.values(keys)) if (key) uniqueKeys.add(key);
+    const total = uniqueKeys.size;
+    if (!total) return null;
+    const knownSet = new Set(known);
+    let knownCount = 0;
+    for (const key of uniqueKeys) if (knownSet.has(key)) knownCount += 1;
+    // i+1: cues with exactly one resolved, not-yet-known word.
+    let i1 = 0;
+    for (const sub of subs) {
+      const cueKeys = new Set<string>();
+      for (const item of sub.items) {
+        if (item.type !== "word") continue;
+        const key = keys[item.cleanedText || item.text];
+        if (key) cueKeys.add(key);
+      }
+      let unknown = 0;
+      for (const key of cueKeys) if (!knownSet.has(key)) unknown += 1;
+      if (unknown === 1) i1 += 1;
+    }
+    return { total, known: knownCount, percent: Math.round((knownCount / total) * 100), i1 };
+  },
+);

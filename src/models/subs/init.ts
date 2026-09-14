@@ -28,6 +28,8 @@ import {
   loopedCueSet,
   $sentenceOpen,
   sentenceClosed,
+  $coverageKeys,
+  computeCoverageFx,
 } from ".";
 import { $streaming } from "../streamings";
 import {
@@ -144,6 +146,10 @@ $rawSubs.on(rawSubsAdded, (oldSubs, newSubs) => {
 
 $rawSubs.reset(resetSubs);
 $sentenceOpen.reset(resetSubs);
+
+// Resolve every distinct word's key once the subtitles are ready, for coverage stats.
+sample({ clock: $subs, filter: (subs) => subs.length > 0, target: computeCoverageFx });
+$coverageKeys.on(computeCoverageFx.doneData, (_, map) => map).reset(resetSubs);
 
 sample({
   clock: $rawSubs,

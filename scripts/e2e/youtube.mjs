@@ -481,6 +481,7 @@ log(
   "settings content rendered:",
   await page.evaluate(() => !!document.querySelector("[class*=es-settings-content]")),
 );
+log("video stats:", JSON.stringify(await page.evaluate(() => document.querySelector(".es-video-stats")?.textContent ?? null)));
 log("settings panel overflow (scrollHeight > clientHeight means it scrolls):", JSON.stringify(await page.evaluate(() => { const m = document.querySelector(".es-settings-content__main"); const c = document.querySelector(".es-settings-content"); return m && c ? { mainScroll: m.scrollHeight, mainClient: m.clientHeight, panel: c.getBoundingClientRect().height, playerH: document.querySelector(".html5-video-player")?.clientHeight } : null; })));
 log("select values fully visible:", JSON.stringify(await page.evaluate(() => [...document.querySelectorAll(".es-settings-content [class*=singleValue]")].map((e) => [e.textContent, e.scrollWidth <= e.clientWidth + 1]))));
 await page.screenshot({ path: "/tmp/himotoki-e2e-settings.png" });
