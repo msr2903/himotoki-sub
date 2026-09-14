@@ -5,6 +5,7 @@ import { $translateLanguage, $translationService, $deeplApiKey } from "../settin
 import { $currentSubs, $subs } from "../subs";
 import { HIMOTOKI_GLOSS_LANG } from "@src/shared/himotokiConfig";
 import {
+  entryLemma,
   himotokiEntryToWordTranslation,
   himotokiTokenToWordTranslation,
   type HimotokiEntry,
@@ -61,6 +62,13 @@ const lookupLocal = async (source: string): Promise<TWordTranslation | null> => 
   const data = resp.data as ({ available: boolean } & HimotokiToken) | undefined;
   if (!data || data.available === false) return null;
   const translation = himotokiTokenToWordTranslation(data, "en") ?? emptyTranslation(source);
+  // Other dictionary entries for the same surface become the popup's alternate entries.
+  const lemma = entryLemma(data);
+  const bestSeq = data.best?.seq;
+  const alternatives = (data.entries ?? [])
+    .filter((entry) => entry.seq !== bestSeq)
+    .map((entry) => himotokiEntryToWordTranslation(entry, lemma, "en"));
+  if (alternatives.length) translation.alternatives = alternatives;
   translation.lookupSource = "local";
   return translation;
 };
@@ -77,6 +85,8 @@ const lookupApi = async (source: string): Promise<TWordTranslation> => {
   const results = (resp.data || []) as HimotokiEntry[];
   const best = results[0];
   const translation = best ? himotokiEntryToWordTranslation(best, source, "en") : emptyTranslation(source);
+  const alternatives = results.slice(1).map((entry) => himotokiEntryToWordTranslation(entry, source, "en"));
+  if (alternatives.length) translation.alternatives = alternatives;
   translation.lookupSource = "api";
   return translation;
 };
