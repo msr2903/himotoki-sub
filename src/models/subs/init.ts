@@ -20,10 +20,14 @@ import {
   rawSubsAdded,
   processRawSubsFx,
   processJapaneseSubsFx,
+  $secondaryRawSubs,
+  $currentSecondarySubs,
+  fetchSecondarySubsFx,
+  updateCurrentSecondarySubsFx,
 } from ".";
 import { $streaming } from "../streamings";
 import { $video, videoTimeUpdate } from "../videos";
-import { $autoPause } from "../settings";
+import { $autoPause, $secondarySubs, $translateLanguage } from "../settings";
 import type { Captions } from "../types";
 import { debug } from "patronum";
 import { notifyError } from "@src/pages/content/notify";
@@ -144,6 +148,35 @@ sample({
   filter: (rawSubs) => Boolean(rawSubs?.length),
   target: processJapaneseSubsFx,
 });
+
+/* ---------- Second subtitle line ---------- */
+
+// Fetch the secondary track when the primary captions arrive, or when the mode / language changes.
+sample({
+  clock: [fetchSubsFx.doneData, $secondarySubs.updates, $translateLanguage.updates],
+  source: { streaming: $streaming, mode: $secondarySubs, language: $translateLanguage, rawSubs: $rawSubs },
+  filter: ({ mode, rawSubs, streaming }) => mode === "track" && rawSubs.length > 0 && streaming.name !== "stub",
+  fn: ({ streaming, language }) => ({ streaming, language }),
+  target: fetchSecondarySubsFx,
+});
+
+$secondaryRawSubs
+  .on(fetchSecondarySubsFx.doneData, (_, subs) => subs)
+  .reset(resetSubs)
+  .on($secondarySubs.updates, (subs, mode) => (mode === "track" ? subs : []));
+
+sample({
+  clock: [videoTimeUpdate, $secondaryRawSubs, $subsDelay],
+  source: { subs: $secondaryRawSubs, video: $video, delayMs: $subsDelay.map((s) => s * 1000) },
+  filter: ({ video, subs }) => video != null && subs.length > 0,
+  target: updateCurrentSecondarySubsFx,
+});
+$currentSecondarySubs
+  .on(updateCurrentSecondarySubsFx.doneData, (oldSubs, subs) =>
+    oldSubs.length === subs.length && oldSubs.every((c, i) => c.text === subs[i]!.text) ? oldSubs : subs,
+  )
+  .reset(resetSubs)
+  .on($secondaryRawSubs, (current, subs) => (subs.length ? current : []));
 
 $currentSubs.on([updateCurrentSubsFx.doneData, autoPauseFx.doneData], (oldSubs, subs) =>
   JSON.stringify(oldSubs) === JSON.stringify(subs) ? oldSubs : subs

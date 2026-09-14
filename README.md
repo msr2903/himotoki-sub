@@ -56,6 +56,7 @@ HIMOTOKI_DICT_DIR=/tmp/himotoki-dict pnpm test:e2e   # YouTube with the offline 
 - Subtitles overlaid on the player, draggable, with adjustable size, background and delay.
 - Hover and click on a word are configured separately in the extension settings page (toolbar popup → Settings, or `chrome://extensions` → Details → Extension options). Each can be **Furigana**, **Meaning**, **Furigana + meaning**, **Pop-up dictionary** or **No action**. Hover results vanish when the pointer leaves; click results stay pinned until Escape, a click elsewhere, or the next subtitle. Defaults: hover shows furigana + meaning, click pins the pop-up dictionary.
 - Whole-line machine translation on click (Google Translate or DeepL, with optional DeepL API key).
+- Dual subtitles: a second line under the Japanese one, either the video's own subtitle track in your "Translate to" language (on YouTube, its auto-translation when no such track exists) or a machine translation of the current line. Off by default; switch in the settings or press `d` in the player.
 - Save words to Himotoki favorites or Anki.
 - Subtitle progress bar; rewind to previous/next/current subtitle with the arrow keys (`alt` + arrow forces the jump).
 - Pause while hovering a word, or pause after every subtitle.

@@ -360,6 +360,35 @@ if (dupInfo) {
 }
 await page.evaluate(() => document.querySelector("video").play());
 
+// Second subtitle line: track (real English track on this video), translate (Google MT), off; D key cycles.
+const setSecondary = (mode) => popup.evaluate((m) => chrome.storage.local.set({ "persist:secondarySubs": JSON.stringify(m) }), mode);
+const secondaryState = () =>
+  page.evaluate(() => ({
+    lines: [...document.querySelectorAll(".es-sub-secondary")].map((e) => e.textContent.slice(0, 80)),
+    jp: [...document.querySelectorAll(".es-sub-item")].length,
+  }));
+await page.evaluate(() => { const v = document.querySelector("video"); v.currentTime = 9; v.pause(); });
+await setSecondary("track");
+await page.waitForFunction(() => document.querySelector(".es-sub-secondary"), null, { timeout: 15000 }).catch(() => {});
+await page.waitForTimeout(500);
+log("secondary=track (expect an English line):", JSON.stringify(await secondaryState()));
+await page.screenshot({ path: "/tmp/himotoki-e2e-dual.png" });
+await setSecondary("translate");
+await page.waitForFunction(() => { const e = document.querySelector(".es-sub-secondary"); return e && e.textContent !== "…"; }, null, { timeout: 20000 }).catch(() => {});
+await page.waitForTimeout(300);
+log("secondary=translate (expect a translated line, needs network):", JSON.stringify(await secondaryState()));
+await setSecondary("off");
+await page.waitForTimeout(400);
+log("secondary=off (expect none):", JSON.stringify(await secondaryState()));
+await page.mouse.click(640, 200);
+await page.keyboard.press("d");
+await page.waitForTimeout(600);
+log("after pressing D (expect mode 'track' in storage):", JSON.stringify(await popup.evaluate(() => chrome.storage.local.get("persist:secondarySubs"))));
+await page.keyboard.press("d");
+await page.keyboard.press("d");
+await page.waitForTimeout(400);
+log("after two more D presses (expect 'off'):", JSON.stringify(await popup.evaluate(() => chrome.storage.local.get("persist:secondarySubs"))));
+
 // Settings gear
 const gearInfo = await page.evaluate(() => {
   const root = document.querySelector(".es-settings");

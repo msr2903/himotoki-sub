@@ -93,6 +93,9 @@ export type TLearningService = "himotoki" | "anki" | "disabled";
 /** What hovering or clicking a subtitle token does. */
 export type TTokenAction = "furigana" | "meaning" | "both" | "popup" | "none";
 
+/** Second subtitle line under the Japanese one: none, a subtitle track in the translate-to language, or machine translation. */
+export type TSecondarySubs = "off" | "track" | "translate";
+
 export type TTranslationService = "google" | "deepl";
 
 export type Captions = subTitleType[];

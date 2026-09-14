@@ -6,7 +6,7 @@ import {
   addKeyboardEventsListeners,
   removeKeyboardEventsListeners,
 } from "@src/utils/keyboardHandler";
-import { TLearningService, TTokenAction, TTranslationService } from "../types";
+import { TLearningService, TSecondarySubs, TTokenAction, TTranslationService } from "../types";
 import { fetchCurrentStreamingFx } from "../streamings";
 import {
   CLICK_ACTION_SETTING,
@@ -15,6 +15,7 @@ import {
   HOVER_ACTION_SETTING,
 } from "@src/shared/tokenActions";
 import { UI_SCALE_DEFAULT, UI_SCALE_SETTING, clampUiScale } from "@src/shared/uiScale";
+import { DEFAULT_SECONDARY_SUBS, SECONDARY_SUBS_SETTING, nextSecondarySubs } from "@src/shared/secondarySubs";
 
 // Every persisted store carries an explicit name: it is the chrome.storage key (`persist:<name>`)
 // and is shared with the options page. See src/utils/withPersist.ts.
@@ -132,6 +133,14 @@ $clickAction.on(clickActionChanged, (_, value) => value);
 export const $uiScale = withPersist(createStore<number>(UI_SCALE_DEFAULT, { name: UI_SCALE_SETTING }));
 export const uiScaleChanged = createEvent<number>();
 $uiScale.on(uiScaleChanged, (_, value) => clampUiScale(value));
+
+/** Second subtitle line: off, subtitle track in the translate-to language, or machine translation. */
+export const $secondarySubs = withPersist(
+  createStore<TSecondarySubs>(DEFAULT_SECONDARY_SUBS, { name: SECONDARY_SUBS_SETTING }),
+);
+export const secondarySubsChanged = createEvent<TSecondarySubs>();
+export const secondarySubsCycled = createEvent();
+$secondarySubs.on(secondarySubsChanged, (_, value) => value).on(secondarySubsCycled, (current) => nextSecondarySubs(current));
 
 export const esRenderSetings = createEvent();
 

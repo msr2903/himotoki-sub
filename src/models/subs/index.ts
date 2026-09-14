@@ -66,6 +66,30 @@ export const processJapaneseSubsFx = createEffect<Captions, TSub[]>(
   async (rawSubs) => convertJapaneseSubsWithLocalSplit(rawSubs),
 );
 
+/* ---------- Second subtitle line (subtitle track mode) ---------- */
+
+export const $secondaryRawSubs = createStore<Captions>([]);
+export const $currentSecondarySubs = createStore<Captions>([]);
+export const fetchSecondarySubsFx = createEffect<{ streaming: Service; language: string }, Captions>(
+  async ({ streaming, language }) => {
+    try {
+      const fetcher = streaming.getSecondarySubs ?? streaming.getSubs;
+      return (await fetcher.call(streaming, language)) ?? [];
+    } catch (error) {
+      console.warn("[himotoki] secondary subtitles failed", error);
+      return [];
+    }
+  },
+);
+export const updateCurrentSecondarySubsFx = createEffect<
+  { subs: Captions; video: UnitValue<typeof $video>; delayMs: number },
+  Captions
+>(({ subs, video, delayMs }) => {
+  if (!video) return [];
+  const time = video.currentTime * 1000 - delayMs;
+  return subs.filter((cue) => Number(cue.start) <= time && Number(cue.end) >= time);
+});
+
 export const $subsDelay = createStore<number>(0);
 export const subsDelayButtonPressed = createEvent<number>();
 export const subsDelayChangeFx = createEffect<number, number>((value) => value);

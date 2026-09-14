@@ -1,9 +1,24 @@
 import { $streaming } from "@src/models/streamings";
 import { moveKeyPressed } from "@src/models/videos";
+import { secondarySubsCycled } from "@src/models/settings";
+
+const isEditable = (target: EventTarget | null): boolean => {
+  const el = target as HTMLElement | null;
+  if (!el || typeof el.closest !== "function") return false;
+  return Boolean(el.closest("input, textarea, select, [contenteditable=''], [contenteditable='true']"));
+};
 
 const keyboardEvents = ["keyup", "keydown", "keypress"];
 
 export const keyboardHandler = (event: KeyboardEvent) => {
+  // Never hijack keys while the user is typing (search box, comments).
+  if (isEditable(event.target)) return;
+  if (event.code === "KeyD" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+    event.stopPropagation();
+    event.preventDefault();
+    if (event.type === "keydown") secondarySubsCycled();
+    return;
+  }
   if (event.code === "ArrowLeft") {
     event.stopPropagation();
     if (event.type === "keydown") {

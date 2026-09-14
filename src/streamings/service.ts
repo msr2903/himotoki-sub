@@ -6,6 +6,9 @@ interface Service {
   // Getting subtitles from a service
   getSubs: (language: string) => Promise<Captions>;
 
+  // Optional: a second subtitle track (language code) for dual subtitles. Falls back to getSubs when absent.
+  getSecondarySubs?: (language: string) => Promise<Captions>;
+
   // Player container selector, required to render subtitles
   getSubsContainer: () => HTMLElement | null;
 

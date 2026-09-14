@@ -2,7 +2,7 @@ import { FC, useEffect, useRef, useState } from "react";
 import { useUnit } from "effector-react";
 import Draggable from "react-draggable";
 
-import { $currentSubs } from "@src/models/subs";
+import { $currentSecondarySubs, $currentSubs } from "@src/models/subs";
 import { $video, $wasPaused, wasPausedChanged } from "@src/models/videos";
 import { TSub, TSubItem, TTokenAction } from "@src/models/types";
 import {
@@ -12,6 +12,7 @@ import {
   $moveBySubsEnabled,
   $subsBackground,
   $subsBackgroundOpacity,
+  $secondarySubs,
   $subsFontSize,
   $uiScale,
 } from "@src/models/settings";
@@ -25,10 +26,12 @@ import {
 } from "@src/models/translations";
 import { addKeyboardEventsListeners, removeKeyboardEventsListeners } from "@src/utils/keyboardHandler";
 import { SubItemTranslation } from "./SubItemTranslation";
-import { SubFullTranslation } from "./SubFullTranslation";
+import { SecondaryTranslation, SubFullTranslation } from "./SubFullTranslation";
 import { TokenLabel } from "./TokenLabel";
 
 type TSubsProps = {};
+
+const subsBackgroundAlpha = (enabled: boolean, opacity: number) => (enabled ? opacity / 100 : 0);
 
 export const Subs: FC<TSubsProps> = () => {
   const [
@@ -42,6 +45,8 @@ export const Subs: FC<TSubsProps> = () => {
     pinnedWord,
     unpin,
     uiScale,
+    secondaryMode,
+    currentSecondary,
   ] = useUnit([
     $video,
     $currentSubs,
@@ -53,7 +58,10 @@ export const Subs: FC<TSubsProps> = () => {
     $pinnedWord,
     tokenUnpinned,
     $uiScale,
+    $secondarySubs,
+    $currentSecondarySubs,
   ]);
+  const [subsBackground, subsBackgroundOpacity] = useUnit([$subsBackground, $subsBackgroundOpacity]);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -119,14 +127,19 @@ export const Subs: FC<TSubsProps> = () => {
         style={{ fontSize: `${fontSizePx}px`, "--es-ui-scale": String(uiScale / 100) } as React.CSSProperties}
       >
         {currentSubs.map((sub) => (
-          <Sub key={sub.id} sub={sub} />
+          <Sub key={sub.id} sub={sub} secondary={secondaryMode === "translate"} />
         ))}
+        {secondaryMode === "track" && currentSubs.length > 0 && currentSecondary.length > 0 && (
+          <div className="es-sub es-sub--secondary" style={{ background: `rgba(0, 0, 0, ${subsBackgroundAlpha(subsBackground, subsBackgroundOpacity)})` }}>
+            <div className="es-sub-secondary">{currentSecondary.map((cue) => cue.text).join(" ")}</div>
+          </div>
+        )}
       </div>
     </Draggable>
   );
 };
 
-const Sub: FC<{ sub: TSub }> = ({ sub }) => {
+const Sub: FC<{ sub: TSub; secondary: boolean }> = ({ sub, secondary }) => {
   const [showTranslation, setShowTranslation] = useState(false);
   const [subsBackground, subsBackgroundOpacity] = useUnit([$subsBackground, $subsBackgroundOpacity]);
 
@@ -151,7 +164,8 @@ const Sub: FC<{ sub: TSub }> = ({ sub }) => {
         if (item.type === "space") return <span key={key} className="es-sub-item-space"> </span>;
         return <SubItem key={`${key}:${item.text}`} hoverKey={key} subItem={item} contextSentence={sub.cleanedText} />;
       })}
-      {showTranslation && <SubFullTranslation text={sub.cleanedText} />}
+      {secondary && <SecondaryTranslation text={sub.cleanedText} />}
+      {showTranslation && !secondary && <SubFullTranslation text={sub.cleanedText} />}
     </div>
   );
 };

@@ -3,7 +3,6 @@ import { createEffect, createEvent, createStore, sample } from "effector";
 import { TSubItem, TWordTranslation } from "../types";
 import { $translateLanguage, $translationService, $deeplApiKey } from "../settings";
 import { $currentSubs, $subs } from "../subs";
-import { createGate } from "effector-react";
 import { HIMOTOKI_GLOSS_LANG } from "@src/shared/himotokiConfig";
 import {
   himotokiEntryToWordTranslation,
@@ -121,11 +120,11 @@ $lookupPendings.on(fetchWordTranslationFx.finally, (pendings, { params: { source
 
 /* ---------- Whole-line machine translation (Google / DeepL) ---------- */
 
-export const $currentSubTranslation = createStore<string>(null);
-export const $subTranslationPendings = createStore<Record<string, boolean>>({});
-export const SubTranslationGate = createGate<string>("SubTranslationGate");
-export const requestSubTranslation = createEvent<string>();
-export const cleanSubTranslation = createEvent();
+/** Translations keyed by line text; failures stored with `error` so the UI can show them and retry on request. */
+export const $lineTranslations = createStore<Record<string, { text: string; error?: string }>>({});
+export const $lineTranslationPendings = createStore<Record<string, boolean>>({});
+export const lineTranslationRequested = createEvent<string>();
+
 export const fetchSubTranslationFx = createEffect<
   {
     source: string;
@@ -135,42 +134,36 @@ export const fetchSubTranslationFx = createEffect<
   },
   string
 >(async ({ source, language, translationService, deeplApiKey }) => {
-  try {
-    const resp = await chrome.runtime.sendMessage({
-      type: "translateFullText",
-      language,
-      text: source,
-      translationService,
-      deeplApiKey,
-    });
-
-    if (resp?.error) {
-      throw new Error(resp.error);
-    }
-
-    if (translationService === "deepl") {
-      return resp;
-    }
-
-    const responseText: string = JSON.parse(resp)
-      ["sentences"].map((sentence) => sentence["trans"])
-      .join(" ");
-    return responseText;
-  } catch (error) {
-    console.error(error);
-    throw error;
-  }
+  const resp = await chrome.runtime.sendMessage({
+    type: "translateFullText",
+    language,
+    text: source,
+    translationService,
+    deeplApiKey,
+  });
+  if (resp?.error) throw new Error(resp.error);
+  if (translationService === "deepl") return String(resp ?? "");
+  const parsed = JSON.parse(resp);
+  return (parsed.sentences as Array<{ trans?: string }>).map((sentence) => sentence.trans ?? "").join(" ");
 });
 
 sample({
-  clock: requestSubTranslation,
+  clock: lineTranslationRequested,
   source: {
+    translations: $lineTranslations,
+    pendings: $lineTranslationPendings,
     language: $translateLanguage,
     translationService: $translationService,
     deeplApiKey: $deeplApiKey,
   },
+  filter: ({ translations, pendings }, source) => {
+    const key = source.trim();
+    if (!key || pendings[key]) return false;
+    const cached = translations[key];
+    return !cached || Boolean(cached.error);
+  },
   fn: ({ language, translationService, deeplApiKey }, source) => ({
-    source,
+    source: source.trim(),
     language,
     translationService,
     deeplApiKey,
@@ -178,18 +171,18 @@ sample({
   target: fetchSubTranslationFx,
 });
 
-$currentSubTranslation.on(fetchSubTranslationFx.doneData, (_, translation) => translation);
-$currentSubTranslation.reset(SubTranslationGate.close);
-$subTranslationPendings.on(fetchSubTranslationFx, (pendings, { source }) => ({
-  ...pendings,
-  [source]: true,
-}));
-$subTranslationPendings.on(fetchSubTranslationFx.finally, (pendings, { params: { source } }) => {
-  const copy = { ...pendings };
-  delete copy[source];
-  return copy;
-});
-sample({
-  clock: SubTranslationGate.open,
-  target: requestSubTranslation,
-});
+$lineTranslations
+  .on(fetchSubTranslationFx.done, (all, { params, result }) => ({ ...all, [params.source]: { text: result } }))
+  .on(fetchSubTranslationFx.fail, (all, { params, error }) => ({
+    ...all,
+    [params.source]: { text: "", error: error instanceof Error ? error.message : String(error) },
+  }))
+  // A different target language or service invalidates everything.
+  .reset($translateLanguage.updates, $translationService.updates);
+$lineTranslationPendings
+  .on(fetchSubTranslationFx, (pendings, { source }) => ({ ...pendings, [source]: true }))
+  .on(fetchSubTranslationFx.finally, (pendings, { params: { source } }) => {
+    const copy = { ...pendings };
+    delete copy[source];
+    return copy;
+  });

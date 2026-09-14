@@ -27,6 +27,19 @@ const JP_LANGS = ["ja", "ja-JP"];
 /** True when a timedtext URL carries YouTube's PO token; token-less URLs return empty bodies. */
 const hasPoToken = (url: string): boolean => /[?&]pot=/.test(url);
 
+/** Query params the player adds to its own timedtext requests; needed on any track URL we build ourselves. */
+const PLAYER_PARAMS = ["pot", "potc", "xorb", "xobt", "xovt", "c", "cver", "cplayer", "cos", "cosver", "cplatform", "cbrand", "cbr", "cbrver"];
+
+const withPlayerParams = (targetUrl: string, sourceUrl: string): string => {
+  const target = new URL(targetUrl, "https://www.youtube.com");
+  const source = new URL(sourceUrl, "https://www.youtube.com");
+  for (const key of PLAYER_PARAMS) {
+    const value = source.searchParams.get(key);
+    if (value && !target.searchParams.has(key)) target.searchParams.set(key, value);
+  }
+  return target.href;
+};
+
 class Youtube implements Service {
   name = "youtube";
 
@@ -143,6 +156,39 @@ class Youtube implements Service {
     }
 
     return parse("");
+  }
+
+  /**
+   * Second subtitle line. Prefers a real track in `language`; otherwise YouTube's own translation of
+   * the Japanese track (`tlang`). Both reuse the PO token from a URL the player already fetched.
+   */
+  public async getSecondarySubs(language: string): Promise<subTitleType[]> {
+    const videoId = this.getVideoId();
+    if (!videoId || !language) return [];
+    const cache = this.subCache[videoId] || {};
+    const tokenUrl = Object.values(cache).find(hasPoToken);
+    if (!tokenUrl) return [];
+
+    const track = this.pickCaptionTrack(this.getCaptionTracks(), [language]);
+    if (track?.baseUrl && !JP_LANGS.includes(track.languageCode ?? "")) {
+      try {
+        const subs = await this.fetchTimedtextJson(withPlayerParams(track.baseUrl, tokenUrl));
+        if (subs.length) return subs;
+      } catch (error) {
+        console.warn("[himotoki] secondary track failed", language, error);
+      }
+    }
+
+    const jaUrl = [cache.ja, cache["ja-JP"], tokenUrl].find((u) => u && hasPoToken(u));
+    if (!jaUrl) return [];
+    try {
+      const translated = new URL(jaUrl);
+      translated.searchParams.set("tlang", language);
+      return await this.fetchTimedtextJson(translated.href);
+    } catch (error) {
+      console.warn("[himotoki] secondary auto-translation failed", language, error);
+      return [];
+    }
   }
 
   /**

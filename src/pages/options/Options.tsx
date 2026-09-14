@@ -1,6 +1,6 @@
 import { FC, useEffect, useState } from "react";
 
-import type { TTokenAction } from "@src/models/types";
+import type { TSecondarySubs, TTokenAction } from "@src/models/types";
 import { onPersistedChange, readPersisted, writePersisted } from "@src/shared/persistedSettings";
 import {
   CLICK_ACTION_SETTING,
@@ -11,6 +11,7 @@ import {
   isTokenAction,
 } from "@src/shared/tokenActions";
 import { HIMOTOKI_API_BASE } from "@src/shared/himotokiConfig";
+import { DEFAULT_SECONDARY_SUBS, SECONDARY_SUBS_OPTIONS, SECONDARY_SUBS_SETTING, isSecondarySubs } from "@src/shared/secondarySubs";
 import { UI_SCALE_DEFAULT, UI_SCALE_MAX, UI_SCALE_MIN, UI_SCALE_SETTING, UI_SCALE_STEP, clampUiScale } from "@src/shared/uiScale";
 import { AccountPanel } from "@src/pages/shared/AccountPanel";
 import { DictionaryPanel } from "@src/pages/shared/DictionaryPanel";
@@ -71,6 +72,11 @@ const Options: FC = () => {
     UI_SCALE_DEFAULT,
     (v): v is number => typeof v === "number" && Number.isFinite(v),
   );
+  const [secondary, setSecondary] = usePersistedSetting<TSecondarySubs>(
+    SECONDARY_SUBS_SETTING,
+    DEFAULT_SECONDARY_SUBS,
+    isSecondarySubs,
+  );
   const version = chrome.runtime.getManifest().version;
 
   return (
@@ -116,6 +122,26 @@ const Options: FC = () => {
               <span>{uiScale}%</span>
             </div>
             <div className="es-options-help">Size of the dictionary pop-up, hover labels and the in-player panel.</div>
+          </div>
+        </div>
+        <div className="es-options-row">
+          <label htmlFor="secondary-subs">Second line</label>
+          <div>
+            <select
+              id="secondary-subs"
+              className="es-options-select"
+              value={secondary}
+              onChange={(e) => isSecondarySubs(e.target.value) && setSecondary(e.target.value)}
+            >
+              {SECONDARY_SUBS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <div className="es-options-help">
+              {SECONDARY_SUBS_OPTIONS.find((o) => o.value === secondary)?.description} Press D in the player to cycle.
+            </div>
           </div>
         </div>
         <p className="es-popup-hint">
