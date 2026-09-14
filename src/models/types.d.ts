@@ -79,6 +79,13 @@ export type TWordTranslation = {
   /** Dictionary headword (kanji form if any) and its kana reading, for furigana. */
   headword?: string;
   reading?: string;
+  common?: boolean;
+  pitch?: string;
+  jlpt?: string[];
+  /** "飲みます → 飲む (Polite)" when the surface was deconjugated. */
+  conjugationNote?: string;
+  /** First example sentence of the first sense, when the dictionary has one. */
+  example?: { jp: string; en: string; keyword?: string };
 };
 
 export type TLearningService = "himotoki" | "anki" | "disabled";

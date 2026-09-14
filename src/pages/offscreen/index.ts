@@ -72,12 +72,7 @@ function dictCall(op: string, payload: Record<string, unknown>): Promise<unknown
   const id = ++dictSeq;
   return new Promise((resolve, reject) => {
     dictPending.set(id, { resolve, reject });
-    getDictWorker().postMessage({
-      id,
-      op,
-      wasmUrl: chrome.runtime.getURL("sqlite/sqlite3.wasm"),
-      ...payload,
-    });
+    getDictWorker().postMessage({ id, op, ...payload });
   });
 }
 

@@ -26,7 +26,7 @@ If `pnpm` scripts abort with `ERR_PNPM_IGNORED_BUILDS`, check `pnpm-workspace.ya
 2. `src/models/subs` converts captions to `TSub[]`: an immediate `Intl.Segmenter` paint (`convertJapaneseSubsFallback`), then an upgrade pass through the local ONNX split (`convertJapaneseSubsWithLocalSplit`), both in `src/utils/convertRawSubs.ts`.
 3. The ONNX model lives in `public/models/default.onnx` (+ CRF params in `default.onnx.crf.npz`) and runs in the offscreen document `src/pages/offscreen/index.ts` via `src/split/`. The background service worker (`src/pages/background/index.ts`) creates the offscreen document and relays `himotokiSplit`/`himotokiSplitBatch` messages.
 4. Hovering or clicking a token (`src/pages/content/components/Subs/Subs.tsx`) opens `SubItemTranslation`, which triggers `fetchWordTranslationFx` in `src/models/translations`. It first asks the offline dictionary (`himotokiLookup` → background → offscreen → `src/pages/offscreen/dict.worker.ts`, SQLite WebAssembly over an OPFS-hosted Jitendex file; lookup and deinflection logic in `src/dict/lookup.ts`, rules in `src/dict/conj_rules.ts`, ported from himotoki-web-ts). If the dictionary is not installed it falls back to `GET https://himotoki.my.id/api/search`. Response mapping is in `src/utils/himotokiTypes.ts`.
-   - The dictionary file is built by `scripts/build-dict.py` and downloaded from `HIMOTOKI_DICT_URL` (`src/shared/himotokiConfig.ts`) via the popup. After the ONNX split, `himotokiRepairSegments` merges adjacent segments that form a dictionary headword.
+   - The dictionary file is built by `scripts/build-dict.py` and downloaded from `HIMOTOKI_DICT_URL` (`src/shared/himotokiConfig.ts`) via the popup or settings page. A JSON manifest next to it (`jitendex-lite.json`) carries the revision and sha256; the worker verifies the sha256 while importing and the panel offers an update when the manifest revision differs. After the ONNX split, `himotokiRepairSegments` merges adjacent segments that form a dictionary headword.
    - Prefer local processing over API calls for anything on the hover path.
 5. Clicking a line outside a word shows a whole-line machine translation (Google or DeepL) via `translateFullText`.
 
@@ -49,6 +49,9 @@ Hover and click are independent, user-configurable actions (`TTokenAction`: furi
 - `src/pages/offscreen/` - ONNX runtime host
 - `src/pages/popup/` - toolbar popup (dictionary status, sign-in/out, link to settings)
 - `src/pages/options/` - settings page (hover/click actions, offline dictionary, account); shared panels in `src/pages/shared/`
+- `src/pages/welcome/` - first-run page opened on install (dictionary download, actions, sign-in, test video)
+- `store/` - Chrome Web Store listing text, screenshots, promo tile; `PRIVACY.md` is the privacy policy
+- `manifest.js` embeds a public `key` so the unpacked extension ID is stable; the private key is outside the repo (`~/.himotoki-sub/extension-key.pem`)
 - `public/` - manifest assets, locales (en, ja, id), model, `onnxruntime-web` wasm files
 - `manifest.js` - manifest generation for Chrome/Firefox
 

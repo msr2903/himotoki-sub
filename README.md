@@ -61,6 +61,21 @@ HIMOTOKI_DICT_DIR=/tmp/himotoki-dict pnpm test:e2e   # YouTube with the offline 
 - Pause while hovering a word, or pause after every subtitle.
 - Upload your own `.srt` / `.vtt` subtitles when a site has none.
 
+## Using alongside Yomitan
+
+Yomitan scans any text on the page, including this extension's subtitle overlay, so with both enabled you may see two pop-ups. Either add `youtube.com` (and the other video sites) to Yomitan's excluded sites, or set this extension's hover action to "No action" and keep click for the Himotoki pop-up.
+
+## Manual QA before a release
+
+Automated checks cover Playwright's Chromium; do this once in your real Chrome profile:
+
+1. Load `dist/` unpacked, reload once (host permission), open a video with Japanese captions.
+2. Hover several adjacent words: labels must follow the pointer without flicker.
+3. Click a word: pop-up pins, stays while the pointer leaves, closes on Escape.
+4. Settings page: download the dictionary, then confirm the "Online lookup" footer disappears.
+5. With Yomitan enabled, confirm only one pop-up appears (see above).
+6. Sign in, save a word, check it on himotoki.my.id.
+
 ## Contributing
 
 Issues and pull requests are welcome. Please open an issue to discuss larger features before implementing them.

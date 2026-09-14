@@ -4,6 +4,8 @@ export type HimotokiSense = {
   pos?: string[];
   glosses?: string[];
   lang?: string;
+  examples?: Array<{ jp: string; en: string; keyword?: string }>;
+  notes?: string[];
 };
 
 export type HimotokiEntry = {
@@ -13,7 +15,9 @@ export type HimotokiEntry = {
   readings?: string[];
   senses?: HimotokiSense[];
   common?: boolean;
-  jlpt?: string | null;
+  jlpt?: string | string[] | null;
+  pitch?: number[];
+  pitch_display?: string;
 };
 
 export type HimotokiConjugation = {
@@ -98,10 +102,7 @@ export const himotokiEntryToWordTranslation = (
   }));
 
   const main = firstGloss(entry) || translations[0]?.word || "";
-  let transcription = entryReading(entry);
-  if (conjNote) {
-    transcription = transcription ? `${transcription} · ${conjNote}` : conjNote;
-  }
+  const transcription = entryReading(entry);
 
   const headword =
     entry.kanji?.[0] || entry.readings?.[0] || source;
@@ -117,6 +118,9 @@ export const himotokiEntryToWordTranslation = (
         }
       : undefined;
 
+  const firstExample = senses.find((s) => s.examples?.length)?.examples?.[0];
+  const jlpt = Array.isArray(entry.jlpt) ? entry.jlpt : entry.jlpt ? [entry.jlpt] : undefined;
+
   return {
     source,
     mainTranslation: main,
@@ -126,6 +130,11 @@ export const himotokiEntryToWordTranslation = (
     himotokiSave,
     headword,
     reading: reading || undefined,
+    common: Boolean(entry.common),
+    pitch: entry.pitch_display || (entry.pitch?.length ? entry.pitch.join("/") : undefined),
+    jlpt,
+    conjugationNote: conjNote || undefined,
+    example: firstExample ? { jp: firstExample.jp, en: firstExample.en, keyword: firstExample.keyword } : undefined,
   };
 };
 

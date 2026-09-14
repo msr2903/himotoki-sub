@@ -21,6 +21,22 @@ const isProduction = !isDev;
 const enableHmrInBackgroundScript = true;
 const cacheInvalidationKeyRef = { current: generateKey() };
 
+/**
+ * onnxruntime-web references its wasm via `new URL(..., import.meta.url)`, so Vite emits a 27 MB copy
+ * into assets/ even though the offscreen document loads the copy in public/ort (ort.env.wasm.wasmPaths).
+ * Drop the emitted duplicate.
+ */
+function dropDuplicateOrtWasm() {
+  return {
+    name: "drop-duplicate-ort-wasm",
+    generateBundle(_options: unknown, bundle: Record<string, unknown>) {
+      for (const fileName of Object.keys(bundle)) {
+        if (/ort-wasm.*\.wasm$/.test(fileName)) delete bundle[fileName];
+      }
+    },
+  };
+}
+
 export default defineConfig({
   esbuild: {
     drop: isProduction ? ["console", "debugger"] : [],
@@ -42,6 +58,7 @@ export default defineConfig({
     addHmr({ background: enableHmrInBackgroundScript, view: true }),
     isDev && watchRebuild({ afterWriteBundle: regenerateCacheInvalidationKey }),
     inlineVitePreloadScript(),
+    dropDuplicateOrtWasm(),
   ],
   publicDir,
   worker: {
@@ -65,6 +82,7 @@ export default defineConfig({
         contentStyle: resolve(pagesDir, "content", "style.scss"),
         popup: resolve(pagesDir, "popup", "index.html"),
         options: resolve(pagesDir, "options", "index.html"),
+        welcome: resolve(pagesDir, "welcome", "index.html"),
         offscreen: resolve(pagesDir, "offscreen", "index.html"),
       },
       output: {

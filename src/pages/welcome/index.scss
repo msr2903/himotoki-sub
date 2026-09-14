@@ -1,0 +1,89 @@
+@import "../options/index.scss";
+
+.es-welcome {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 40px 24px 64px;
+}
+
+.es-welcome-hero {
+  text-align: center;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--hm-border);
+  margin-bottom: 8px;
+
+  .header-brand {
+    font-size: 44px;
+  }
+}
+
+.es-welcome-tagline {
+  margin: 8px 0 0;
+  color: var(--hm-ink-muted);
+  font-size: 16px;
+}
+
+.es-welcome-step {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 16px;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--hm-border);
+
+  h2 {
+    margin: 4px 0 6px;
+    font-family: var(--hm-font-display);
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .es-popup-btn {
+    width: auto;
+    min-width: 220px;
+  }
+}
+
+.es-welcome-num {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--hm-accent-muted);
+  color: var(--hm-accent);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.es-welcome-actions {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--hm-ink-muted);
+  }
+
+  select {
+    width: 220px;
+    padding: 6px 8px;
+    font: inherit;
+    color: var(--hm-ink);
+    background: var(--hm-raised);
+    border: 1px solid var(--hm-border);
+    border-radius: var(--hm-radius-sm);
+  }
+}
+
+.es-welcome-cta {
+  display: inline-block;
+  text-align: center;
+  text-decoration: none;
+  margin: 6px 0 10px;
+  box-sizing: border-box;
+}

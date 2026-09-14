@@ -143,6 +143,14 @@ const Options: FC = () => {
             himotoki.my.id
           </a>
         </p>
+        <p className="es-popup-hint">
+          Dictionary data: <a href="https://jitendex.org/" target="_blank" rel="noreferrer">Jitendex</a> © Stephen Kraus,{" "}
+          <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer">CC BY-SA 4.0</a>, built from{" "}
+          <a href="https://www.edrdg.org/jmdict/j_jmdict.html" target="_blank" rel="noreferrer">JMdict</a> (EDRDG) and{" "}
+          <a href="https://tatoeba.org/" target="_blank" rel="noreferrer">Tatoeba</a> examples (CC BY 2.0 FR). Nothing you
+          watch or look up leaves your device unless you use online translation or save to your account (see the{" "}
+          <a href="https://github.com/msr2903/himotoki-sub/blob/master/PRIVACY.md" target="_blank" rel="noreferrer">privacy policy</a>).
+        </p>
       </section>
     </div>
   );

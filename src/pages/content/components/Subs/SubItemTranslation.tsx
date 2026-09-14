@@ -1,4 +1,4 @@
-import { FC, Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { FC, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useUnit } from "effector-react";
 import toast from "react-hot-toast";
 
@@ -11,16 +11,35 @@ import ILearningService from "@src/learning-service/learningService";
 import { getLearningService } from "@src/utils/getLearningService";
 import { HIMOTOKI_API_BASE } from "@src/shared/himotokiConfig";
 import { SoundIcon } from "./assets/SoundIcon";
-import { PlusIcon } from "./assets/PlusIcon";
 
+const SENSE_LIMIT = 3;
+const SERVICE_LABEL: Record<string, string> = { himotoki: "Save to Himotoki", anki: "Save to Anki" };
+
+/** Highlight the dictionary's keyword inside an example sentence. */
+const ExampleText: FC<{ text: string; keyword?: string }> = ({ text, keyword }) => {
+  if (!keyword || !text.includes(keyword)) return <>{text}</>;
+  const index = text.indexOf(keyword);
+  return (
+    <>
+      {text.slice(0, index)}
+      <mark className="es-ex-hit">{keyword}</mark>
+      {text.slice(index + keyword.length)}
+    </>
+  );
+};
+
+/**
+ * Dictionary pop-up for one token. Layout follows the entry card on himotoki.my.id: headword,
+ * reading, tags, numbered senses with part of speech, one example, then actions.
+ */
 export const SubItemTranslation: FC<{
   subItem: TSubItem;
   contextSentence?: string;
-  /** Opened by click: stays until dismissed, shows a close button. */
+  /** Opened by click: stays until dismissed, shows Close. */
   pinned?: boolean;
 }> = ({ subItem, contextSentence, pinned }) => {
   const text = subItem.cleanedText || subItem.text;
-  const { translation: currentWordTranslation, pending } = useLookup(subItem);
+  const { translation, pending } = useLookup(subItem);
   const [learningService, video, unpin] = useUnit([$learningService, $video, tokenUnpinned]);
 
   const [service, setService] = useState<ILearningService>(null);
@@ -63,38 +82,38 @@ export const SubItemTranslation: FC<{
 
   if (pending) {
     return (
-      <div className="es-word-translation es-word-translation--loading" onClick={stop}>
+      <div className="es-word-translation es-word-translation--status" onClick={stop} ref={popupRef}>
         Looking up…
       </div>
     );
   }
 
-  if (!currentWordTranslation) {
+  if (!translation) {
     return (
-      <div className="es-word-translation es-word-translation--loading" onClick={stop}>
+      <div className="es-word-translation es-word-translation--status" onClick={stop} ref={popupRef}>
         No translation
       </div>
     );
   }
 
-  if (currentWordTranslation.error) {
+  if (translation.error) {
     return (
-      <div className="es-word-translation" onClick={stop}>
-        <div className="es-word-original-info">
-          <div className="es-word-original">{text}</div>
-        </div>
-        <div className="es-word-transcription">Lookup failed: {currentWordTranslation.error}</div>
+      <div className="es-word-translation" onClick={stop} ref={popupRef}>
+        <header className="es-popup-head">
+          <div className="es-popup-word">{text}</div>
+        </header>
+        <p className="es-popup-status">Lookup failed: {translation.error}</p>
       </div>
     );
   }
 
-  if (!currentWordTranslation.mainTranslation && currentWordTranslation.translations.length === 0) {
+  if (!translation.mainTranslation && translation.translations.length === 0) {
     return (
-      <div className="es-word-translation" onClick={stop}>
-        <div className="es-word-original-info">
-          <div className="es-word-original">{text}</div>
-        </div>
-        <div className="es-word-transcription">No dictionary entry</div>
+      <div className="es-word-translation" onClick={stop} ref={popupRef}>
+        <header className="es-popup-head">
+          <div className="es-popup-word">{text}</div>
+        </header>
+        <p className="es-popup-status">No dictionary entry</p>
       </div>
     );
   }
@@ -106,126 +125,125 @@ export const SubItemTranslation: FC<{
     timestampMs: video ? Math.floor(video.currentTime * 1000) : undefined,
   };
 
-  const handleAddWord = (word: string, translation: TWordTranslationItem) => {
+  const handleAddWord = (sense: TWordTranslationItem) => {
     if (!service) return;
     service
-      .addWord(word, translation.word, {
-        partOfSpeech: translation.partOfSpeech,
+      .addWord(translation.source, sense.word, {
+        partOfSpeech: sense.partOfSpeech,
         context: miningContext.contextSentence,
         ...miningContext,
-        himotokiSave: currentWordTranslation.himotokiSave
-          ? {
-              ...currentWordTranslation.himotokiSave,
-              gloss: translation.word || currentWordTranslation.himotokiSave.gloss,
-            }
+        himotokiSave: translation.himotokiSave
+          ? { ...translation.himotokiSave, gloss: sense.word || translation.himotokiSave.gloss }
           : undefined,
       })
-      .then((value) => {
-        toast.success(value);
-      })
-      .catch((error) => {
-        toast.error(typeof error === "string" ? error : error?.message || String(error));
-      });
+      .then((value) => toast.success(value))
+      .catch((error) => toast.error(typeof error === "string" ? error : error?.message || String(error)));
   };
 
   const handlePlaySound = () => {
     const msg = new SpeechSynthesisUtterance();
-    msg.text = currentWordTranslation.source;
+    msg.text = translation.headword || translation.source;
     msg.lang = "ja-JP";
     msg.rate = 0.8;
     window.speechSynthesis.speak(msg);
   };
 
-  const himotokiQuery = encodeURIComponent(
-    currentWordTranslation.himotokiSave?.headword || currentWordTranslation.source || text,
-  );
-
-  const SENSE_LIMIT = 3;
-  const senses = currentWordTranslation.translations;
+  const headword = translation.headword || translation.source || text;
+  const reading = translation.reading && translation.reading !== headword ? translation.reading : null;
+  const senses = translation.translations.length
+    ? translation.translations
+    : [{ word: translation.mainTranslation, partOfSpeech: "unknown" as const, synonyms: [], popularity: 0 }];
   const visibleSenses = showAll ? senses : senses.slice(0, SENSE_LIMIT);
   const hiddenCount = senses.length - visibleSenses.length;
+  const himotokiQuery = encodeURIComponent(translation.himotokiSave?.headword || headword);
+  const saveLabel = SERVICE_LABEL[learningService] ?? "Save";
 
   return (
     <div className="es-word-translation" onClick={stop} ref={popupRef}>
-      {pinned && (
-        <button className="es-word-close" title="Close (Esc)" onClick={() => unpin()}>
-          ×
+      <header className="es-popup-head">
+        <div className="es-popup-title">
+          <span className="es-popup-word">{headword}</span>
+          <button className="es-popup-speak" title="Pronounce" onClick={handlePlaySound}>
+            <SoundIcon />
+          </button>
+        </div>
+        {reading && <p className="es-popup-reading">{reading}</p>}
+        {(translation.pitch || translation.common || translation.jlpt?.length || translation.conjugationNote) && (
+          <div className="es-popup-tags">
+            {translation.pitch && <span className="es-tag es-tag-pitch">[{translation.pitch}]</span>}
+            {translation.common && <span className="es-tag">common</span>}
+            {translation.jlpt?.map((level) => (
+              <span key={level} className="es-tag">
+                {level.toUpperCase()}
+              </span>
+            ))}
+            {translation.conjugationNote && <span className="es-popup-conj">{translation.conjugationNote}</span>}
+          </div>
+        )}
+      </header>
+
+      <ol className="es-popup-senses">
+        {visibleSenses.map((sense, index) => (
+          <li key={index} className="es-sense">
+            <span className="es-sense-num">{index + 1}</span>
+            <div className="es-sense-body">
+              {sense.partOfSpeech !== "unknown" && <span className="es-sense-pos">{sense.partOfSpeech}</span>}
+              <span className="es-sense-gloss">{sense.word}</span>
+            </div>
+            {service && (
+              <button className="es-sense-save" title={`${saveLabel} (this sense)`} onClick={() => handleAddWord(sense)}>
+                +
+              </button>
+            )}
+          </li>
+        ))}
+      </ol>
+      {hiddenCount > 0 && (
+        <button className="es-word-more" onClick={() => setShowAll(true)}>
+          Show {hiddenCount} more {hiddenCount === 1 ? "sense" : "senses"}
         </button>
       )}
-      <div className="es-word-main">
-        <div
-          className="es-translation-variant-word"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleAddWord(currentWordTranslation.source, {
-              word: currentWordTranslation.mainTranslation,
-              partOfSpeech: "unknown",
-              popularity: 0,
-              synonyms: [],
-            });
-          }}
-        >
-          {service && (
-            <button className="es-settings-button">
-              <PlusIcon fill={service.color} />
-            </button>
-          )}
-          <div>{currentWordTranslation.mainTranslation}</div>
-        </div>
-      </div>
-      <hr className="es-word-original-hr" />
-      <div className="es-word-original-info">
-        <div className="es-word-original-sound-icon" onClick={handlePlaySound}>
-          <SoundIcon />
-        </div>
-        <div className="es-word-original">{text}</div>
-      </div>
-      {currentWordTranslation.transcription && (
-        <div className="es-word-transcription">{currentWordTranslation.transcription}</div>
+      {showAll && senses.length > SENSE_LIMIT && (
+        <button className="es-word-more" onClick={() => setShowAll(false)}>
+          Show fewer
+        </button>
       )}
-      <div className="es-translation-variants">
-        {visibleSenses.map((translation, index) => (
-          <Fragment key={index}>
-            <div
-              className="es-translation-variant-word"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleAddWord(currentWordTranslation.source, translation);
-              }}
-            >
-              {service && (
-                <button className="es-settings-button">
-                  <PlusIcon fill={service.color} />
-                </button>
-              )}
-              <div>{translation.word}</div>
-            </div>
-            <div className="es-translation-variant-part-of-speach">{translation.partOfSpeech}</div>
-          </Fragment>
-        ))}
-        {hiddenCount > 0 && (
-          <button className="es-word-more" onClick={() => setShowAll(true)}>
-            Show {hiddenCount} more {hiddenCount === 1 ? "sense" : "senses"}
+
+      {translation.example && (
+        <div className="es-popup-example">
+          <span className="es-ex-label">Example</span>
+          <p className="es-ex-jp">
+            <ExampleText text={translation.example.jp} keyword={translation.example.keyword} />
+          </p>
+          {translation.example.en && (
+            <p className="es-ex-en">
+              <span className="es-ex-lang">EN</span>
+              {translation.example.en}
+            </p>
+          )}
+        </div>
+      )}
+
+      <footer className="es-popup-actions">
+        {service && (
+          <button
+            className="es-popup-btn es-popup-btn--primary"
+            style={{ "--es-service": service.color } as React.CSSProperties}
+            onClick={() => handleAddWord(senses[0]!)}
+          >
+            {saveLabel}
           </button>
         )}
-        {showAll && senses.length > SENSE_LIMIT && (
-          <button className="es-word-more" onClick={() => setShowAll(false)}>
-            Show fewer
-          </button>
-        )}
-      </div>
-      <hr className="es-translation-services-hr" />
-      <div className="es-translation-services">
-        <a
-          className="es-translation-service es-translation-service-himotoki"
-          href={`${HIMOTOKI_API_BASE}/?q=${himotokiQuery}`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Open in Himotoki
+        <a className="es-popup-btn" href={`${HIMOTOKI_API_BASE}/?q=${himotokiQuery}`} target="_blank" rel="noreferrer">
+          Open entry
         </a>
-      </div>
-      {currentWordTranslation.lookupSource === "api" && (
+        {pinned && (
+          <button className="es-popup-btn es-popup-btn--ghost" onClick={() => unpin()}>
+            Close
+          </button>
+        )}
+      </footer>
+      {translation.lookupSource === "api" && (
         <div className="es-word-hint">Online lookup. Download the offline dictionary in the extension settings for instant results.</div>
       )}
     </div>

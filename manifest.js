@@ -8,6 +8,8 @@ const packageJson = JSON.parse(fs.readFileSync("./package.json", "utf8"));
 
 const manifest = {
   manifest_version: 3,
+  // Public key: keeps the extension ID stable across machines and unpacked reloads (see store/README.md).
+  key: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvwDOMGKm/xmBAUn/BEuxgg8na1+SY5Eqn3TbNpsvm2VW+MBxYAPzmRQmE40pOm9Hu2+QLlKFEKQWbGvJ6yv0zVHrJCpVGAaYoQCHKrBw1XPg44O9gbvSX6BRwLPqnnbqAf+YksP+VRUDg/rzWxHpKV/Q1zU11GhIZexd0Jl2YaZlym0fh5oyngE3kjtz3/4XOWypvTnca12lz2VxhFG0A6wBCeXeZg9iMo+6foS79rwq4/pvEBfcS1alS9zU17LNByIAt71SvbbU+ZHi/k5hg4ipLuDGpJPggwBIPoXSfEwxrqCO8EDzMbGCnmu5gelGV2IKEQySWGyHzr0KKY5zBwIDAQAB",
   default_locale: "en",
   name: "__MSG_appName__",
   version: packageJson.version,
@@ -75,7 +77,6 @@ const manifest = {
         "icon-34.png",
         "models/*",
         "ort/*",
-        "sqlite/*",
         "fonts/*",
       ],
       matches: ["*://*/*"],

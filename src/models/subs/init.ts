@@ -26,6 +26,7 @@ import { $video, videoTimeUpdate } from "../videos";
 import { $autoPause } from "../settings";
 import type { Captions } from "../types";
 import { debug } from "patronum";
+import { notifyError } from "@src/pages/content/notify";
 
 split({
   source: esSubsChanged,
@@ -93,6 +94,20 @@ sample({
 const sameCaptions = (a: Captions, b: Captions): boolean =>
   a.length === b.length &&
   a.every((cue, i) => cue.text === b[i]!.text && cue.start === b[i]!.start && cue.end === b[i]!.end);
+
+// A requested track that comes back empty is the most common "nothing happens" report; say so.
+sample({
+  clock: fetchSubsFx.done,
+  filter: ({ params, result }) => Boolean(params.language) && params.language !== ES_CUSTOM_SUB_LABEL && result.length === 0,
+  fn: ({ params }) => params.language,
+}).watch((language) => {
+  notifyError(
+    language.startsWith("ja")
+      ? "No Japanese captions could be loaded for this video. Turn on CC in the player or upload subtitles in the Himotoki settings."
+      : `No captions could be loaded for "${language}".`,
+    "no-captions",
+  );
+});
 
 $rawSubs.on(
   [fetchSubsFx.doneData, subsResyncFx.doneData, updateCustomSubsFx.doneData, rawSubsAdded],
