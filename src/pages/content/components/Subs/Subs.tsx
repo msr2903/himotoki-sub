@@ -87,7 +87,12 @@ export const Subs: FC<TSubsProps> = () => {
       if (event.key === "Escape") unpin();
     };
     const onClick = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) unpin();
+      const root = rootRef.current;
+      if (!root) return;
+      // Composed path handles Draggable/portal edge cases better than contains().
+      const path = (event.composedPath && event.composedPath()) || [];
+      const inside = path.includes(root) || root.contains(event.target as Node) || (event.target as HTMLElement)?.closest?.("#es-subs") != null;
+      if (!inside) unpin();
     };
     document.addEventListener("keydown", onKey, true);
     document.addEventListener("click", onClick, true);
@@ -257,6 +262,8 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
   };
 
   const handleClick = (event: React.MouseEvent) => {
+    // Clicks inside the pop-up (buttons, switcher, conjugation toggle) must never toggle the pin.
+    if ((event.target as HTMLElement).closest(".es-word-translation")) return;
     // With click set to "No action" the click falls through to the line (whole-line translation).
     if (!isWord || clickAction === "none") return;
     event.stopPropagation();

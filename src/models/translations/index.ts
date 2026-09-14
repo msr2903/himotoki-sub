@@ -69,6 +69,17 @@ const lookupLocal = async (source: string): Promise<TWordTranslation | null> => 
     .filter((entry) => entry.seq !== bestSeq)
     .map((entry) => himotokiEntryToWordTranslation(entry, lemma, "en"));
   if (alternatives.length) translation.alternatives = alternatives;
+  const tree = data.conjugation as
+    | { root_text?: string; root_reading?: string; root_seq?: number; steps?: Array<{ conjType?: string; tip?: string }> }
+    | undefined;
+  if (tree?.steps?.length && tree.root_text) {
+    translation.conjugation = {
+      rootText: tree.root_text,
+      rootReading: tree.root_reading,
+      rootSeq: tree.root_seq,
+      steps: tree.steps.map((st) => ({ label: String(st.conjType ?? ""), tip: st.tip })).filter((st) => st.label),
+    };
+  }
   translation.lookupSource = "local";
   return translation;
 };

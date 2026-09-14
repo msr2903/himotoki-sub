@@ -349,6 +349,19 @@ log("popup depth:", JSON.stringify(await page.evaluate(() => {
     playFromVideo: !!p.querySelector(".es-popup-speak[title*='video']"),
   };
 })));
+// Grammar (idea 12): the deconjugation chain renders from data (no click needed).
+await page.evaluate(() => document.querySelector("video")?.pause());
+await page.waitForTimeout(200);
+log("conjugation chain:", JSON.stringify(await page.evaluate(() =>
+  document.querySelector(".es-conj-chain")?.textContent?.replace(/\s+/g, " ").trim() ?? null)));
+// Conjugation table: flip showConj in-place and read it, tolerant of popup timing.
+await page.evaluate(() => document.querySelector(".es-conj .es-word-more")?.click());
+await page.waitForTimeout(1200);
+log("conjugation table:", JSON.stringify(await page.evaluate(() => ({
+  rows: document.querySelectorAll(".es-conj-table tr").length,
+  sample: [...document.querySelectorAll(".es-conj-table tr")].slice(0, 3).map((r) => r.textContent.replace(/\s+/g, " ").trim()),
+  status: document.querySelector(".es-conj-status")?.textContent ?? null,
+}))));
 log("popup fit:", JSON.stringify(await page.evaluate(() => { const p = document.querySelector(".es-word-translation"); const pl = document.querySelector(".html5-video-player"); if (!p || !pl) return null; const r = p.getBoundingClientRect(), q = pl.getBoundingClientRect(); return { insideTop: r.top >= q.top, insideLeft: r.left >= q.left, insideRight: r.right <= q.right, maxHeight: p.style.maxHeight, scrollable: p.classList.contains("es-word-translation--scrollable"), senses: document.querySelectorAll(".es-sense").length, more: document.querySelector(".es-word-more")?.textContent ?? null }; })));
 await page.screenshot({ path: "/tmp/himotoki-e2e-pinned.png" });
 await popup.evaluate(() => chrome.storage.local.set({ "persist:uiScale": JSON.stringify(70) }));
