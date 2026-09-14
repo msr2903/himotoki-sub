@@ -18,6 +18,7 @@ import { UI_SCALE_DEFAULT, UI_SCALE_SETTING, clampUiScale } from "@src/shared/ui
 import { DEFAULT_SECONDARY_SUBS, SECONDARY_SUBS_SETTING, nextSecondarySubs } from "@src/shared/secondarySubs";
 import { DEFAULT_FURIGANA, FURIGANA_SETTING } from "@src/shared/furiganaSettings";
 import { DEFAULT_READING_LINE, READING_LINE_SETTING } from "@src/shared/furiganaSettings";
+import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
 
 // Every persisted store carries an explicit name: it is the chrome.storage key (`persist:<name>`)
 // and is shared with the options page. See src/utils/withPersist.ts.
@@ -153,6 +154,19 @@ $furigana.on(furiganaChanged, (_, value) => value);
 export const $readingLine = withPersist(createStore<TReadingLineMode>(DEFAULT_READING_LINE, { name: READING_LINE_SETTING }));
 export const readingLineChanged = createEvent<TReadingLineMode>();
 $readingLine.on(readingLineChanged, (_, value) => value);
+
+/** Words the user has marked as known (stable keys from knownKeyOf); persisted and synced across pages. */
+export const $knownWords = withPersist(createStore<string[]>([], { name: KNOWN_WORDS_SETTING }));
+export const wordMarkedKnown = createEvent<string>();
+export const wordUnmarkedKnown = createEvent<string>();
+$knownWords
+  .on(wordMarkedKnown, (list, key) => (list.includes(key) ? list : [...list, key]))
+  .on(wordUnmarkedKnown, (list, key) => list.filter((k) => k !== key));
+
+/** Dim words already marked known (opt-in; requires resolving each visible token). */
+export const $dimKnownWords = withPersist(createStore<boolean>(DEFAULT_DIM_KNOWN, { name: DIM_KNOWN_SETTING }));
+export const dimKnownWordsChanged = createEvent<boolean>();
+$dimKnownWords.on(dimKnownWordsChanged, (_, value) => value);
 
 export const esRenderSetings = createEvent();
 

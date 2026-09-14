@@ -17,6 +17,8 @@ import {
   $uiScale,
   $furigana,
   $readingLine,
+  $dimKnownWords,
+  $knownWords,
 } from "@src/models/settings";
 import {
   $activeHoverWord,
@@ -32,6 +34,8 @@ import { SecondaryTranslation, SubFullTranslation } from "./SubFullTranslation";
 import { TokenLabel } from "./TokenLabel";
 import { TokenRuby } from "./TokenRuby";
 import { hasKanji } from "@src/utils/furigana";
+import { useLookup } from "@src/pages/content/hooks/useLookup";
+import { knownKeyOf } from "@src/shared/knownWords";
 
 type TSubsProps = {};
 
@@ -210,7 +214,7 @@ type TSubItemProps = {
 };
 
 const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furigana, cueStart, cueEnd }) => {
-  const [activeHoverWord, pinnedWord, hoverAction, clickAction, handleSubItemMouseEntered, handleSubItemMouseLeft, pinToggle] =
+  const [activeHoverWord, pinnedWord, hoverAction, clickAction, handleSubItemMouseEntered, handleSubItemMouseLeft, pinToggle, dimKnownWords, knownWords] =
     useUnit([
       $activeHoverWord,
       $pinnedWord,
@@ -219,6 +223,8 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
       subItemMouseEntered,
       subItemMouseLeft,
       tokenPinToggled,
+      $dimKnownWords,
+      $knownWords,
     ]);
   const leaveTimer = useRef<number | null>(null);
   const itemRef = useRef<HTMLPreElement | null>(null);
@@ -229,6 +235,10 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
   const action: TTokenAction = pinned ? clickAction : hovered ? hoverAction : "none";
   // Inline ruby over kanji tokens: always, or only while hovered.
   const showRuby = isWord && hasKanji(subItem.text) && (furigana === "always" || (furigana === "hover" && hovered));
+  // Dim words already marked known (opt-in; resolves the token so this only looks up when enabled).
+  const { translation: knownTx } = useLookup(subItem, isWord && dimKnownWords);
+  const knownKey = knownTx ? knownKeyOf(knownTx) : null;
+  const isKnown = Boolean(dimKnownWords && knownKey && knownWords.includes(knownKey));
 
   useEffect(() => {
     // After ONNX upgrade remount, restore hover state if the pointer is still over this token.
@@ -276,7 +286,7 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
       ref={itemRef}
       onMouseEnter={handleOnMouseEnter}
       onMouseLeave={handleOnMouseLeave}
-      className={`es-sub-item ${subItem.tag} ${action !== "none" ? "es-sub-item-active" : ""} ${pinned ? "es-sub-item-pinned" : ""}`}
+      className={`es-sub-item ${subItem.tag} ${action !== "none" ? "es-sub-item-active" : ""} ${pinned ? "es-sub-item-pinned" : ""} ${isKnown ? "es-sub-item--known" : ""}`}
       onClick={handleClick}
     >
       {showRuby ? <TokenRuby subItem={subItem} /> : subItem.text}

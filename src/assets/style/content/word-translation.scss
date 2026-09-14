@@ -351,6 +351,11 @@
     background: transparent;
     color: var(--hm-ink-muted);
   }
+
+  &--known {
+    border-color: var(--hm-accent);
+    color: var(--hm-accent);
+  }
 }
 
 .es-word-hint {
