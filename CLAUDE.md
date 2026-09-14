@@ -31,6 +31,9 @@ If `pnpm` scripts abort with `ERR_PNPM_IGNORED_BUILDS`, check `pnpm-workspace.ya
 5. Clicking a line outside a word shows a whole-line machine translation (Google or DeepL) via `translateFullText`; results are cached per line in `$lineTranslations` (`useLineTranslation`).
 6. Dual subtitles (`$secondarySubs`: off / track / translate, options in `src/shared/secondarySubs.ts`, hotkey `d`). "track" fetches a second caption track through `Service.getSecondarySubs` (YouTube: a real track with the player's PO-token params, else `tlang` auto-translation of the Japanese track) into `$secondaryRawSubs`; "translate" renders `SecondaryTranslation` under each current cue from the line-translation cache.
 
+### Furigana and reading line
+`$furigana` (always/hover/never) renders inline `<ruby>` over kanji tokens via `TokenRuby.tsx` + `surfaceReading` (`src/utils/furigana.ts`), reusing the `useLookup` cache. When ruby shows a token's reading, `TokenLabel` suppresses its own reading (`showReading` prop) to avoid duplication. `convertRawSubs.splitReadingLine` detects a channel's kana line (two newline groups, second all-kana, first has kanji), keeps it off the segmenter, and exposes it as `TSub.readingLine`; `$readingLine` (hide/text) controls whether it renders. Options in `src/shared/furiganaSettings.ts`.
+
 ### Token interaction
 Hover and click are independent, user-configurable actions (`TTokenAction`: furigana, meaning, both, popup, none; options in `src/shared/tokenActions.ts`). `Subs.tsx` resolves the action per token: a pinned click result (`$pinnedWord`) wins over the transient hover (`$activeHoverWord`). Labels are rendered by `TokenLabel.tsx` (reading derived by `src/utils/furigana.ts`), the full entry by `SubItemTranslation.tsx`; both read the shared lookup cache through `useLookup`.
 

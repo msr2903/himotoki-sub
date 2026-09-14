@@ -199,6 +199,32 @@ for (let i = 0; i < 12; i++) {
   await page.waitForTimeout(1000);
 }
 log("distinct cues observed:", seen.size);
+
+// --- Furigana (ideas 9+10) ---
+const setPersist = (obj) => popup.evaluate((o) => chrome.storage.local.set(o), obj);
+const furiState = () =>
+  page.evaluate(() => {
+    const rubies = [...document.querySelectorAll(".es-sub-item ruby rt")].map((rt) => rt.textContent);
+    return {
+      rubyCount: rubies.length,
+      sampleRuby: rubies.slice(0, 4),
+      readingLineText: [...document.querySelectorAll(".es-sub-reading-line")].map((e) => e.textContent.slice(0, 40)),
+    };
+  });
+await page.evaluate(() => { const v = document.querySelector("video"); v.currentTime = 1; v.pause(); });
+await setPersist({ "persist:furigana": JSON.stringify("always"), "persist:readingLine": JSON.stringify("hide") });
+await page.waitForFunction(() => document.querySelector(".es-sub-item ruby rt"), null, { timeout: 15000 }).catch(() => {});
+await page.waitForTimeout(600);
+log("furigana=always, readingLine=hide (expect ruby>0, no reading line):", JSON.stringify(await furiState()));
+await page.screenshot({ path: "/tmp/himotoki-e2e-furigana.png" });
+await setPersist({ "persist:readingLine": JSON.stringify("text") });
+await page.waitForTimeout(600);
+log("readingLine=text (expect a kana reading line when the cue has one):", JSON.stringify(await furiState()));
+await setPersist({ "persist:furigana": JSON.stringify("never"), "persist:readingLine": JSON.stringify("hide") });
+await page.waitForTimeout(500);
+log("furigana=never (expect ruby=0):", JSON.stringify(await furiState()));
+await setPersist({ "persist:furigana": JSON.stringify("always") });
+
 let matched = 0;
 let total = 0;
 for (const [text, rendered] of [...seen.entries()].slice(0, 6)) {
@@ -248,10 +274,17 @@ if (wantWord) {
 }
 for (let attempt = 0; attempt < 10 && !targetText; attempt++) {
   target = await page.evaluateHandle(([jpSrc, want]) => {
+    // Surface text without ruby <rt> (furigana), so exact word matching still works.
+    const surface = (el) => {
+      if (!el.querySelector("rt")) return el.textContent;
+      const c = el.cloneNode(true);
+      c.querySelectorAll("rt").forEach((x) => x.remove());
+      return c.textContent;
+    };
     const jp = new RegExp(jpSrc);
     const all = [...document.querySelectorAll(".es-sub-item")];
-    if (want) return all.find((i) => i.textContent === want) || null;
-    const items = all.filter((i) => jp.test(i.textContent) && i.textContent.length >= 2);
+    if (want) return all.find((i) => surface(i) === want) || null;
+    const items = all.filter((i) => jp.test(surface(i)) && surface(i).length >= 2);
     return items[0] || null;
   }, [JP.source, wantWord]);
   targetText = await target.evaluate((e) => e?.textContent ?? null);

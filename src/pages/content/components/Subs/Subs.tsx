@@ -4,7 +4,7 @@ import Draggable from "react-draggable";
 
 import { $currentSecondarySubs, $currentSubs } from "@src/models/subs";
 import { $video, $wasPaused, wasPausedChanged } from "@src/models/videos";
-import { TSub, TSubItem, TTokenAction } from "@src/models/types";
+import { TFuriganaMode, TSub, TSubItem, TTokenAction } from "@src/models/types";
 import {
   $autoStopEnabled,
   $clickAction,
@@ -15,6 +15,8 @@ import {
   $secondarySubs,
   $subsFontSize,
   $uiScale,
+  $furigana,
+  $readingLine,
 } from "@src/models/settings";
 import {
   $activeHoverWord,
@@ -28,6 +30,8 @@ import { addKeyboardEventsListeners, removeKeyboardEventsListeners } from "@src/
 import { SubItemTranslation } from "./SubItemTranslation";
 import { SecondaryTranslation, SubFullTranslation } from "./SubFullTranslation";
 import { TokenLabel } from "./TokenLabel";
+import { TokenRuby } from "./TokenRuby";
+import { hasKanji } from "@src/utils/furigana";
 
 type TSubsProps = {};
 
@@ -47,6 +51,8 @@ export const Subs: FC<TSubsProps> = () => {
     uiScale,
     secondaryMode,
     currentSecondary,
+    furigana,
+    readingLine,
   ] = useUnit([
     $video,
     $currentSubs,
@@ -60,6 +66,8 @@ export const Subs: FC<TSubsProps> = () => {
     $uiScale,
     $secondarySubs,
     $currentSecondarySubs,
+    $furigana,
+    $readingLine,
   ]);
   const [subsBackground, subsBackgroundOpacity] = useUnit([$subsBackground, $subsBackgroundOpacity]);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -127,7 +135,7 @@ export const Subs: FC<TSubsProps> = () => {
         style={{ fontSize: `${fontSizePx}px`, "--es-ui-scale": String(uiScale / 100) } as React.CSSProperties}
       >
         {currentSubs.map((sub) => (
-          <Sub key={sub.id} sub={sub} secondary={secondaryMode === "translate"} />
+          <Sub key={sub.id} sub={sub} secondary={secondaryMode === "translate"} furigana={furigana} readingLine={readingLine} />
         ))}
         {secondaryMode === "track" && currentSubs.length > 0 && currentSecondary.length > 0 && (
           <div className="es-sub es-sub--secondary" style={{ background: `rgba(0, 0, 0, ${subsBackgroundAlpha(subsBackground, subsBackgroundOpacity)})` }}>
@@ -139,7 +147,12 @@ export const Subs: FC<TSubsProps> = () => {
   );
 };
 
-const Sub: FC<{ sub: TSub; secondary: boolean }> = ({ sub, secondary }) => {
+const Sub: FC<{ sub: TSub; secondary: boolean; furigana: TFuriganaMode; readingLine: "hide" | "text" }> = ({
+  sub,
+  secondary,
+  furigana,
+  readingLine,
+}) => {
   const [showTranslation, setShowTranslation] = useState(false);
   const [subsBackground, subsBackgroundOpacity] = useUnit([$subsBackground, $subsBackgroundOpacity]);
 
@@ -162,8 +175,17 @@ const Sub: FC<{ sub: TSub; secondary: boolean }> = ({ sub, secondary }) => {
         const key = `${sub.id}:${index}`;
         if (item.type === "newline") return <br key={key} />;
         if (item.type === "space") return <span key={key} className="es-sub-item-space"> </span>;
-        return <SubItem key={`${key}:${item.text}`} hoverKey={key} subItem={item} contextSentence={sub.cleanedText} />;
+        return (
+          <SubItem
+            key={`${key}:${item.text}`}
+            hoverKey={key}
+            subItem={item}
+            contextSentence={sub.cleanedText}
+            furigana={furigana}
+          />
+        );
       })}
+      {readingLine === "text" && sub.readingLine && <div className="es-sub-reading-line">{sub.readingLine}</div>}
       {secondary && <SecondaryTranslation text={sub.cleanedText} />}
       {showTranslation && !secondary && <SubFullTranslation text={sub.cleanedText} />}
     </div>
@@ -175,9 +197,10 @@ type TSubItemProps = {
   /** Position-based identity (cue id + index) so two identical tokens in one cue do not both open. */
   hoverKey: string;
   contextSentence?: string;
+  furigana: TFuriganaMode;
 };
 
-const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence }) => {
+const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furigana }) => {
   const [activeHoverWord, pinnedWord, hoverAction, clickAction, handleSubItemMouseEntered, handleSubItemMouseLeft, pinToggle] =
     useUnit([
       $activeHoverWord,
@@ -195,6 +218,8 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence }) => {
   const pinned = isWord && pinnedWord === hoverKey;
   // The pinned click action wins over the transient hover action.
   const action: TTokenAction = pinned ? clickAction : hovered ? hoverAction : "none";
+  // Inline ruby over kanji tokens: always, or only while hovered.
+  const showRuby = isWord && hasKanji(subItem.text) && (furigana === "always" || (furigana === "hover" && hovered));
 
   useEffect(() => {
     // After ONNX upgrade remount, restore hover state if the pointer is still over this token.
@@ -243,10 +268,10 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence }) => {
       className={`es-sub-item ${subItem.tag} ${action !== "none" ? "es-sub-item-active" : ""} ${pinned ? "es-sub-item-pinned" : ""}`}
       onClick={handleClick}
     >
-      {subItem.text}
+      {showRuby ? <TokenRuby subItem={subItem} /> : subItem.text}
       {action === "popup" && <SubItemTranslation subItem={subItem} contextSentence={contextSentence} pinned={pinned} />}
       {(action === "furigana" || action === "meaning" || action === "both") && (
-        <TokenLabel subItem={subItem} mode={action} />
+        <TokenLabel subItem={subItem} mode={action} showReading={!showRuby} />
       )}
     </pre>
   );

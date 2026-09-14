@@ -30,6 +30,8 @@ export type TSub = {
   cleanedText: string;
   items: TSubItem[];
   analyzed?: boolean;
+  /** A kana reading line the channel printed under the kanji line, when detected (see convertRawSubs). */
+  readingLine?: string;
 };
 
 export type TPartOfSpeach =
@@ -92,6 +94,11 @@ export type TLearningService = "himotoki" | "anki" | "disabled";
 
 /** What hovering or clicking a subtitle token does. */
 export type TTokenAction = "furigana" | "meaning" | "both" | "popup" | "none";
+
+/** Inline ruby furigana over kanji tokens. */
+export type TFuriganaMode = "always" | "hover" | "never";
+/** The kana "reading line" some channels print under the kanji line. */
+export type TReadingLineMode = "hide" | "text";
 
 /** Second subtitle line under the Japanese one: none, a subtitle track in the translate-to language, or machine translation. */
 export type TSecondarySubs = "off" | "track" | "translate";
