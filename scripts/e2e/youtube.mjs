@@ -515,6 +515,23 @@ const tLoop = await page.evaluate(() => document.querySelector("video").currentT
 log("loop L: toast=", JSON.stringify(loopToast), "; currentTime after nearing end:", tLoop.toFixed(2), tLoop < 15 ? "(looped back)" : "(did not loop)");
 await page.keyboard.press("l");
 
+// Sentence breakdown (idea 14): B opens a local word list for the current line.
+await page.evaluate(() => { const v = document.querySelector("video"); v.play(); v.currentTime = 2; });
+await page.waitForTimeout(700);
+await page.evaluate(() => document.querySelector("video")?.pause());
+await page.keyboard.press("b");
+await page.waitForFunction(() => document.querySelector(".es-breakdown-row"), null, { timeout: 15000 }).catch(() => {});
+await page.waitForTimeout(500);
+log("breakdown:", JSON.stringify(await page.evaluate(() => ({
+  open: !!document.querySelector(".es-breakdown"),
+  rows: document.querySelectorAll(".es-breakdown-row").length,
+  sample: [...document.querySelectorAll(".es-breakdown-row")].slice(0, 3).map((r) => r.textContent.replace(/\s+/g, " ").trim()),
+}))));
+await page.screenshot({ path: "/tmp/hf-sent.png" });
+await page.keyboard.press("b");
+await page.waitForTimeout(300);
+log("breakdown after second B (expect closed):", await page.evaluate(() => !!document.querySelector(".es-breakdown")));
+
 log("page errors:", pageErrors.length, pageErrors.slice(0, 5));
 await ctx.close();
 dictServer?.close();

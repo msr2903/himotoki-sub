@@ -26,6 +26,8 @@ import {
   updateCurrentSecondarySubsFx,
   $loopedCue,
   loopedCueSet,
+  $sentenceOpen,
+  sentenceClosed,
 } from ".";
 import { $streaming } from "../streamings";
 import {
@@ -141,6 +143,7 @@ $rawSubs.on(rawSubsAdded, (oldSubs, newSubs) => {
 });
 
 $rawSubs.reset(resetSubs);
+$sentenceOpen.reset(resetSubs);
 
 sample({
   clock: $rawSubs,
