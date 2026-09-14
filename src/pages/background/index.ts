@@ -8,7 +8,24 @@ import {
   HIMOTOKI_GOOGLE_CLIENT_ID,
 } from "@src/shared/himotokiConfig";
 import { signInWithGoogleIdToken, addHimotokiFavorite } from "@src/utils/himotokiConvex";
-import { HIMOTOKI_DICT_URL } from "@src/shared/himotokiConfig";
+import { HIMOTOKI_DICT_URL, dictManifestUrlFor } from "@src/shared/himotokiConfig";
+
+export type DictManifest = { name?: string; revision?: string; sha256?: string; bytes?: number; gzipBytes?: number; title?: string };
+
+async function resolveDictUrl(): Promise<string> {
+  const stored = await chrome.storage.local.get(["himotokiDictUrl"]);
+  return (stored.himotokiDictUrl as string | undefined) || HIMOTOKI_DICT_URL;
+}
+
+async function fetchDictManifest(): Promise<DictManifest | null> {
+  try {
+    const resp = await fetch(dictManifestUrlFor(await resolveDictUrl()), { cache: "no-cache" });
+    if (!resp.ok) return null;
+    return (await resp.json()) as DictManifest;
+  } catch {
+    return null;
+  }
+}
 
 /** Content-script / popup message types that map onto dictionary worker operations. */
 const DICT_OPS: Record<string, string> = {
@@ -104,7 +121,7 @@ async function sendToOffscreen<T>(
 
 chrome.runtime.onInstalled.addListener(function (object) {
   if (object.reason === chrome.runtime.OnInstalledReason.INSTALL) {
-    chrome.tabs.create({ url: "https://himotoki.my.id" });
+    chrome.tabs.create({ url: chrome.runtime.getURL("src/pages/welcome/index.html") });
   }
 });
 
@@ -143,6 +160,10 @@ chrome.runtime.onMessage.addListener(function (message, _sender, sendResponse) {
       .catch((error: Error) => sendResponse({ ok: false, error: error.message }));
   }
 
+  if (message.type === "himotokiDictManifest") {
+    void fetchDictManifest().then((manifest) => sendResponse({ ok: true, data: manifest }));
+  }
+
   if (message.type === "openOptionsPage") {
     chrome.runtime.openOptionsPage(() => sendResponse({ ok: true }));
   }
@@ -153,8 +174,10 @@ chrome.runtime.onMessage.addListener(function (message, _sender, sendResponse) {
         const op = DICT_OPS[message.type]!;
         const { type: _type, ...payload } = message as { type: string } & Record<string, unknown>;
         if (op === "install") {
-          const stored = await chrome.storage.local.get(["himotokiDictUrl"]);
-          payload.url = (stored.himotokiDictUrl as string | undefined) || HIMOTOKI_DICT_URL;
+          payload.url = await resolveDictUrl();
+          const manifest = await fetchDictManifest();
+          if (manifest?.sha256) payload.expectedSha256 = manifest.sha256;
+          if (manifest?.revision) payload.expectedRevision = manifest.revision;
         }
         const resp = await sendToOffscreen({ ...payload, type: "himotokiDict", op });
         sendResponse(resp);

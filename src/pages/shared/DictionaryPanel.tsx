@@ -9,7 +9,10 @@ export type DictStatus = {
   title: string;
   terms: number;
   bytes: number;
+  verified?: "ok" | "skipped" | "";
 };
+
+type DictManifest = { revision?: string; gzipBytes?: number; title?: string } | null;
 
 const formatMb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(0)} MB`;
 const isBusy = (s: DictStatus | null) => s?.state === "downloading" || s?.state === "importing" || s?.state === "booting";
@@ -17,6 +20,7 @@ const isBusy = (s: DictStatus | null) => s?.state === "downloading" || s?.state 
 /** Offline dictionary status / download / remove. Used by the popup and the options page. */
 export const DictionaryPanel: FC<{ compact?: boolean }> = ({ compact }) => {
   const [dict, setDict] = useState<DictStatus | null>(null);
+  const [manifest, setManifest] = useState<DictManifest>(null);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
 
@@ -49,6 +53,9 @@ export const DictionaryPanel: FC<{ compact?: boolean }> = ({ compact }) => {
     void refresh().then((status) => {
       if (isBusy(status)) pollWhileBusy();
     });
+    void chrome.runtime.sendMessage({ type: "himotokiDictManifest" }).then((resp) => {
+      if (resp?.ok) setManifest((resp.data as DictManifest) ?? null);
+    });
     return stopPolling;
   }, []);
 
@@ -71,6 +78,9 @@ export const DictionaryPanel: FC<{ compact?: boolean }> = ({ compact }) => {
 
   const busy = isBusy(dict);
   const percent = dict && dict.total > 0 ? Math.min(100, Math.round((dict.received / dict.total) * 100)) : null;
+  const updateAvailable =
+    dict?.state === "ready" && Boolean(manifest?.revision) && Boolean(dict.revision) && manifest!.revision !== dict.revision;
+  const downloadMb = manifest?.gzipBytes ? formatMb(manifest.gzipBytes) : "about 38 MB";
 
   return (
     <div className="es-dict-panel">
@@ -79,7 +89,18 @@ export const DictionaryPanel: FC<{ compact?: boolean }> = ({ compact }) => {
         <>
           <p className="es-popup-hint">
             {dict.title || "Jitendex"} · {dict.terms.toLocaleString()} entries · {formatMb(dict.bytes)} on disk
+            {dict.verified === "ok" ? " · verified" : ""}
           </p>
+          {updateAvailable && (
+            <>
+              <p className="es-popup-hint">
+                Update available: {manifest?.title || manifest?.revision} ({downloadMb}).
+              </p>
+              <button className="es-popup-btn es-popup-btn-primary" onClick={handleInstall}>
+                Update dictionary
+              </button>
+            </>
+          )}
           {!compact && (
             <p className="es-popup-hint">
               Lookups run offline in a few milliseconds. Jitendex is © Stephen Kraus, CC BY-SA 4.0, built from JMdict
@@ -94,7 +115,7 @@ export const DictionaryPanel: FC<{ compact?: boolean }> = ({ compact }) => {
       {(dict?.state === "missing" || dict?.state === "error") && (
         <>
           <p className="es-popup-hint">
-            Download Jitendex (about 38 MB) for instant lookups without the network. Until then, words are looked up
+            Download Jitendex ({downloadMb}) for instant lookups without the network. Until then, words are looked up
             online.
           </p>
           <button className="es-popup-btn es-popup-btn-primary" onClick={handleInstall}>

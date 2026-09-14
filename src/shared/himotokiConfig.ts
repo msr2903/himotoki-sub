@@ -8,6 +8,8 @@ export const HIMOTOKI_CONVEX_URL = "https://resolute-parakeet-238.convex.cloud";
  * Jitendex SQLite, ~38 MB). Can be overridden at runtime via chrome.storage.local.himotokiDictUrl.
  */
 export const HIMOTOKI_DICT_URL = "https://himotoki.my.id/dicts/jitendex-lite.sqlite.gz";
+/** JSON manifest written next to the dictionary by scripts/build-dict.py (revision, sizes, sha256). */
+export const dictManifestUrlFor = (dictUrl: string): string => dictUrl.replace(/\.sqlite(\.gz)?(\?.*)?$/, ".json");
 /** Same Google Web client ID as himotoki-web — add chrome-extension://ID to Authorized JavaScript origins / redirect URIs. */
 export const HIMOTOKI_GOOGLE_CLIENT_ID =
   "584773048392-114lmg42epe0gig6a9edmhshs20kkmti.apps.googleusercontent.com";

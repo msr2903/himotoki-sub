@@ -6,6 +6,7 @@
  */
 import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
 import { Dictionary, type LookupResult } from "@src/dict/lookup";
+import { Sha256 } from "@src/dict/sha256";
 
 type DictState = "booting" | "missing" | "downloading" | "importing" | "ready" | "error";
 
@@ -18,6 +19,8 @@ export type DictStatus = {
   title: string;
   terms: number;
   bytes: number;
+  /** "ok" when the installed file matched the manifest sha256, "skipped" when no manifest was available. */
+  verified: "ok" | "skipped" | "";
 };
 
 const DB_FILE = "/jitendex-lite.sqlite";
@@ -53,6 +56,7 @@ const status: DictStatus = {
   title: "",
   terms: 0,
   bytes: 0,
+  verified: "",
 };
 
 function query(sql: string, params: unknown[] = []): Array<Record<string, unknown>> {
@@ -62,12 +66,11 @@ function query(sql: string, params: unknown[] = []): Array<Record<string, unknow
   >;
 }
 
-async function boot(wasmUrl: string): Promise<void> {
+async function boot(): Promise<void> {
   if (!bootPromise) {
     bootPromise = (async () => {
       // The bundler build resolves sqlite3.wasm relative to the worker script itself (Vite emits it as
       // an asset); passing a custom Emscripten config here breaks the one-shot API bootstrap.
-      void wasmUrl;
       // The API bootstrap merges globalThis.sqlite3ApiConfig over its defaults; in the bundled
       // build the logging defaults are missing, which crashes with "reading 'bind'" otherwise.
       (globalThis as unknown as Record<string, unknown>).sqlite3ApiConfig = {
@@ -127,7 +130,7 @@ function closeDb(): void {
   }
 }
 
-async function install(url: string): Promise<void> {
+async function install(url: string, expectedSha256?: string): Promise<void> {
   if (installing) return installing;
   installing = (async () => {
     if (!poolUtil) throw new Error("VFS not ready");
@@ -153,6 +156,7 @@ async function install(url: string): Promise<void> {
     if (poolUtil.getFileNames().includes(DB_FILE)) poolUtil.unlink(DB_FILE);
     if (poolUtil.getCapacity() < 2) await poolUtil.addCapacity(2);
     let sawData = false;
+    const hasher = new Sha256();
     await poolUtil.importDb(DB_FILE, async () => {
       const { done, value } = await reader.read();
       if (done) {
@@ -160,9 +164,19 @@ async function install(url: string): Promise<void> {
         return undefined;
       }
       sawData = true;
+      hasher.update(value);
       return value;
     });
     if (!sawData) throw new Error("dictionary download was empty");
+    if (expectedSha256) {
+      const digest = hasher.hex();
+      if (digest !== expectedSha256.toLowerCase()) {
+        throw new Error("downloaded dictionary is corrupt (checksum mismatch); please try again");
+      }
+      status.verified = "ok";
+    } else {
+      status.verified = "skipped";
+    }
     openDb();
   })()
     .catch((error) => {
@@ -188,16 +202,17 @@ function remove(): void {
   status.revision = "";
   status.terms = 0;
   status.bytes = 0;
+  status.verified = "";
 }
 
-type Request = { id: number; op: string; wasmUrl: string; url?: string; surface?: string; surfaces?: string[]; cues?: string[][] };
+type Request = { id: number; op: string; url?: string; expectedSha256?: string; surface?: string; surfaces?: string[]; cues?: string[][] };
 
 self.onmessage = async (event: MessageEvent<Request>) => {
   const msg = event.data;
   const reply = (ok: boolean, data?: unknown, error?: string) => self.postMessage({ id: msg.id, ok, data, error });
   try {
-    if (msg.op !== "status") await boot(msg.wasmUrl);
-    else await boot(msg.wasmUrl).catch(() => undefined);
+    if (msg.op !== "status") await boot();
+    else await boot().catch(() => undefined);
 
     switch (msg.op) {
       case "status":
@@ -205,7 +220,7 @@ self.onmessage = async (event: MessageEvent<Request>) => {
         return;
       case "install":
         if (!msg.url) throw new Error("missing dictionary url");
-        await install(msg.url);
+        await install(msg.url, msg.expectedSha256);
         reply(true, { ...status });
         return;
       case "remove":
