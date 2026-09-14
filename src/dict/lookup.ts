@@ -42,6 +42,8 @@ export type DictEntry = {
   forms?: string[];
   pitch?: number[];
   pitch_display?: string;
+  freq?: number;
+  jlpt?: string[];
   examples?: Array<Record<string, unknown>>;
   _vs_compound?: boolean;
   _vs_lemma?: string;
@@ -92,7 +94,7 @@ const CONJ_STEP_PRIORITY: Record<string, number> = Object.fromEntries(
 );
 
 const TERM_COLUMNS =
-  "id, expression, reading, def_tags, rules, score, sequence, term_tags, glossary_json, expression_raw";
+  "id, expression, reading, def_tags, rules, score, sequence, term_tags, glossary_json, expression_raw, pitch, freq, jlpt";
 
 /* ---------------- kana / query variants ---------------- */
 
@@ -276,6 +278,15 @@ function groupTermsToEntry(rows: TermRow[], entryKeyNum: number): DictEntry | nu
     entry.pitch_display = pitch.map(String).join("/");
   }
   if (examples.length) entry.examples = examples;
+
+  // Pitch accent, frequency rank and JLPT level folded into the term table at build time.
+  const pitchCol = rows.map((r) => r.pitch).find((v) => v != null && v !== "");
+  if (pitchCol != null && !entry.pitch_display) entry.pitch_display = String(pitchCol);
+  const freqs = rows.map((r) => Number(r.freq)).filter((n) => Number.isFinite(n) && n > 0);
+  if (freqs.length) entry.freq = Math.min(...freqs);
+  const jlptCol = rows.map((r) => r.jlpt).find((v) => v != null && v !== "");
+  if (jlptCol != null) entry.jlpt = [String(jlptCol)];
+
   void payload;
   return entry;
 }

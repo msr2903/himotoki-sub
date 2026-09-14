@@ -13,6 +13,7 @@ import { getLearningService } from "@src/utils/getLearningService";
 import { HIMOTOKI_API_BASE } from "@src/shared/himotokiConfig";
 import { SoundIcon } from "./assets/SoundIcon";
 import { ConjugationTable } from "./ConjugationTable";
+import { FrequencyBadge, PitchAccent } from "./PitchAccent";
 
 const SENSE_LIMIT = 3;
 const SERVICE_LABEL: Record<string, string> = { himotoki: "Save to Himotoki", anki: "Save to Anki" };
@@ -251,15 +252,20 @@ export const SubItemTranslation: FC<{
           </button>
         </div>
         {reading && <p className="es-popup-reading">{reading}</p>}
-        {(current.pitch || current.common || current.jlpt?.length || translation.conjugationNote) && (
+        {(current.pitch ||
+          current.common ||
+          current.jlpt?.length ||
+          current.frequency ||
+          translation.conjugationNote) && (
           <div className="es-popup-tags">
-            {current.pitch && <span className="es-tag es-tag-pitch">[{current.pitch}]</span>}
-            {current.common && <span className="es-tag">common</span>}
+            {current.pitch && <PitchAccent pitch={current.pitch} reading={current.reading} />}
             {current.jlpt?.map((level) => (
               <span key={level} className="es-tag">
                 {level.toUpperCase()}
               </span>
             ))}
+            {current.frequency != null && <FrequencyBadge rank={current.frequency} />}
+            {current.common && <span className="es-tag">common</span>}
             {translation.conjugationNote && <span className="es-popup-conj">{translation.conjugationNote}</span>}
           </div>
         )}
