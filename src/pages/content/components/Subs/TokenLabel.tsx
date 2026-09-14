@@ -5,11 +5,19 @@ import { useLookup } from "@src/pages/content/hooks/useLookup";
 import { shortGloss, surfaceReading } from "@src/utils/furigana";
 
 /** Small annotation above a token: reading (furigana), short meaning, or both. */
-export const TokenLabel: FC<{ subItem: TSubItem; mode: "furigana" | "meaning" | "both" }> = ({ subItem, mode }) => {
+export const TokenLabel: FC<{
+  subItem: TSubItem;
+  mode: "furigana" | "meaning" | "both";
+  /** When ruby already shows the reading over this token, suppress the label's reading to avoid duplication. */
+  showReading?: boolean;
+}> = ({ subItem, mode, showReading = true }) => {
   const { translation, pending } = useLookup(subItem);
   if (pending || !translation || translation.error) return null;
 
-  const reading = mode !== "meaning" ? surfaceReading(subItem.text, translation.headword, translation.reading) : null;
+  const reading =
+    mode !== "meaning" && showReading
+      ? surfaceReading(subItem.text, translation.headword, translation.reading)
+      : null;
   const meaning = mode !== "furigana" ? shortGloss(translation.mainTranslation) : null;
   if (!reading && !meaning) return null;
 

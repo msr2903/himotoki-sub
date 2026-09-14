@@ -12,6 +12,27 @@ const cleanCueText = (text: string): string => {
   return (tmpDiv.textContent || "").replace(/\r\n?/g, "\n");
 };
 
+const KANJI_RE = /[一-鿿々〆ヶ]/;
+const NON_KANA_RE = /[^぀-ヿ゠-ヿ・ー\s、。！？!?,.]/u;
+
+/**
+ * Some learning channels print a kana reading line under the kanji line, e.g.
+ *   皆さんは朝起きたら何をしますか\nみなさん あさおきたら なにをしますか
+ * Detect that: exactly two newline-separated groups, the first containing kanji and the second
+ * being all kana (a plausible reading). Returns the kanji body and the kana line separately so the
+ * reading line never reaches the segmenter and can be hidden or shown per the readingLine setting.
+ */
+const splitReadingLine = (cleaned: string): { body: string; readingLine: string | null } => {
+  const lines = cleaned.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length !== 2) return { body: cleaned, readingLine: null };
+  const [first, second] = lines as [string, string];
+  const secondIsKana = !NON_KANA_RE.test(second) && /[぀-ヿ]/.test(second);
+  if (KANJI_RE.test(first) && secondIsKana && second.length >= first.length * 0.5) {
+    return { body: first, readingLine: second };
+  }
+  return { body: cleaned, readingLine: null };
+};
+
 type Chunk = { kind: "text"; text: string } | { kind: "space" } | { kind: "newline" };
 
 /**
@@ -75,22 +96,30 @@ const chunksToItems = (chunks: Chunk[], segmentText: (text: string) => string[])
   return items;
 };
 
-const buildSub = (sub: Captions[number], index: number, cleaned: string, items: TSubItem[], analyzed: boolean): TSub => ({
+const buildSub = (
+  sub: Captions[number],
+  index: number,
+  body: string,
+  items: TSubItem[],
+  analyzed: boolean,
+  readingLine: string | null,
+): TSub => ({
   id: index,
   start: Number(sub.start),
   end: Number(sub.end),
   text: sub.text,
-  cleanedText: cleaned.replace(/\n+/g, " "),
+  cleanedText: body.replace(/\n+/g, " "),
   items,
   analyzed,
+  readingLine: readingLine ?? undefined,
 });
 
 /** Sync immediate paint (Intl.Segmenter). Also the fallback if the ONNX split fails. */
 export const convertJapaneseSubsFallback = (rawSubs: Captions): TSub[] => {
   return rawSubs.map((sub, index) => {
-    const cleaned = cleanCueText(sub.text);
-    const items = chunksToItems(chunkCue(cleaned), intlSegments);
-    return buildSub(sub, index, cleaned, items, false);
+    const { body, readingLine } = splitReadingLine(cleanCueText(sub.text));
+    const items = chunksToItems(chunkCue(body), intlSegments);
+    return buildSub(sub, index, body, items, false, readingLine);
   });
 };
 
@@ -128,8 +157,8 @@ async function repairSegmentsViaDictionary(runs: string[][]): Promise<string[][]
 /** Pre-segment all cues via the in-extension ONNX split (offscreen document). */
 export const convertJapaneseSubsWithLocalSplit = async (rawSubs: Captions): Promise<TSub[]> => {
   const fallback = convertJapaneseSubsFallback(rawSubs);
-  const cleaned = rawSubs.map((sub) => cleanCueText(sub.text));
-  const perCue = cleaned.map(chunkCue);
+  const split = rawSubs.map((sub) => splitReadingLine(cleanCueText(sub.text)));
+  const perCue = split.map((s) => chunkCue(s.body));
   const texts: string[] = [];
   for (const chunks of perCue) {
     for (const chunk of chunks) if (chunk.kind === "text") texts.push(chunk.text);
@@ -147,7 +176,7 @@ export const convertJapaneseSubsWithLocalSplit = async (rawSubs: Captions): Prom
     return rawSubs.map((sub, index) => {
       const items = chunksToItems(perCue[index]!, () => results[cursor++]!);
       if (!items.some((item) => item.type === "word")) return fallback[index]!;
-      return buildSub(sub, index, cleaned[index]!, items, true);
+      return buildSub(sub, index, split[index]!.body, items, true, split[index]!.readingLine);
     });
   } catch (error) {
     console.warn("[himotoki] local split error, using Segmenter fallback", error);

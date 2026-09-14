@@ -1,6 +1,6 @@
 import { FC, useEffect, useState } from "react";
 
-import type { TSecondarySubs, TTokenAction } from "@src/models/types";
+import type { TFuriganaMode, TReadingLineMode, TSecondarySubs, TTokenAction } from "@src/models/types";
 import { onPersistedChange, readPersisted, writePersisted } from "@src/shared/persistedSettings";
 import {
   CLICK_ACTION_SETTING,
@@ -12,6 +12,16 @@ import {
 } from "@src/shared/tokenActions";
 import { HIMOTOKI_API_BASE } from "@src/shared/himotokiConfig";
 import { DEFAULT_SECONDARY_SUBS, SECONDARY_SUBS_OPTIONS, SECONDARY_SUBS_SETTING, isSecondarySubs } from "@src/shared/secondarySubs";
+import {
+  DEFAULT_FURIGANA,
+  DEFAULT_READING_LINE,
+  FURIGANA_OPTIONS,
+  FURIGANA_SETTING,
+  READING_LINE_OPTIONS,
+  READING_LINE_SETTING,
+  isFuriganaMode,
+  isReadingLineMode,
+} from "@src/shared/furiganaSettings";
 import { UI_SCALE_DEFAULT, UI_SCALE_MAX, UI_SCALE_MIN, UI_SCALE_SETTING, UI_SCALE_STEP, clampUiScale } from "@src/shared/uiScale";
 import { AccountPanel } from "@src/pages/shared/AccountPanel";
 import { DictionaryPanel } from "@src/pages/shared/DictionaryPanel";
@@ -77,6 +87,12 @@ const Options: FC = () => {
     DEFAULT_SECONDARY_SUBS,
     isSecondarySubs,
   );
+  const [furigana, setFurigana] = usePersistedSetting<TFuriganaMode>(FURIGANA_SETTING, DEFAULT_FURIGANA, isFuriganaMode);
+  const [readingLine, setReadingLine] = usePersistedSetting<TReadingLineMode>(
+    READING_LINE_SETTING,
+    DEFAULT_READING_LINE,
+    isReadingLineMode,
+  );
   const version = chrome.runtime.getManifest().version;
 
   return (
@@ -122,6 +138,42 @@ const Options: FC = () => {
               <span>{uiScale}%</span>
             </div>
             <div className="es-options-help">Size of the dictionary pop-up, hover labels and the in-player panel.</div>
+          </div>
+        </div>
+        <div className="es-options-row">
+          <label htmlFor="furigana">Furigana</label>
+          <div>
+            <select
+              id="furigana"
+              className="es-options-select"
+              value={furigana}
+              onChange={(e) => isFuriganaMode(e.target.value) && setFurigana(e.target.value)}
+            >
+              {FURIGANA_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <div className="es-options-help">{FURIGANA_OPTIONS.find((o) => o.value === furigana)?.description}</div>
+          </div>
+        </div>
+        <div className="es-options-row">
+          <label htmlFor="reading-line">Reading line</label>
+          <div>
+            <select
+              id="reading-line"
+              className="es-options-select"
+              value={readingLine}
+              onChange={(e) => isReadingLineMode(e.target.value) && setReadingLine(e.target.value)}
+            >
+              {READING_LINE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <div className="es-options-help">{READING_LINE_OPTIONS.find((o) => o.value === readingLine)?.description}</div>
           </div>
         </div>
         <div className="es-options-row">

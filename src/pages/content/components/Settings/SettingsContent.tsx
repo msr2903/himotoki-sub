@@ -17,6 +17,7 @@ import { EnableAutoStop } from "./EnableAutoStop";
 import { ClickActionSelect, HoverActionSelect, OpenOptionsPage } from "./TokenActionSelect";
 import { UiScale } from "./UiScale";
 import { SecondarySubsSelect } from "./SecondarySubsSelect";
+import { FuriganaSelect, ReadingLineSelect } from "./FuriganaSelect";
 import { useClickOutside } from "@src/hooks/useClickOutside";
 import { useUnit } from "effector-react";
 import {
@@ -101,6 +102,12 @@ export const SettingsContent: FC<{ onClose: () => void }> = ({ onClose }) => {
               </div>
               <div className="es-settings-content__item">
                 <SecondarySubsSelect />
+              </div>
+              <div className="es-settings-content__item">
+                <FuriganaSelect />
+              </div>
+              <div className="es-settings-content__item">
+                <ReadingLineSelect />
               </div>
               <div className="es-settings-content__item">
                 <EnableAutoStop />

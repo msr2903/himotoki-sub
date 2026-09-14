@@ -6,7 +6,7 @@ import {
   addKeyboardEventsListeners,
   removeKeyboardEventsListeners,
 } from "@src/utils/keyboardHandler";
-import { TLearningService, TSecondarySubs, TTokenAction, TTranslationService } from "../types";
+import { TFuriganaMode, TLearningService, TReadingLineMode, TSecondarySubs, TTokenAction, TTranslationService } from "../types";
 import { fetchCurrentStreamingFx } from "../streamings";
 import {
   CLICK_ACTION_SETTING,
@@ -16,6 +16,8 @@ import {
 } from "@src/shared/tokenActions";
 import { UI_SCALE_DEFAULT, UI_SCALE_SETTING, clampUiScale } from "@src/shared/uiScale";
 import { DEFAULT_SECONDARY_SUBS, SECONDARY_SUBS_SETTING, nextSecondarySubs } from "@src/shared/secondarySubs";
+import { DEFAULT_FURIGANA, FURIGANA_SETTING } from "@src/shared/furiganaSettings";
+import { DEFAULT_READING_LINE, READING_LINE_SETTING } from "@src/shared/furiganaSettings";
 
 // Every persisted store carries an explicit name: it is the chrome.storage key (`persist:<name>`)
 // and is shared with the options page. See src/utils/withPersist.ts.
@@ -141,6 +143,16 @@ export const $secondarySubs = withPersist(
 export const secondarySubsChanged = createEvent<TSecondarySubs>();
 export const secondarySubsCycled = createEvent();
 $secondarySubs.on(secondarySubsChanged, (_, value) => value).on(secondarySubsCycled, (current) => nextSecondarySubs(current));
+
+/** Inline ruby furigana over kanji tokens (see src/shared/furiganaSettings.ts). */
+export const $furigana = withPersist(createStore<TFuriganaMode>(DEFAULT_FURIGANA, { name: FURIGANA_SETTING }));
+export const furiganaChanged = createEvent<TFuriganaMode>();
+$furigana.on(furiganaChanged, (_, value) => value);
+
+/** What to do with a channel's kana reading line: hide it or keep it as text. */
+export const $readingLine = withPersist(createStore<TReadingLineMode>(DEFAULT_READING_LINE, { name: READING_LINE_SETTING }));
+export const readingLineChanged = createEvent<TReadingLineMode>();
+$readingLine.on(readingLineChanged, (_, value) => value);
 
 export const esRenderSetings = createEvent();
 
