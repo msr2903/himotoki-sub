@@ -20,6 +20,10 @@ const manifest = {
     default_popup: "src/pages/popup/index.html",
     default_icon: "icon-128.png",
   },
+  options_ui: {
+    page: "src/pages/options/index.html",
+    open_in_tab: true,
+  },
   icons: {
     128: "icon-128.png",
   },
@@ -46,23 +50,21 @@ const manifest = {
       css: ["assets/css/contentStyle<KEY>.chunk.css"],
     },
   ],
-  permissions: ["scripting", "storage", "activeTab"],
+  permissions: ["scripting", "storage", "unlimitedStorage", "activeTab", "offscreen", "identity"],
   optional_host_permissions: ["*://*/*"],
   optional_permissions: [],
   host_permissions: [
+    "https://himotoki.my.id/*",
+    "https://*.convex.cloud/*",
+    "https://accounts.google.com/*",
     "https://translate.google.com/*",
     "http://localhost:8765/*",
-    "https://api.lingualeo.com/*",
     "https://api-free.deepl.com/*",
     "https://api.deepl.com/*",
     "https://www2.deepl.com/*",
-    "https://www.bing.com/*",
-    "https://api-edge.cognitive.microsofttranslator.com/*",
-    "https://translate.yandex.net/*",
-    "https://api.openai.com/*",
   ],
   content_security_policy: {
-    extension_pages: "script-src 'self'; object-src 'self'",
+    extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
   },
   web_accessible_resources: [
     {
@@ -71,10 +73,18 @@ const manifest = {
         "assets/css/*.css",
         "icon-128.png",
         "icon-34.png",
+        "models/*",
+        "ort/*",
+        "sqlite/*",
+        "fonts/*",
       ],
       matches: ["*://*/*"],
     },
   ],
+  oauth2: {
+    client_id: "584773048392-114lmg42epe0gig6a9edmhshs20kkmti.apps.googleusercontent.com",
+    scopes: ["openid", "email", "profile"],
+  },
   browser_specific_settings: {
     gecko: {
       id: "{4077aa9d-b753-4913-8e52-27ef408d4c82}",

@@ -1,3 +1,45 @@
-.crx-class {
-  color: pink;
+/* Himotoki dark-theme tokens (aligned with himotoki-web html[data-theme=dark]) */
+/* Font URLs are relative to dist/assets/css/*.css → ../../fonts (public/fonts). */
+
+@font-face {
+  font-family: "Newsreader";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../../fonts/newsreader-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Newsreader";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../../fonts/newsreader-600.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Zen Maru Gothic";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../../fonts/zen-maru-gothic-latin-400.woff2") format("woff2");
+}
+
+:root,
+#es {
+  --hm-ink: #e8e6e1;
+  --hm-ink-muted: #a3a09a;
+  --hm-surface: #141413;
+  --hm-raised: #1c1c1a;
+  --hm-border: #2e2e2b;
+  --hm-accent: #3dbeb0;
+  --hm-accent-hover: #4ecfc0;
+  --hm-accent-muted: rgba(61, 190, 176, 0.14);
+  --hm-accent-muted-hover: rgba(61, 190, 176, 0.22);
+  --hm-radius-sm: 6px;
+  --hm-radius-md: 10px;
+  --hm-font-display: "Newsreader", "Zen Maru Gothic", "Hiragino Mincho ProN", Georgia, serif;
+  --hm-font-body: "Zen Maru Gothic", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+  --hm-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  --hm-duration: 0.18s;
 }

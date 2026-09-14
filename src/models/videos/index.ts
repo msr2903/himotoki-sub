@@ -87,6 +87,7 @@ export const moveToTimeFx = createEffect<
   { video: StoreValue<typeof $video>; streaming: StoreValue<typeof $streaming>; time: number },
   void
 >(({ video, streaming, time }) => {
+  if (!video) return;
   moveVideoToTime(video, streaming, time);
 });
 

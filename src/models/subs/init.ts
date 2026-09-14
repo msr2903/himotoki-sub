@@ -14,16 +14,17 @@ import {
   updateCurrentSubsFx,
   updateCustomSubsFx,
   autoPauseFx,
-  $subsLanguage,
-  subsLanguageDetectFx,
   $subsTitle,
   subsReloadRequested,
   ES_CUSTOM_SUB_LABEL,
   rawSubsAdded,
+  processRawSubsFx,
+  processJapaneseSubsFx,
 } from ".";
 import { $streaming } from "../streamings";
 import { $video, videoTimeUpdate } from "../videos";
 import { $autoPause } from "../settings";
+import type { Captions } from "../types";
 import { debug } from "patronum";
 
 split({
@@ -47,8 +48,9 @@ sample({
 });
 
 sample({
-  clock: [videoTimeUpdate, $rawSubs],
+  clock: [videoTimeUpdate, $subs],
   source: { subs: $subs, video: $video },
+  filter: ({ video }) => video != null,
   fn: ({ subs, video }, _) => ({ subs, video }),
   target: updateCurrentSubsFx,
 });
@@ -57,10 +59,11 @@ sample({
   source: { currentSubs: $currentSubs, video: $video, autoPause: $autoPause },
   fn: ({ currentSubs, video, autoPause }, _) => ({ currentSubs, video, autoPause }),
   filter: ({ currentSubs, video, autoPause }) => {
-    if (currentSubs[0]) {
-      const timeDiff = currentSubs[0].end - video.currentTime * 1000;
-      return autoPause && timeDiff < 250 && timeDiff > 0;
+    if (!currentSubs[0] || !video || !autoPause || video.paused || video.ended) {
+      return false;
     }
+    const timeDiff = currentSubs[0].end - video.currentTime * 1000;
+    return timeDiff < 250 && timeDiff > 0;
   },
   target: autoPauseFx,
 });
@@ -78,12 +81,6 @@ sample({
 });
 
 sample({
-  clock: $subs,
-  filter: (subs) => subs.length > 0,
-  target: subsLanguageDetectFx,
-});
-
-sample({
   clock: subsReloadRequested,
   source: { subsTitle: $subsTitle, rawSubs: $rawSubs },
   filter: ({ subsTitle, rawSubs }) => subsTitle && rawSubs.length > 0,
@@ -91,9 +88,15 @@ sample({
   target: esSubsChanged,
 });
 
+// Streaming sites re-request the same caption track often; identical captions must not restart
+// the split pipeline (it remounts every token and drops hover state).
+const sameCaptions = (a: Captions, b: Captions): boolean =>
+  a.length === b.length &&
+  a.every((cue, i) => cue.text === b[i]!.text && cue.start === b[i]!.start && cue.end === b[i]!.end);
+
 $rawSubs.on(
   [fetchSubsFx.doneData, subsResyncFx.doneData, updateCustomSubsFx.doneData, rawSubsAdded],
-  (_, subs) => subs
+  (oldSubs, subs) => (sameCaptions(oldSubs, subs) ? oldSubs : subs)
 );
 
 $rawSubs.on(rawSubsAdded, (oldSubs, newSubs) => {
@@ -109,12 +112,29 @@ $rawSubs.on(rawSubsAdded, (oldSubs, newSubs) => {
 });
 
 $rawSubs.reset(resetSubs);
+
+sample({
+  clock: $rawSubs,
+  target: processRawSubsFx,
+});
+
+$subs.on(processRawSubsFx.doneData, (_, subs) => subs);
+$subs.on(processJapaneseSubsFx.doneData, (_, subs) => subs);
+$subs.reset(resetSubs);
+
+// After the Segmenter paint, upgrade all cues via the local ONNX split.
+sample({
+  clock: processRawSubsFx.doneData,
+  source: $rawSubs,
+  filter: (rawSubs) => Boolean(rawSubs?.length),
+  target: processJapaneseSubsFx,
+});
+
 $currentSubs.on([updateCurrentSubsFx.doneData, autoPauseFx.doneData], (oldSubs, subs) =>
   JSON.stringify(oldSubs) === JSON.stringify(subs) ? oldSubs : subs
 );
 
 $subsDelay.on(subsDelayChangeFx.doneData, (_, newSubsDelay) => newSubsDelay);
-$subsLanguage.on(subsLanguageDetectFx.doneData, (_, lang) => lang);
 $subsTitle.on(esSubsChanged, (_, value) => value);
 $subsTitle.on(updateCustomSubsFx.doneData, () => ES_CUSTOM_SUB_LABEL);
 
@@ -128,5 +148,6 @@ debug(
   subsReloadRequested,
   $subsTitle,
   esSubsChanged,
-  subsLanguageDetectFx
+  processRawSubsFx.doneData,
+  processJapaneseSubsFx.doneData
 );

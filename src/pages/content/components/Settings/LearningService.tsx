@@ -26,8 +26,7 @@ export const LearningService: FC<HTMLProps<HTMLSelectElement>> = () => {
 };
 
 const services = [
-  { label: "Disabled", value: "disabled" },
+  { label: "Himotoki", value: "himotoki" },
   { label: "Anki", value: "anki" },
-  { label: "LinguaLeo", value: "lingualeo" },
-  { label: "Puzzle English", value: "puzzle-english" },
+  { label: "Disabled", value: "disabled" },
 ];

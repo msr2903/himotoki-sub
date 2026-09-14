@@ -1,33 +1,60 @@
-import { FC, useEffect, useState } from "react";
+import { FC, useEffect, useRef, useState } from "react";
 import { useUnit } from "effector-react";
 import Draggable from "react-draggable";
 
 import { $currentSubs } from "@src/models/subs";
 import { $video, $wasPaused, wasPausedChanged } from "@src/models/videos";
-import { TSub, TSubItem } from "@src/models/types";
+import { TSub, TSubItem, TTokenAction } from "@src/models/types";
 import {
   $autoStopEnabled,
+  $clickAction,
+  $hoverAction,
   $moveBySubsEnabled,
   $subsBackground,
   $subsBackgroundOpacity,
   $subsFontSize,
+  $uiScale,
 } from "@src/models/settings";
 import {
-  $findPhrasalVerbsPendings,
+  $activeHoverWord,
+  $pinnedWord,
   subItemMouseEntered,
   subItemMouseLeft,
-  $currentPhrasalVerb,
+  tokenPinToggled,
+  tokenUnpinned,
 } from "@src/models/translations";
 import { addKeyboardEventsListeners, removeKeyboardEventsListeners } from "@src/utils/keyboardHandler";
 import { SubItemTranslation } from "./SubItemTranslation";
-import { PhrasalVerbTranslation } from "./PhrasalVerbTranslation";
 import { SubFullTranslation } from "./SubFullTranslation";
+import { TokenLabel } from "./TokenLabel";
 
 type TSubsProps = {};
 
 export const Subs: FC<TSubsProps> = () => {
-  const [video, currentSubs, subsFontSize, moveBySubsEnabled, wasPaused, handleWasPausedChanged, autoStopEnabled] =
-    useUnit([$video, $currentSubs, $subsFontSize, $moveBySubsEnabled, $wasPaused, wasPausedChanged, $autoStopEnabled]);
+  const [
+    video,
+    currentSubs,
+    subsFontSize,
+    moveBySubsEnabled,
+    wasPaused,
+    handleWasPausedChanged,
+    autoStopEnabled,
+    pinnedWord,
+    unpin,
+    uiScale,
+  ] = useUnit([
+    $video,
+    $currentSubs,
+    $subsFontSize,
+    $moveBySubsEnabled,
+    $wasPaused,
+    wasPausedChanged,
+    $autoStopEnabled,
+    $pinnedWord,
+    tokenUnpinned,
+    $uiScale,
+  ]);
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (moveBySubsEnabled) {
@@ -38,36 +65,61 @@ export const Subs: FC<TSubsProps> = () => {
     };
   }, []);
 
+  // A pinned click result is dismissed by Escape or by clicking anywhere outside the subtitles.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") unpin();
+    };
+    const onClick = (event: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) unpin();
+    };
+    document.addEventListener("keydown", onKey, true);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("click", onClick, true);
+    };
+  }, [unpin]);
+
+  // While something is pinned the video stays paused even if the pointer leaves; resume on unpin.
+  useEffect(() => {
+    if (pinnedWord || !wasPaused || !video) return;
+    if (rootRef.current?.matches(":hover")) return;
+    video.play();
+    handleWasPausedChanged(false);
+  }, [pinnedWord]);
+
   const handleOnMouseLeave = () => {
-    if (wasPaused) {
+    if (pinnedWord) return;
+    if (wasPaused && video) {
       video.play();
-      console.log("handleWasPausedChanged false");
       handleWasPausedChanged(false);
     }
   };
 
   const handleOnMouseEnter = () => {
-    if (!autoStopEnabled) {
+    if (!autoStopEnabled || !video) {
       return;
     }
     if (!video.paused) {
-      console.log("handleWasPausedChanged true");
-
       handleWasPausedChanged(true);
       video.pause();
     }
   };
 
+  const fontSizePx = video ? ((video.clientWidth / 100) * subsFontSize) / 43 : subsFontSize * 0.5;
+
   return (
     <Draggable>
       <div
         id="es-subs"
+        ref={rootRef}
         onMouseLeave={handleOnMouseLeave}
         onMouseEnter={handleOnMouseEnter}
-        style={{ fontSize: `${((video.clientWidth / 100) * subsFontSize) / 43}px` }}
+        style={{ fontSize: `${fontSizePx}px`, "--es-ui-scale": String(uiScale / 100) } as React.CSSProperties}
       >
         {currentSubs.map((sub) => (
-          <Sub sub={sub} />
+          <Sub key={sub.id} sub={sub} />
         ))}
       </div>
     </Draggable>
@@ -76,20 +128,13 @@ export const Subs: FC<TSubsProps> = () => {
 
 const Sub: FC<{ sub: TSub }> = ({ sub }) => {
   const [showTranslation, setShowTranslation] = useState(false);
-  const [subsBackground, subsBackgroundOpacity, findPhrasalVerbsPendings] = useUnit([
-    $subsBackground,
-    $subsBackgroundOpacity,
-    $findPhrasalVerbsPendings,
-  ]);
+  const [subsBackground, subsBackgroundOpacity] = useUnit([$subsBackground, $subsBackgroundOpacity]);
 
+  // Clicking the line (outside a word) shows a whole-line machine translation.
   const handleOnClick = (event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation();
     setShowTranslation(true);
   };
-
-  if (findPhrasalVerbsPendings[sub.text]) {
-    return null;
-  }
 
   return (
     <div
@@ -100,9 +145,12 @@ const Sub: FC<{ sub: TSub }> = ({ sub }) => {
         background: `rgba(0, 0, 0, ${subsBackground ? subsBackgroundOpacity / 100 : 0})`,
       }}
     >
-      {sub.items.map((item, index) => (
-        <SubItem subItem={item} index={index} />
-      ))}
+      {sub.items.map((item, index) => {
+        const key = `${sub.id}:${index}`;
+        if (item.type === "newline") return <br key={key} />;
+        if (item.type === "space") return <span key={key} className="es-sub-item-space"> </span>;
+        return <SubItem key={`${key}:${item.text}`} hoverKey={key} subItem={item} contextSentence={sub.cleanedText} />;
+      })}
       {showTranslation && <SubFullTranslation text={sub.cleanedText} />}
     </div>
   );
@@ -110,55 +158,82 @@ const Sub: FC<{ sub: TSub }> = ({ sub }) => {
 
 type TSubItemProps = {
   subItem: TSubItem;
-  index: number;
+  /** Position-based identity (cue id + index) so two identical tokens in one cue do not both open. */
+  hoverKey: string;
+  contextSentence?: string;
 };
 
-const SubItem: FC<TSubItemProps> = ({ subItem, index }) => {
-  const [currentPhrasalVerb, handleSubItemMouseEntered, handleSubItemMouseLeft, findPhrasalVerbsPendings] = useUnit([
-    $currentPhrasalVerb,
-    subItemMouseEntered,
-    subItemMouseLeft,
-    $findPhrasalVerbsPendings,
-  ]);
-  const [showTranslation, setShowTranslation] = useState(false);
+const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence }) => {
+  const [activeHoverWord, pinnedWord, hoverAction, clickAction, handleSubItemMouseEntered, handleSubItemMouseLeft, pinToggle] =
+    useUnit([
+      $activeHoverWord,
+      $pinnedWord,
+      $hoverAction,
+      $clickAction,
+      subItemMouseEntered,
+      subItemMouseLeft,
+      tokenPinToggled,
+    ]);
+  const leaveTimer = useRef<number | null>(null);
+  const itemRef = useRef<HTMLPreElement | null>(null);
+  const isWord = subItem.type === "word";
+  const hovered = isWord && activeHoverWord === hoverKey;
+  const pinned = isWord && pinnedWord === hoverKey;
+  // The pinned click action wins over the transient hover action.
+  const action: TTokenAction = pinned ? clickAction : hovered ? hoverAction : "none";
+
+  useEffect(() => {
+    // After ONNX upgrade remount, restore hover state if the pointer is still over this token.
+    const el = itemRef.current;
+    if (!el || !isWord) return;
+    if (el.matches(":hover")) {
+      handleSubItemMouseEntered(hoverKey);
+    }
+  }, [hoverKey, isWord, handleSubItemMouseEntered]);
+
+  const clearLeaveTimer = () => {
+    if (leaveTimer.current != null) {
+      window.clearTimeout(leaveTimer.current);
+      leaveTimer.current = null;
+    }
+  };
 
   const handleOnMouseLeave = () => {
-    setShowTranslation(false);
-    handleSubItemMouseLeft();
+    clearLeaveTimer();
+    // Delay so remount mid-hover does not wipe the active word before the new node mounts.
+    leaveTimer.current = window.setTimeout(() => {
+      handleSubItemMouseLeft(hoverKey);
+      leaveTimer.current = null;
+    }, 80);
   };
 
   const handleOnMouseEnter = () => {
-    setShowTranslation(true);
-    handleSubItemMouseEntered(subItem.cleanedText);
+    if (!isWord) return;
+    clearLeaveTimer();
+    handleSubItemMouseEntered(hoverKey);
   };
 
-  const handleClick = () => {
-    setShowTranslation(false);
-    handleSubItemMouseLeft();
+  const handleClick = (event: React.MouseEvent) => {
+    // With click set to "No action" the click falls through to the line (whole-line translation).
+    if (!isWord || clickAction === "none") return;
+    event.stopPropagation();
+    clearLeaveTimer();
+    pinToggle(hoverKey);
   };
 
   return (
-    <>
-      <pre
-        onMouseEnter={handleOnMouseEnter}
-        onMouseLeave={handleOnMouseLeave}
-        className={`es-sub-item ${subItem.tag} ${
-          currentPhrasalVerb?.indexes?.includes(index) ? "es-sub-item-highlighted" : ""
-        }`}
-        onClick={handleClick}
-      >
-        {subItem.text}
-        {!findPhrasalVerbsPendings[subItem.cleanedText] && showTranslation && (
-          <>
-            {currentPhrasalVerb ? (
-              <PhrasalVerbTranslation phrasalVerb={currentPhrasalVerb} />
-            ) : (
-              <SubItemTranslation text={subItem.cleanedText} />
-            )}
-          </>
-        )}
-      </pre>
-      <pre className="es-sub-item-space"> </pre>
-    </>
+    <pre
+      ref={itemRef}
+      onMouseEnter={handleOnMouseEnter}
+      onMouseLeave={handleOnMouseLeave}
+      className={`es-sub-item ${subItem.tag} ${action !== "none" ? "es-sub-item-active" : ""} ${pinned ? "es-sub-item-pinned" : ""}`}
+      onClick={handleClick}
+    >
+      {subItem.text}
+      {action === "popup" && <SubItemTranslation subItem={subItem} contextSentence={contextSentence} pinned={pinned} />}
+      {(action === "furigana" || action === "meaning" || action === "both") && (
+        <TokenLabel subItem={subItem} mode={action} />
+      )}
+    </pre>
   );
 };

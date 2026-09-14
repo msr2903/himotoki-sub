@@ -2,35 +2,31 @@ import { parse } from "subtitle";
 
 import Service from "./service";
 
+/** Placeholder before the real streaming service is detected. Must not throw. */
 class ServiceStub implements Service {
   name = "stub";
 
   public init(): void {
-    throw new Error("Not Implimented streaming service");
+    // no-op — real service replaces this on fetchCurrentStreamingFx
   }
 
   public async getSubs() {
-    throw new Error("Not Implimented streaming service");
     return parse("");
   }
 
-  public getSubsContainer() {
-    throw new Error("Not Implimented streaming service");
-    return window.document.body;
+  public getSubsContainer(): HTMLElement | null {
+    return null;
   }
 
-  public getSettingsButtonContainer() {
-    throw new Error("Not Implimented streaming service");
-    return window.document.body;
+  public getSettingsButtonContainer(): HTMLElement | null {
+    return null;
   }
 
-  public getSettingsContentContainer() {
-    throw new Error("Not Implimented streaming service");
-    return window.document.body;
+  public getSettingsContentContainer(): HTMLElement | null {
+    return null;
   }
 
   public isOnFlight() {
-    throw new Error("Not Implimented streaming service");
     return false;
   }
 }

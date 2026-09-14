@@ -6,34 +6,44 @@ import {
   addKeyboardEventsListeners,
   removeKeyboardEventsListeners,
 } from "@src/utils/keyboardHandler";
-import { TLearningService, TTranslationService } from "../types";
+import { TLearningService, TTokenAction, TTranslationService } from "../types";
 import { fetchCurrentStreamingFx } from "../streamings";
+import {
+  CLICK_ACTION_SETTING,
+  DEFAULT_CLICK_ACTION,
+  DEFAULT_HOVER_ACTION,
+  HOVER_ACTION_SETTING,
+} from "@src/shared/tokenActions";
+import { UI_SCALE_DEFAULT, UI_SCALE_SETTING, clampUiScale } from "@src/shared/uiScale";
 
-export const $enabled = withPersist(createStore<boolean>(true));
+// Every persisted store carries an explicit name: it is the chrome.storage key (`persist:<name>`)
+// and is shared with the options page. See src/utils/withPersist.ts.
+
+export const $enabled = withPersist(createStore<boolean>(true, { name: "enabled" }));
 export const enableToggleChanged = createEvent<boolean>();
 export const enableToggleChangeFx = createEffect<boolean, boolean>(
   (isEnabled) => isEnabled,
 );
 
-export const $activeSettingsTab = withPersist(createStore<number>(0));
+export const $activeSettingsTab = withPersist(createStore<number>(0, { name: "activeSettingsTab" }));
 export const activeSettingsTabChanged = createEvent<number>();
 
-export const $progressBarEnabled = withPersist(createStore<boolean>(true));
+export const $progressBarEnabled = withPersist(createStore<boolean>(true, { name: "progressBarEnabled" }));
 export const progressBarEnabledChanged = createEvent<boolean>();
 export const progressBarEnabledChangeFx = createEffect<boolean, boolean>(
   (isEnabled) => isEnabled,
 );
 
-export const $autoStopEnabled = withPersist(createStore<boolean>(true));
+export const $autoStopEnabled = withPersist(createStore<boolean>(true, { name: "autoStopEnabled" }));
 export const autoStopEnabledChanged = createEvent<boolean>();
 
-export const $netflixOnFlightEnabled = withPersist(createStore<boolean>(false));
+export const $netflixOnFlightEnabled = withPersist(createStore<boolean>(false, { name: "netflixOnFlightEnabled" }));
 export const netflixOnFlightEnabledChanged = createEvent<boolean>();
 export const netflixOnFlightEnabledChangedFx = createEffect<boolean, void>(() =>
   location.reload(),
 );
 
-export const $moveBySubsEnabled = withPersist(createStore<boolean>(true));
+export const $moveBySubsEnabled = withPersist(createStore<boolean>(true, { name: "moveBySubsEnabled" }));
 export const moveBySubsEnabledChanged = createEvent<boolean>();
 export const moveBySubsEnabledChangeFx = createEffect<boolean, boolean>(
   (isEnabled) => {
@@ -47,7 +57,7 @@ export const moveBySubsEnabledChangeFx = createEffect<boolean, boolean>(
 );
 
 export const $translateLanguage = withPersist(
-  createStore<string>(window.navigator.language.split("-")[0]),
+  createStore<string>(window.navigator.language.split("-")[0], { name: "translateLanguage" }),
 );
 export const translateLanguageChanged = createEvent<string>();
 export const translateLanguageChangeFx = createEffect<string, string>(
@@ -55,7 +65,7 @@ export const translateLanguageChangeFx = createEffect<string, string>(
 );
 
 export const $learningService = withPersist(
-  createStore<TLearningService>("disabled"),
+  createStore<TLearningService>("himotoki", { name: "learningService" }),
 );
 export const learningServiceChanged = createEvent<TLearningService>();
 export const learningServiceChangeFx = createEffect<
@@ -64,7 +74,7 @@ export const learningServiceChangeFx = createEffect<
 >((value) => value);
 
 export const $translationService = withPersist(
-  createStore<TTranslationService>("google"),
+  createStore<TTranslationService>("google", { name: "translationService" }),
 );
 export const translationServiceChanged = createEvent<TTranslationService>();
 export const translationServiceChangeFx = createEffect<
@@ -72,7 +82,7 @@ export const translationServiceChangeFx = createEffect<
   TTranslationService
 >((value) => value);
 
-export const $deeplApiKey = withPersist(createStore<string>(""));
+export const $deeplApiKey = withPersist(createStore<string>("", { name: "deeplApiKey" }));
 export const deeplApiKeyChanged = createEvent<string>();
 export const deeplApiKeyChangeFx = createEffect<string, string>(
   (value) => value,
@@ -82,43 +92,46 @@ export const $deeplApiKeyModalOpen = createStore<boolean>(false);
 export const deeplApiKeyModalOpened = createEvent();
 export const deeplApiKeyModalClosed = createEvent();
 
-export const $chatGPTApiKey = withPersist(createStore<string>(""));
-export const chatGPTApiKeyChanged = createEvent<string>();
-export const chatGPTApiKeyChangeFx = createEffect<string, string>(
-  (value) => value,
-);
-
-export const $chatGPTModel = withPersist(createStore<string>("gpt-4o-mini"));
-export const chatGPTModelChanged = createEvent<string>();
-export const chatGPTModelChangeFx = createEffect<string, string>(
-  (value) => value,
-);
-
-export const $chatGPTApiKeyModalOpen = createStore<boolean>(false);
-export const chatGPTApiKeyModalOpened = createEvent();
-export const chatGPTApiKeyModalClosed = createEvent();
-
-export const $subsFontSize = withPersist(createStore<number>(100));
+export const $subsFontSize = withPersist(createStore<number>(100, { name: "subsFontSize" }));
 export const subsFontSizeButtonPressed = createEvent<number>();
 export const subsFontSizeChangeFx = createEffect<number, number>(
   (value) => value,
 );
 
-export const $subsBackground = withPersist(createStore<boolean>(true));
+export const $subsBackground = withPersist(createStore<boolean>(true, { name: "subsBackground" }));
 export const subsBackgroundButtonPressed = createEvent<boolean>();
 export const subsBackgroundToggleFx = createEffect<boolean, boolean>(
   (value) => value,
 );
 
-export const $subsBackgroundOpacity = withPersist(createStore<number>(50));
+export const $subsBackgroundOpacity = withPersist(createStore<number>(50, { name: "subsBackgroundOpacity" }));
 export const subsBackgroundOpacityButtonPressed = createEvent<number>();
 export const subsBackgroundOpacityChangeFx = createEffect<number, number>(
   (value) => value,
 );
 
-export const $autoPause = withPersist(createStore<boolean>(false));
+export const $autoPause = withPersist(createStore<boolean>(false, { name: "autoPause" }));
 export const autoPauseChanged = createEvent<boolean>();
 $autoPause.on(autoPauseChanged, (_, value) => value);
+
+/** What hovering a subtitle word does (see src/shared/tokenActions.ts). */
+export const $hoverAction = withPersist(
+  createStore<TTokenAction>(DEFAULT_HOVER_ACTION, { name: HOVER_ACTION_SETTING }),
+);
+export const hoverActionChanged = createEvent<TTokenAction>();
+$hoverAction.on(hoverActionChanged, (_, value) => value);
+
+/** What clicking a subtitle word does. Click results stay pinned until dismissed. */
+export const $clickAction = withPersist(
+  createStore<TTokenAction>(DEFAULT_CLICK_ACTION, { name: CLICK_ACTION_SETTING }),
+);
+export const clickActionChanged = createEvent<TTokenAction>();
+$clickAction.on(clickActionChanged, (_, value) => value);
+
+/** Size of the pop-up, hover labels and settings panel, in percent (50–150). */
+export const $uiScale = withPersist(createStore<number>(UI_SCALE_DEFAULT, { name: UI_SCALE_SETTING }));
+export const uiScaleChanged = createEvent<number>();
+$uiScale.on(uiScaleChanged, (_, value) => clampUiScale(value));
 
 export const esRenderSetings = createEvent();
 
@@ -159,24 +172,8 @@ sample({
 });
 
 sample({
-  clock: translationServiceChanged,
-  filter: (service) => service === "chatgpt",
-  target: chatGPTApiKeyModalOpened,
-});
-
-sample({
   clock: deeplApiKeyChanged,
   target: deeplApiKeyChangeFx,
-});
-
-sample({
-  clock: chatGPTApiKeyChanged,
-  target: chatGPTApiKeyChangeFx,
-});
-
-sample({
-  clock: chatGPTModelChanged,
-  target: chatGPTModelChangeFx,
 });
 
 sample({
@@ -221,10 +218,6 @@ $translationService.on(
 $deeplApiKey.on(deeplApiKeyChangeFx.doneData, (_, key) => key);
 $deeplApiKeyModalOpen.on(deeplApiKeyModalOpened, () => true);
 $deeplApiKeyModalOpen.on(deeplApiKeyModalClosed, () => false);
-$chatGPTApiKey.on(chatGPTApiKeyChangeFx.doneData, (_, key) => key);
-$chatGPTModel.on(chatGPTModelChangeFx.doneData, (_, model) => model);
-$chatGPTApiKeyModalOpen.on(chatGPTApiKeyModalOpened, () => true);
-$chatGPTApiKeyModalOpen.on(chatGPTApiKeyModalClosed, () => false);
 $subsFontSize.on(
   subsFontSizeChangeFx.doneData,
   (_, subsFontSize) => subsFontSize,
@@ -264,4 +257,6 @@ debug(
   $subsFontSize,
   $subsBackground,
   $moveBySubsEnabled,
+  $hoverAction,
+  $clickAction,
 );

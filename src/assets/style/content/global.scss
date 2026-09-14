@@ -1,13 +1,12 @@
-#es {
-  display: none;
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 24px;
-  color: white;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
-    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
-    sans-serif !important;
+  #es {
+    display: none;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 24px;
+    color: #fff;
+    z-index: 60;
+    font-family: var(--hm-font-body) !important;
 
   pre {
     all: unset;
@@ -40,17 +39,48 @@
       display: inline;
     }
 
-    &:hover {
-      color: #3a88a2;
+    &:hover,
+    &-active {
+      color: var(--hm-accent);
+      background: var(--hm-accent-muted);
+      border-radius: 2px;
       cursor: pointer;
-    }
-
-    &-highlighted {
-      color: #3a88a2;
     }
   }
   .es-sub-item-space {
     display: inline;
+    white-space: pre;
+  }
+
+  .es-sub-item-pinned {
+    outline: 1px solid var(--hm-accent);
+    outline-offset: 1px;
+  }
+
+  // Furigana / meaning annotation above a token (hover or pinned click action).
+  .es-token-label {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    white-space: nowrap;
+    pointer-events: none;
+    font-family: var(--hm-font-body);
+    font-size: calc(0.42em * var(--es-ui-scale, 1));
+    line-height: 1.15;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(20, 20, 19, 0.88);
+    color: var(--hm-accent);
+    z-index: 60;
+  }
+  .es-token-label-meaning {
+    color: var(--hm-ink);
+    font-size: 0.92em;
   }
 
   .es-full-translation {
@@ -58,18 +88,20 @@
     top: -10px;
     left: 50%;
     transform: translate3d(-50%, -100%, 0);
-    background-color: #1e1e1e;
-    border-radius: 0.4em;
+    background-color: var(--hm-raised);
+    border: 1px solid var(--hm-border);
+    border-radius: var(--hm-radius-md);
     font-size: 18px;
     width: 100%;
     font-style: normal;
+    font-family: var(--hm-font-body);
     white-space: normal;
-    box-sizing: content-box;
-    color: #fff;
+    color: var(--hm-ink);
     padding: 16px 24px;
     box-sizing: border-box;
     white-space: pre-wrap;
     text-wrap: balance;
+    box-shadow: var(--hm-shadow);
 
     &:after {
       content: "";
@@ -79,7 +111,7 @@
       width: 0;
       height: 0;
       border: 10px solid transparent;
-      border-top-color: #1e1e1e;
+      border-top-color: var(--hm-raised);
       border-bottom: 0;
       margin-left: -10px;
       margin-bottom: -10px;
@@ -174,11 +206,18 @@
     display: none !important;
   }
 
+  // Hovering a word pauses the video; YouTube then slides its "More videos" panel over the bottom
+  // of the player, right where the subtitles are, and steals the pointer.
+  .ytp-pause-overlay,
+  .ytp-pause-overlay-container {
+    display: none !important;
+  }
+
   .html5-video-player {
     &.ytp-fullscreen {
       padding-bottom: 0;
 
-      #easysubs {
+      #es {
         bottom: 110px;
       }
     }

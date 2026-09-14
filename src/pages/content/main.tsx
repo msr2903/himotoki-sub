@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import refreshOnUpdate from "virtual:reload-on-update-in-view";
 
-import { $streaming, fetchCurrentStreamingFx } from "@src/models/streamings";
+import { $streaming, streamingDetected } from "@src/models/streamings";
 import { esRenderSetings } from "@src/models/settings";
 import { esSubsChanged } from "@src/models/subs";
 import { $video, getCurrentVideoFx, videoTimeUpdate } from "@src/models/videos";
@@ -9,61 +9,117 @@ import { Settings } from "@src/pages/content/components/Settings";
 import { Subs } from "./components/Subs";
 import { ProgressBar } from "./components/ProgressBar";
 import { removeKeyboardEventsListeners } from "@src/utils/keyboardHandler";
+import { getCurrentService } from "@src/utils/getCurrentService";
 
 refreshOnUpdate("pages/content");
-
-fetchCurrentStreamingFx();
 
 const handleTimeUpdate = () => {
   videoTimeUpdate();
 };
 
-$streaming.watch((streaming) => {
-  console.log("streaming changed", streaming);
-  document.body.classList.add("es-" + streaming.name);
+let videoWatchAttached = false;
+let settingsWatchAttached = false;
+let initializedService: { name: string } | null = null;
 
-  if (streaming == null) {
-    return;
-  }
+const mountSettings = () => {
+  try {
+    const streaming = $streaming.getState();
+    if (!streaming || streaming.name === "stub") return;
 
-  esRenderSetings.watch(() => {
-    console.log("Event:", "esRenderSetings");
     document.querySelectorAll(".es-settings").forEach((e) => e.remove());
     const buttonContainer = streaming.getSettingsButtonContainer();
     const contentContainer = streaming.getSettingsContentContainer();
+    if (!buttonContainer || !contentContainer) {
+      console.warn("[himotoki] settings containers not ready yet");
+      return;
+    }
 
-    const parentNode = buttonContainer?.parentNode;
+    const parentNode = buttonContainer.parentNode;
+    if (!parentNode) {
+      console.warn("[himotoki] settings button parent missing");
+      return;
+    }
+
     const settingNode = document.createElement("div");
     settingNode.className = "es-settings";
-    parentNode?.insertBefore(settingNode, buttonContainer);
+    parentNode.insertBefore(settingNode, buttonContainer);
 
     getCurrentVideoFx();
-    $video.watch((video) => {
-      video?.removeEventListener("timeupdate", handleTimeUpdate as EventListener);
-      video?.addEventListener("timeupdate", handleTimeUpdate as EventListener);
-    });
+    if (!videoWatchAttached) {
+      videoWatchAttached = true;
+      $video.watch((video) => {
+        video?.removeEventListener("timeupdate", handleTimeUpdate as EventListener);
+        video?.addEventListener("timeupdate", handleTimeUpdate as EventListener);
+      });
+    }
     createRoot(settingNode).render(<Settings contentContainer={contentContainer} />);
-  });
+  } catch (error) {
+    console.warn("[himotoki] failed to render settings", error);
+  }
+};
 
-  streaming.init();
-});
-
-esSubsChanged.watch((language) => {
-  console.log("Event:", "esSubsChanged");
-  console.log("Language:", language);
-  removeKeyboardEventsListeners();
-  document.querySelectorAll("#es").forEach((e) => e.remove());
-  const subsContainer = $streaming.getState().getSubsContainer();
-  const subsNode = document.createElement("div");
-  subsNode.id = "es";
-  subsContainer?.appendChild(subsNode);
-  createRoot(subsNode).render(<Subs />);
-
-  if (!$streaming.getState().isOnFlight()) {
+const mountSubsUi = (language: string) => {
+  try {
+    console.log("Event:", "esSubsChanged", language);
+    removeKeyboardEventsListeners();
+    document.querySelectorAll("#es").forEach((e) => e.remove());
     document.querySelectorAll(".es-progress-bar").forEach((e) => e.remove());
-    const progressBarNode = document.createElement("div");
-    progressBarNode.classList.add("es-progress-bar");
-    subsContainer?.appendChild(progressBarNode);
-    createRoot(progressBarNode).render(<ProgressBar />);
+
+    // Empty language = captions off / reset (EasySubs behavior).
+    if (!language) return;
+
+    const streaming = $streaming.getState();
+    if (!streaming || streaming.name === "stub") return;
+
+    const subsContainer = streaming.getSubsContainer();
+    if (!subsContainer) {
+      console.warn("[himotoki] subs container not ready yet");
+      return;
+    }
+
+    const subsNode = document.createElement("div");
+    subsNode.id = "es";
+    subsContainer.appendChild(subsNode);
+    createRoot(subsNode).render(<Subs />);
+
+    if (!streaming.isOnFlight()) {
+      const progressBarNode = document.createElement("div");
+      progressBarNode.classList.add("es-progress-bar");
+      subsContainer.appendChild(progressBarNode);
+      createRoot(progressBarNode).render(<ProgressBar />);
+    }
+  } catch (error) {
+    console.warn("[himotoki] failed to render subs UI", error);
+  }
+};
+
+$streaming.watch((streaming) => {
+  if (!streaming || streaming.name === "stub") return;
+
+  console.log("streaming changed", streaming.name);
+  document.body.classList.add("es-" + streaming.name);
+
+  if (!settingsWatchAttached) {
+    settingsWatchAttached = true;
+    esRenderSetings.watch(mountSettings);
+  }
+
+  // Guard by instance identity so listeners always live on the active object.
+  if (initializedService === streaming) return;
+  initializedService = streaming;
+
+  try {
+    streaming.init();
+  } catch (error) {
+    console.warn("[himotoki] streaming.init failed", error);
   }
 });
+
+esSubsChanged.watch(mountSubsUi);
+
+// Detect once synchronously — avoid dual Youtube instances (detect + fetch effect).
+try {
+  streamingDetected(getCurrentService());
+} catch (error) {
+  console.warn("[himotoki] service detect failed", error);
+}

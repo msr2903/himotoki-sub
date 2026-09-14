@@ -1,16 +1,12 @@
 import { Anki } from "@src/learning-service/anki";
-import { LinguaLeo } from "@src/learning-service/linguaLeo";
-import { PuzzleEnglish } from "@src/learning-service/puzzleEnglish";
+import { HimotokiLearningService } from "@src/learning-service/himotoki";
 import { TLearningService } from "@src/models/types";
 
 export const getLearningService = (learningService: TLearningService) => {
+  if (learningService === "himotoki") {
+    return new HimotokiLearningService();
+  }
   if (learningService === "anki") {
     return new Anki();
-  }
-  if (learningService === "lingualeo") {
-    return new LinguaLeo();
-  }
-  if (learningService === "puzzle-english") {
-    return new PuzzleEnglish();
   }
 };

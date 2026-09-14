@@ -1,7 +1,7 @@
 import ILearningService, { TAditionalData } from "./learningService";
 
 const ANKI_API_VERSION = 6;
-const ANKI_DESK = "Easysubs";
+const ANKI_DESK = "Himotoki";
 const ANKI_URL = "http://localhost:8765";
 
 export class Anki implements ILearningService {

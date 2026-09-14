@@ -8,7 +8,7 @@ export const AutoPauseBySubs: FC = () => {
 
   return (
     <div className="es-settings-content__element">
-      <div className="es-settings-content__element__left">Auto pause</div>
+      <div className="es-settings-content__element__left">Pause after subtitle</div>
       <div className="es-settings-content__element__right">
         <Toggle isEnabled={autoPause} onChange={handleAutoPauseChanged} />
       </div>

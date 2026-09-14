@@ -3,9 +3,15 @@ input.es-input {
 }
 
 .es-input__label {
-  border: 1px solid #fff;
+  border: 1px solid var(--hm-border);
   padding: 4px 12px;
-  border-radius: 8px;
+  border-radius: var(--hm-radius-sm);
   cursor: pointer;
   font-weight: 400 !important;
+  color: var(--hm-ink);
+
+  &:hover {
+    border-color: var(--hm-accent);
+    background: var(--hm-accent-muted);
+  }
 }

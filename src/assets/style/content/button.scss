@@ -11,9 +11,12 @@
 
   &__value {
     line-height: 20px;
-    background: #252836;
+    background: var(--hm-raised);
+    border: 1px solid var(--hm-border);
+    border-radius: var(--hm-radius-sm);
     text-align: center;
     min-width: 48px;
     padding: 0 8px;
+    color: var(--hm-ink);
   }
 }

@@ -2,111 +2,65 @@
   <img height="80" src="./logo.png">
 </p>
 <p align="center">
-  <h2 align="center">Learn languages with fun 🎉</h2>
+  <h2 align="center">Himotoki Sub – learn Japanese from subtitles</h2>
 </p>
 
-Browser extension to learn languages by watching movies and TV shows.
+Browser extension that turns the subtitles of YouTube, Netflix and other streaming sites into a Japanese study tool. Every subtitle line is split into words with a local model, and hovering or clicking a word opens a [Himotoki](https://himotoki.my.id) dictionary popup. Words can be saved to your Himotoki account or to Anki.
 
-## Installation
+Forked from [EasySubs](https://github.com/Nitrino/easysubs). The multi-language features of EasySubs (Google word translation, phrasal verbs, English dictionaries, LinguaLeo, Puzzle English) have been removed; this project is Japanese-only.
 
-The extension supports Chrome and Chrome-based browsers. It should also work in other browsers that have WebExtensions API support, but it hasn't been tested yet.
+## How it works
 
-**Release version available on [Chrome Web Store](https://chrome.google.com/webstore/detail/easysubs/ocelmccppkcibiflhhepafdjjomimddf?utm_source=github&utm_medium=social&utm_campaign=github)**
+1. **Word splitting runs locally.** A character-level BiLSTM + CRF model (`public/models/default.onnx`, trained in [himotoki-split](https://github.com/msr2903/himotoki-split)) runs inside the extension through `onnxruntime-web` in an offscreen document. No text leaves the browser for segmentation. Until the model has run, cues are painted with `Intl.Segmenter` so subtitles appear instantly.
+2. **Dictionary lookup is local.** On first use the extension popup offers to download a trimmed Jitendex database (about 38 MB compressed, 185 MB unpacked) into the browser's origin-private file system. Lookups then run in an extension worker with SQLite compiled to WebAssembly, including deinflection (the same rules engine as the Himotoki server), and answer in a few milliseconds. Until the dictionary is installed, words are looked up through `GET https://himotoki.my.id/api/search` and the popup says so.
+3. **Whole-line translation** is optional: clicking a subtitle line outside a word shows a machine translation of the full line via Google Translate or DeepL, in the language chosen in settings.
+4. **Saving words.** Sign in with Google from the extension popup to save words (with the sentence, video URL and timestamp) to Himotoki favorites, or choose Anki in settings to send them to a local AnkiConnect (`http://localhost:8765`).
 
-<a href="https://chrome.google.com/webstore/detail/easysubs/ocelmccppkcibiflhhepafdjjomimddf?utm_source=github&utm_medium=social&utm_campaign=github" target="_blank">
-  <img src="./chrome-store.png" alt="chrome store" width="220px">
-</a>
+## Supported sites
+
+YouTube, Netflix, KinoPub, Coursera, Plex, Udemy, Kinopoisk, Amazon Prime Video, inoriginal.online. On YouTube a Japanese caption track is preferred automatically when the video has one.
 
 ## Build
 
-1. Install node 20+
-2. Clone repo `git clone git@github.com:Nitrino/easysubs.git`
-3. Go to folder and install dependencies `cd easysubs && pnpm i`
-4. Build extension `pnpm build`
+1. Install Node 20+ and pnpm.
+2. `pnpm i`
+3. `pnpm build` (Chrome) or `pnpm build:firefox`
+4. Load the `dist/` folder as an unpacked extension (`chrome://extensions`, developer mode, "Load unpacked"). Reload the extension once after the first install so the `https://himotoki.my.id/*` host permission is granted.
 
-## Manual install
+`pnpm dev` starts a watch build with hot reload.
 
-1. Download and unzip [latest version](https://github.com/Nitrino/easysubs/releases)
-2. Open extensions page in browser:
-   - For Chrome: `chrome://extensions/`
-   - For Yandex browser: `browser://tune/`
-3. Turn on developer mode (for all except Yandex browser)
-4. Load unpacked extension:
-   - For Chrome and Opera: Click to `Load unpacked` button and select folder
-   - For Firefox: Click to `Load temporary Add-on...` button and select folder
-   - For Yandex browser: Drag and drop folder to extensions page
+### Offline dictionary file
+
+The extension downloads `jitendex-lite.sqlite.gz` from the URL in `src/shared/himotokiConfig.ts` (`HIMOTOKI_DICT_URL`, default `https://himotoki.my.id/dicts/jitendex-lite.sqlite.gz`). Build that file from a Jitendex SQLite produced by himotoki-web-ts and upload it there:
+
+```bash
+python3 scripts/build-dict.py /path/to/himotoki-web-ts/data/dicts/jitendex.sqlite dist-dict
+# → dist-dict/jitendex-lite.sqlite.gz (+ .json manifest with revision and sha256)
+```
+
+For local testing you can point the extension at any URL by setting `himotokiDictUrl` in `chrome.storage.local` (the end-to-end scripts do this).
+
+### End-to-end checks
+
+```bash
+npx playwright install chromium
+pnpm test:e2e                                   # YouTube: split, popup, settings, hotkeys
+node scripts/e2e/dict.mjs /tmp/himotoki-dict    # offline dictionary: install, lookups, repair, persistence
+HIMOTOKI_DICT_DIR=/tmp/himotoki-dict pnpm test:e2e   # YouTube with the offline dictionary installed
+```
+
+> Firefox note: the local word splitter relies on `chrome.offscreen`, which Firefox does not implement. On Firefox the extension currently falls back to `Intl.Segmenter`.
 
 ## Features
 
-### Integration with multiple video services
-
-The list of services will expand at the request of users.  
-To use the plugin, you must have a subscription to the desired service.
-
-**Now supported:**
-
-- [Youtube (videos and originals)](https://www.youtube.com)
-- [Netflix](https://www.netflix.com)
-- [KinoPub](https://kino.pub)
-- [Coursera](https://www.coursera.org)
-
-### Word and full subtitle translation
-
-Simply move the cursor over the word you want to translate. The video will automatically pause and resume when you move the cursor away from the subtitles.  
-In the translation pop-up for the word, you can see alternative translations and how often they are used.
-Click the subtitles to translate the entire phrase.
-
-![word translation](screenshots/word.webp)
-
-### Export words to learning services
-
-The list of services will be extended in response to user requests.
-
-**Now supported:**
-
-- [Anki](https://apps.ankiweb.net/),
-- [LinguaLeo](https://lingualeo.com),
-- [Puzzle English](https://puzzle-english.com)
-
-To export, you'll need to be logged in to the service you want to use (make sure it's the same browser). Then select the service you want to use in the extension settings.
-
-A ➕(plus) icon will then appear next to the words in the translation, and clicking on it will export the word to the selected service.
-
-![word translation](screenshots/export-to-service.webp)
-
-### Rewind to previous and next subtitle
-
-Rewind to the previous sentence by pressing ⬅️ (left arrow).  
-Rewind to the next sentence by pressing ➡️ (right arrow).
-Repeat the current subtitle ⬇ (down arrow).
-
-Rewind only works if the next/previous sentence is less than 5 seconds apart from the current sentence. Otherwise it'll rewinds 5 seconds.  
-To force rewinding to the next/previous sentence use `alt (option for macOS) + arrow button`.
-
-![word translation](screenshots/navigation.png)
-
-### Subtitle progress bar
-
-There is a subtitle progress bar at the bottom of the player to help you navigate between subtitles.  
-Click the progress bar to rewind the video to the desired point.
-
-![word translation](screenshots/progressbar.webp)
-
-### Subtitle settings and custom subtitles
-
-The extension allows you to customise the appearance, position and delay of subtitles.
-
-You can also upload your own subtitles if they are not available on the video service. ` SRT`` and  `VTT`` formats are supported.
-
-![word translation](screenshots/subtitles-settings.webp)
-
-### Additional features
-
-- Show all available audio tracks and subtitles on Netflix regardless of region.
+- Subtitles overlaid on the player, draggable, with adjustable size, background and delay.
+- Hover and click on a word are configured separately in the extension settings page (toolbar popup → Settings, or `chrome://extensions` → Details → Extension options). Each can be **Furigana**, **Meaning**, **Furigana + meaning**, **Pop-up dictionary** or **No action**. Hover results vanish when the pointer leaves; click results stay pinned until Escape, a click elsewhere, or the next subtitle. Defaults: hover shows furigana + meaning, click pins the pop-up dictionary.
+- Whole-line machine translation on click (Google Translate or DeepL, with optional DeepL API key).
+- Save words to Himotoki favorites or Anki.
+- Subtitle progress bar; rewind to previous/next/current subtitle with the arrow keys (`alt` + arrow forces the jump).
+- Pause while hovering a word, or pause after every subtitle.
+- Upload your own `.srt` / `.vtt` subtitles when a site has none.
 
 ## Contributing
 
-We are open to community help.  
-To report a bug or feature offer, create [issue](https://github.com/Nitrino/easysubs/issues) and describe the question in detail.
-
-You can also implement the desired feature and send a [pull request](https://github.com/Nitrino/easysubs/pulls). We recommend discussing the feature in issues tracker before implementation. This will help reduce your time.
+Issues and pull requests are welcome. Please open an issue to discuss larger features before implementing them.

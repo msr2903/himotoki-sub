@@ -1,8 +1,8 @@
 {
   "appName": {
-    "message": "EasySubs – Learn languages by watching films and series"
+    "message": "Himotoki Sub – Learn Japanese from subtitles"
   },
   "appDescription": {
-    "message": "Customizable subtitles and a popup dictionary to master your vocabulary while watching YouTube or Netflix. Open-source and free."
+    "message": "Japanese subtitle segmentation and Himotoki dictionary lookup while watching YouTube and other streaming sites. Save words to your Himotoki account."
   }
 }

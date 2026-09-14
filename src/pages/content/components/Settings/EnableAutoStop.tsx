@@ -8,7 +8,7 @@ export const EnableAutoStop: FC = () => {
 
   return (
     <div className="es-settings-content__element">
-      <div className="es-settings-content__element__left">Enable auto stop</div>
+      <div className="es-settings-content__element__left">Pause on hover</div>
       <div className="es-settings-content__element__right">
         <Toggle isEnabled={autoStopEnabled} onChange={handleAutoStopEnabledEnabled} />
       </div>

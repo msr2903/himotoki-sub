@@ -2,11 +2,24 @@ import type { subTitleType } from "subtitle";
 
 export type TMoveDirection = "next" | "prev" | "current";
 
+export type THimotokiSubMeta = {
+  seq?: number;
+  source?: string;
+  reading?: string;
+  lemma?: string;
+  conjType?: string | null;
+  gloss?: string;
+  senses?: Array<{ pos?: string[]; glosses?: string[] }>;
+  common?: boolean;
+};
+
 export type TSubItem = {
   text: string;
   cleanedText: string;
   tag: "span" | "b" | "i" | "u";
-  type: "word" | "phrasal-verb" | "punctuation";
+  /** "space" and "newline" are layout-only items: never hoverable, never looked up. */
+  type: "word" | "punctuation" | "space" | "newline";
+  himotoki?: THimotokiSubMeta;
 };
 
 export type TSub = {
@@ -16,40 +29,9 @@ export type TSub = {
   text: string;
   cleanedText: string;
   items: TSubItem[];
+  analyzed?: boolean;
 };
 
-type FullTranslationItemDefinition = {
-  meaning: string;
-  example: string;
-  synonyms: string[];
-};
-
-type FullTranslationItem = {
-  word: string;
-  translations: string[];
-  popularity: number;
-  definitions: FullTranslationItemDefinition[];
-};
-
-type FullTranslation = {
-  part_of_speech: string;
-  items: FullTranslationItem[];
-};
-
-export type TTranslateAlternativeItem = [
-  string,
-  null,
-  string[],
-  number,
-  boolean,
-];
-export type TTranslateAlternative = [
-  string,
-  TTranslateAlternativeItem[],
-  string,
-  string,
-  number,
-];
 export type TPartOfSpeach =
   | "noun"
   | "pronoun"
@@ -67,13 +49,19 @@ export type TPartOfSpeach =
   | "particle"
   | "unknown";
 
-return `unknown number ${val}`;
-
 export type TWordTranslationItem = {
   word: string;
   partOfSpeech: TPartOfSpeach;
   synonyms: string[];
   popularity: number;
+};
+
+export type THimotokiSaveMeta = {
+  source: string;
+  seq: string | number;
+  headword: string;
+  reading?: string;
+  gloss?: string;
 };
 
 export type TWordTranslation = {
@@ -82,23 +70,22 @@ export type TWordTranslation = {
   targetLanguage: string;
   translations: TWordTranslationItem[];
   transcription: string;
+  /** Stashed from GET /api/search for Convex saved.addFavorite. */
+  himotokiSave?: THimotokiSaveMeta;
+  /** Set when the dictionary request itself failed (network, server), as opposed to "no entry". */
+  error?: string;
+  /** Where the answer came from: the offline SQLite dictionary or the Himotoki HTTP API. */
+  lookupSource?: "local" | "api";
+  /** Dictionary headword (kanji form if any) and its kana reading, for furigana. */
+  headword?: string;
+  reading?: string;
 };
 
-export type TGoogleTranslation = unknown;
+export type TLearningService = "himotoki" | "anki" | "disabled";
 
-export type TLearningService =
-  | "anki"
-  | "lingualeo"
-  | "puzzle-english"
-  | "disabled";
+/** What hovering or clicking a subtitle token does. */
+export type TTokenAction = "furigana" | "meaning" | "both" | "popup" | "none";
 
-export type TTranslationService = "google" | "deepl" | "bing" | "yandex" | "chatgpt";
+export type TTranslationService = "google" | "deepl";
 
 export type Captions = subTitleType[];
-
-export type TPhrasalVerb = {
-  key: string;
-  text: string;
-  indexes: number[];
-  translations: string[];
-};

@@ -44,6 +44,12 @@ export default defineConfig({
     inlineVitePreloadScript(),
   ],
   publicDir,
+  worker: {
+    format: "es",
+  },
+  optimizeDeps: {
+    exclude: ["@sqlite.org/sqlite-wasm"],
+  },
   build: {
     outDir,
     /** Can slow down build speed. */
@@ -58,6 +64,8 @@ export default defineConfig({
         background: resolve(pagesDir, "background", "index.ts"),
         contentStyle: resolve(pagesDir, "content", "style.scss"),
         popup: resolve(pagesDir, "popup", "index.html"),
+        options: resolve(pagesDir, "options", "index.html"),
+        offscreen: resolve(pagesDir, "offscreen", "index.html"),
       },
       output: {
         entryFileNames: "src/pages/[name]/index.js",

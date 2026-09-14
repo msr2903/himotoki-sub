@@ -7,13 +7,13 @@ interface Service {
   getSubs: (language: string) => Promise<Captions>;
 
   // Player container selector, required to render subtitles
-  getSubsContainer: () => HTMLElement;
+  getSubsContainer: () => HTMLElement | null;
 
   // Selector for injecting the application icon in the player
-  getSettingsButtonContainer: () => HTMLElement;
+  getSettingsButtonContainer: () => HTMLElement | null;
 
   // Selector for rendering extension settings inside the player container
-  getSettingsContentContainer: () => HTMLElement;
+  getSettingsContentContainer: () => HTMLElement | null;
 
   // Check if the service is on flight
   isOnFlight: () => boolean;

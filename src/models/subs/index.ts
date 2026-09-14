@@ -1,7 +1,10 @@
 import { createStore, createEvent, createEffect, UnitValue, StoreValue } from "effector";
 import { resync } from "subtitle";
 
-import { convertRawSubs } from "@src/utils/convertRawSubs";
+import {
+  convertJapaneseSubsFallback,
+  convertJapaneseSubsWithLocalSplit,
+} from "@src/utils/convertRawSubs";
 import { $video } from "@src/models/videos";
 import { getCurrentSubs } from "@src/utils/getCurrentSubs";
 import type { Captions, TSub } from "../types";
@@ -10,8 +13,9 @@ import { $autoPause } from "../settings";
 
 export const ES_CUSTOM_SUB_LABEL = "custom";
 export const $rawSubs = createStore<Captions>([]);
-export const $subs = $rawSubs.map((subtitle) => convertRawSubs(subtitle));
-export const $subsLanguage = createStore<string>("auto");
+export const $subs = createStore<TSub[]>([]);
+/** The extension is Japanese-only; kept as a store so consumers (TTS, popup) share one source. */
+export const $subsLanguage = createStore<string>("ja");
 export const $subsTitle = createStore<string>(null);
 export const $currentSubs = createStore<TSub[]>([]);
 export const $prevCurrentSubs = createStore<TSub[]>([]);
@@ -23,7 +27,9 @@ export const autoPauseFx = createEffect<
     autoPause: StoreValue<typeof $autoPause>;
   },
   void
->(({ video }) => video.pause());
+>(({ video }) => {
+  video?.pause();
+});
 
 export const subsRequested = createEvent<string>();
 export const subsReloadRequested = createEvent();
@@ -32,18 +38,33 @@ export const resetSubs = createEvent<string>();
 export const fetchSubsFx = createEffect<{ streaming: Service; language: string }, Captions>(
   async ({ streaming, language }) => {
     try {
-      return await streaming.getSubs(language);
+      return (await streaming.getSubs(language)) ?? [];
     } catch (error) {
       console.error(error);
+      return [];
     }
   }
 );
 export const updateCurrentSubsFx = createEffect<{ subs: TSub[]; video: UnitValue<typeof $video> }, TSub[]>(
-  ({ subs, video }) => getCurrentSubs(subs, video!.currentTime * 1000)
+  ({ subs, video }) => {
+    if (!video) return [];
+    return getCurrentSubs(subs, video.currentTime * 1000);
+  }
 );
 export const updatePrevCurrentSubsFx = createEffect<TSub[], TSub[]>((subs) => subs);
 export const rawSubsAdded = createEvent<Captions>();
 export const updateCustomSubsFx = createEffect<Captions, Captions>((subs) => subs);
+
+/** Immediate paint using Intl.Segmenter, before the ONNX model has run. */
+export const processRawSubsFx = createEffect<Captions, TSub[]>(async (rawSubs) => {
+  if (!rawSubs?.length) return [];
+  return convertJapaneseSubsFallback(rawSubs);
+});
+
+/** Full-transcript local ONNX split (upgrades every cue). */
+export const processJapaneseSubsFx = createEffect<Captions, TSub[]>(
+  async (rawSubs) => convertJapaneseSubsWithLocalSplit(rawSubs),
+);
 
 export const $subsDelay = createStore<number>(0);
 export const subsDelayButtonPressed = createEvent<number>();
@@ -52,15 +73,3 @@ export const subsResyncFx = createEffect<
   { rawSubs: Captions; subsDelay: StoreValue<typeof $subsDelay>; delay: number },
   Captions
 >(({ rawSubs, subsDelay, delay }) => resync(rawSubs, (delay - subsDelay) * 1000));
-
-export const subsLanguageDetectFx = createEffect<TSub[], string>(async (subs) => {
-  try {
-    return await chrome.runtime.sendMessage({
-      type: "getTextLanguage",
-      language: "en",
-      text: subs[Math.floor(Math.random() * subs.length)].cleanedText,
-    });
-  } catch (error) {
-    console.error(error);
-  }
-});

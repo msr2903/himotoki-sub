@@ -1,11 +1,6 @@
-function castTarget(target) {
-  return typeof target === "object"
-    ? target
-    : {
-        tabId: target,
-        frameId: 0,
-      };
-}
+import { HIMOTOKI_API_BASE } from "@src/shared/himotokiConfig";
+import { AccountPanel } from "@src/pages/shared/AccountPanel";
+import { DictionaryPanel } from "@src/pages/shared/DictionaryPanel";
 
 async function getTab() {
   const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
@@ -15,6 +10,7 @@ async function getTab() {
 const Popup = () => {
   const handleRequestPermissions = async () => {
     const tab = await getTab();
+    if (!tab?.url || tab.id == null) return;
     const isGranted = await chrome.permissions.request({
       permissions: ["scripting", "storage", "activeTab"],
       origins: [tab.url],
@@ -24,45 +20,34 @@ const Popup = () => {
     }
   };
 
-  const handleFaqLinkClick = () => {
-    const faqUrl = "https://easysubs.cc/en/faq/";
-    chrome.tabs.create({ url: faqUrl });
-  };
-
   return (
     <div className="content">
-      <div className="header">Easysubs</div>
+      <div className="header">
+        <span className="header-brand">Himotoki</span>
+        <span className="header-sub">Sub</span>
+      </div>
+
+      <section className="es-popup-dict">
+        <div className="es-popup-section-title">Offline dictionary</div>
+        <DictionaryPanel compact />
+      </section>
+
+      <section className="es-popup-account">
+        <div className="es-popup-section-title">Account</div>
+        <AccountPanel />
+      </section>
+
       <menu>
+        <li onClick={() => void chrome.runtime.openOptionsPage()}>
+          <a className="es-popup-settings">Settings (hover, click, dictionary)</a>
+        </li>
         <li>
-          <a target="_blank" href="https://easysubs.cc" rel="noreferrer">
-            Home
+          <a target="_blank" href={HIMOTOKI_API_BASE} rel="noreferrer">
+            Open Himotoki
           </a>
         </li>
         <li onClick={handleRequestPermissions}>
           <a className="es-popup-kinopub">Enable on Kinopub</a>
-        </li>
-        <li onClick={handleFaqLinkClick}>
-          <a>FAQ</a>
-        </li>
-        <li>
-          <a target="_blank" href="https://github.com/Nitrino/easysubs" rel="noreferrer">
-            Github
-          </a>
-        </li>
-        <li>
-          <a target="_blank" href="https://github.com/Nitrino/easysubs/issues" rel="noreferrer">
-            Report bugs
-          </a>
-        </li>
-        <li>
-          <a target="_blank" href="https://github.com/Nitrino/easysubs/issues" rel="noreferrer">
-            Suggest features
-          </a>
-        </li>
-        <li>
-          <a target="_blank" href="https://t.me/easysubs_ext" rel="noreferrer">
-            Support chat
-          </a>
         </li>
       </menu>
     </div>
