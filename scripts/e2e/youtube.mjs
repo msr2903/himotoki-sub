@@ -470,6 +470,26 @@ await page.waitForTimeout(700);
 const tAfter = await page.evaluate(() => document.querySelector("video").currentTime);
 log("ArrowLeft:", tBefore.toFixed(2), "->", tAfter.toFixed(2));
 
+// Navigation (idea 17): replay (R) and loop (L).
+await page.evaluate(() => { const v = document.querySelector("video"); v.play(); v.currentTime = 12; });
+await page.waitForTimeout(600);
+const tBeforeR = await page.evaluate(() => document.querySelector("video").currentTime);
+await page.keyboard.press("r");
+await page.waitForTimeout(700);
+const tAfterR = await page.evaluate(() => document.querySelector("video").currentTime);
+log("replay R:", tBeforeR.toFixed(2), "->", tAfterR.toFixed(2), tAfterR < tBeforeR ? "(jumped back to line start)" : "(no jump)");
+// Loop: enable at t inside a cue, jump near the end, expect it to seek back.
+await page.evaluate(() => { const v = document.querySelector("video"); v.play(); v.currentTime = 12; });
+await page.waitForTimeout(500);
+await page.keyboard.press("l");
+await page.waitForTimeout(300);
+const loopToast = await page.evaluate(() => [...document.querySelectorAll(".es-toast, [class*=toast]")].map((e) => e.textContent).join(" | ").slice(0, 80));
+await page.evaluate(() => { const v = document.querySelector("video"); v.currentTime = 15.7; });
+await page.waitForTimeout(1200);
+const tLoop = await page.evaluate(() => document.querySelector("video").currentTime);
+log("loop L: toast=", JSON.stringify(loopToast), "; currentTime after nearing end:", tLoop.toFixed(2), tLoop < 15 ? "(looped back)" : "(did not loop)");
+await page.keyboard.press("l");
+
 log("page errors:", pageErrors.length, pageErrors.slice(0, 5));
 await ctx.close();
 dictServer?.close();
