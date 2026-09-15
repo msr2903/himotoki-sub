@@ -2,6 +2,7 @@ import { $streaming } from "@src/models/streamings";
 import { moveKeyPressed } from "@src/models/videos";
 import { secondarySubsCycled } from "@src/models/settings";
 import { replayLinePressed, loopLineToggled } from "@src/models/videos";
+import { sentenceToggled } from "@src/models/subs";
 
 const isEditable = (target: EventTarget | null): boolean => {
   const el = target as HTMLElement | null;
@@ -18,6 +19,12 @@ export const keyboardHandler = (event: KeyboardEvent) => {
     event.stopPropagation();
     event.preventDefault();
     if (event.type === "keydown") secondarySubsCycled();
+    return;
+  }
+  if (event.code === "KeyB" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+    event.stopPropagation();
+    event.preventDefault();
+    if (event.type === "keydown") sentenceToggled();
     return;
   }
   if (event.code === "KeyR" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {

@@ -94,6 +94,12 @@ export const updateCurrentSecondarySubsFx = createEffect<
 export const $loopedCue = createStore<TSub | null>(null);
 export const loopedCueSet = createEvent<TSub | null>();
 
+/** Whether the local sentence breakdown panel is open (toggled with B). */
+export const $sentenceOpen = createStore<boolean>(false);
+export const sentenceToggled = createEvent<void>();
+export const sentenceClosed = createEvent<void>();
+$sentenceOpen.on(sentenceToggled, (v) => !v).reset(sentenceClosed);
+
 export const $subsDelay = createStore<number>(0);
 export const subsDelayButtonPressed = createEvent<number>();
 export const subsDelayChangeFx = createEffect<number, number>((value) => value);
