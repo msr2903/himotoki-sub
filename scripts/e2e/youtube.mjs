@@ -357,6 +357,20 @@ log("conjugation chain:", JSON.stringify(await page.evaluate(() =>
 // Conjugation table: flip showConj in-place and read it, tolerant of popup timing.
 await page.evaluate(() => document.querySelector(".es-conj .es-word-more")?.click());
 await page.waitForTimeout(1200);
+
+// Known words (idea 16): mark from the pop-up, verify storage, then dim.
+await page.evaluate(() => {
+  const b = [...document.querySelectorAll(".es-word-translation .es-popup-btn")].find((x) => /Mark known/.test(x.textContent));
+  b && b.click();
+});
+await page.waitForTimeout(300);
+log("known words in storage after mark:", JSON.stringify(await popup.evaluate(() => chrome.storage.local.get("persist:knownWords"))));
+log("known button label now:", JSON.stringify(await page.evaluate(() =>
+  [...document.querySelectorAll(".es-word-translation .es-popup-btn")].map((x) => x.textContent).filter((t) => /Known|Mark known/.test(t)))));
+await popup.evaluate(() => chrome.storage.local.set({ "persist:dimKnownWords": JSON.stringify(true) }));
+await page.waitForTimeout(700);
+log("dimmed tokens with dim on:", await page.evaluate(() => document.querySelectorAll(".es-sub-item--known").length));
+await popup.evaluate(() => chrome.storage.local.set({ "persist:dimKnownWords": JSON.stringify(false), "persist:knownWords": JSON.stringify([]) }));
 log("conjugation table:", JSON.stringify(await page.evaluate(() => ({
   rows: document.querySelectorAll(".es-conj-table tr").length,
   sample: [...document.querySelectorAll(".es-conj-table tr")].slice(0, 3).map((r) => r.textContent.replace(/\s+/g, " ").trim()),

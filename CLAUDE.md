@@ -37,6 +37,9 @@ If `pnpm` scripts abort with `ERR_PNPM_IGNORED_BUILDS`, check `pnpm-workspace.ya
 ### Token interaction
 Hover and click are independent, user-configurable actions (`TTokenAction`: furigana, meaning, both, popup, none; options in `src/shared/tokenActions.ts`). `Subs.tsx` resolves the action per token: a pinned click result (`$pinnedWord`) wins over the transient hover (`$activeHoverWord`). Labels are rendered by `TokenLabel.tsx` (reading derived by `src/utils/furigana.ts`), the full entry by `SubItemTranslation.tsx`; both read the shared lookup cache through `useLookup`. The popup pages across a token's dictionary entries (`TWordTranslation.alternatives`, populated in `src/models/translations`) and can replay the cue's audio from the video (cue timing passed as `cueStart`/`cueEnd`).
 
+### Known words
+`$knownWords` (persisted array of stable keys from `knownKeyOf`, `src/shared/knownWords.ts`) tracks words the user marked known via the pop-up (also set on save). `$dimKnownWords` (opt-in) dims those tokens; `Subs.tsx` resolves each visible token via `useLookup(subItem, enabled)` only when dimming is on.
+
 ### Settings persistence
 `withPersist` stores each setting in `chrome.storage.local` as `persist:<name>` (JSON) and syncs live across extension pages. Every persisted store must be created with an explicit `name`; without the effector babel plugin, `shortName` is a creation-order counter. The options page (`src/pages/options/`) reads and writes the same keys through `src/shared/persistedSettings.ts`, so it never imports the content-script models.
 

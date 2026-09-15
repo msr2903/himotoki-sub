@@ -2,8 +2,9 @@ import { FC, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useUnit } from "effector-react";
 import toast from "react-hot-toast";
 
-import { $learningService } from "@src/models/settings";
+import { $dimKnownWords, $knownWords, $learningService, wordMarkedKnown, wordUnmarkedKnown } from "@src/models/settings";
 import { tokenUnpinned } from "@src/models/translations";
+import { knownKeyOf } from "@src/shared/knownWords";
 import { $video } from "@src/models/videos";
 import { useLookup } from "@src/pages/content/hooks/useLookup";
 import { TSubItem, TWordTranslation, TWordTranslationItem } from "@src/models/types";
@@ -45,7 +46,14 @@ export const SubItemTranslation: FC<{
 }> = ({ subItem, contextSentence, cueStart, cueEnd, pinned }) => {
   const text = subItem.cleanedText || subItem.text;
   const { translation, pending } = useLookup(subItem);
-  const [learningService, video, unpin] = useUnit([$learningService, $video, tokenUnpinned]);
+  const [learningService, video, unpin, knownWords, markKnown, unmarkKnown] = useUnit([
+    $learningService,
+    $video,
+    tokenUnpinned,
+    $knownWords,
+    wordMarkedKnown,
+    wordUnmarkedKnown,
+  ]);
 
   const [service, setService] = useState<ILearningService>(null);
   const [showAll, setShowAll] = useState(false);
@@ -159,7 +167,11 @@ export const SubItemTranslation: FC<{
           ? { ...current.himotokiSave, gloss: sense.word || current.himotokiSave.gloss }
           : undefined,
       })
-      .then((value) => toast.success(value))
+      .then((value) => {
+        const key = knownKeyOf(current);
+        if (key) markKnown(key);
+        toast.success(value);
+      })
       .catch((error) => toast.error(typeof error === "string" ? error : error?.message || String(error)));
   };
 
@@ -195,6 +207,8 @@ export const SubItemTranslation: FC<{
   const hiddenCount = senses.length - visibleSenses.length;
   const himotokiQuery = encodeURIComponent(current.himotokiSave?.headword || headword);
   const saveLabel = SERVICE_LABEL[learningService] ?? "Save";
+  const knownKey = knownKeyOf(current);
+  const isKnown = knownKey != null && knownWords.includes(knownKey);
   const chain = translation.conjugation;
   const conjugable = senses.some(
     (sense) => sense.partOfSpeech === "verb" || sense.partOfSpeech === "adjective",
@@ -321,6 +335,14 @@ export const SubItemTranslation: FC<{
             onClick={() => handleAddWord(senses[0]!)}
           >
             {saveLabel}
+          </button>
+        )}
+        {knownKey && (
+          <button
+            className={`es-popup-btn ${isKnown ? "es-popup-btn--known" : ""}`}
+            onClick={() => (isKnown ? unmarkKnown(knownKey) : markKnown(knownKey))}
+          >
+            {isKnown ? "Known ✓" : "Mark known"}
           </button>
         )}
         <a className="es-popup-btn" href={`${HIMOTOKI_API_BASE}/?q=${himotokiQuery}`} target="_blank" rel="noreferrer">

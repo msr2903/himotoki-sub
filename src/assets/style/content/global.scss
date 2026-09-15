@@ -101,6 +101,11 @@
     outline-offset: 1px;
   }
 
+  // Words the user has marked as known (dim-known-words setting).
+  .es-sub-item--known {
+    opacity: 0.45;
+  }
+
   // Furigana / meaning annotation above a token (hover or pinned click action).
   .es-token-label {
     position: absolute;

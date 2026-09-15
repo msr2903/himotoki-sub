@@ -59,6 +59,7 @@ HIMOTOKI_DICT_DIR=/tmp/himotoki-dict pnpm test:e2e   # YouTube with the offline 
 - Furigana: inline readings over kanji words, always or on hover, from the local dictionary. Channels that print a kana reading line under the kanji line are detected; hide that line (furigana replaces it) or keep it as text.
 - Dual subtitles: a second line under the Japanese one, either the video's own subtitle track in your "Translate to" language (on YouTube, its auto-translation when no such track exists) or a machine translation of the current line. Off by default; switch in the settings or press `d` in the player.
 - Save words to Himotoki favorites or Anki.
+- Mark words as known from the pop-up (saving marks them automatically) and optionally dim known words so unknown ones stand out.
 - Subtitle progress bar; rewind to previous/next/current subtitle with the arrow keys (`alt` + arrow forces the jump).
 - Pause while hovering a word, or pause after every subtitle.
 - Upload your own `.srt` / `.vtt` subtitles when a site has none.
