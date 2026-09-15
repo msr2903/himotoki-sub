@@ -29,6 +29,7 @@ import {
   FURIGANA_LEVEL_SETTING,
   isFuriganaLevel,
 } from "@src/shared/furiganaDifficulty";
+import { COLOR_BY_DIFFICULTY_SETTING, DEFAULT_COLOR_BY_DIFFICULTY } from "@src/shared/tokenColor";
 import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
 import { AccountPanel } from "@src/pages/shared/AccountPanel";
 import { DictionaryPanel } from "@src/pages/shared/DictionaryPanel";
@@ -152,6 +153,11 @@ const Options: FC = () => {
     FURIGANA_LEVEL_SETTING,
     DEFAULT_FURIGANA_LEVEL,
     isFuriganaLevel,
+  );
+  const [colorByDifficulty, setColorByDifficulty] = usePersistedSetting<boolean>(
+    COLOR_BY_DIFFICULTY_SETTING,
+    DEFAULT_COLOR_BY_DIFFICULTY,
+    (v): v is boolean => typeof v === "boolean",
   );
   const [readingLine, setReadingLine] = usePersistedSetting<TReadingLineMode>(
     READING_LINE_SETTING,
@@ -362,6 +368,19 @@ const Options: FC = () => {
                   />
                   <span className="range-value">{uiScale}%</span>
                 </div>
+              }
+            />
+            <Row
+              title="Colour by difficulty"
+              desc="Tint subtitle words by JLPT level (green = easy → red = hard). Off keeps a single colour."
+              htmlFor="color-by-difficulty"
+              control={
+                <input
+                  id="color-by-difficulty"
+                  type="checkbox"
+                  checked={colorByDifficulty}
+                  onChange={(e) => setColorByDifficulty(e.target.checked)}
+                />
               }
             />
           </Group>
