@@ -112,6 +112,54 @@ try {
   assert.deepEqual(await page.evaluate(() => window.auditMessages), ["himotokiLookupBatch"]);
   assert.equal(before.length, 0, "Sentence breakdown must not use HTTP fallback");
   console.log("PASS Editable hotkey guard and offline-only sentence breakdown");
+  // Exercise the shipped options page with real extension storage and two open pages.
+  const options = await ctx.newPage();
+  options.on("pageerror", (e) => errors.push(String(e)));
+  await options.goto(`chrome-extension://${new URL(sw.url()).host}/src/pages/options/index.html`);
+  await options.waitForSelector("#hover-action");
+  for (const [id, key, value] of [
+    ["hover-action", "hoverAction", "meaning"], ["click-action", "clickAction", "none"],
+    ["furigana", "furigana", "hover"], ["reading-line", "readingLine", "text"],
+    ["secondary-subs", "secondarySubs", "translate"],
+  ]) {
+    await options.locator(`#${id}`).selectOption(value);
+    await options.waitForFunction(async ([key, value]) => (await chrome.storage.local.get(`persist:${key}`))[`persist:${key}`] === JSON.stringify(value), [key, value]);
+  }
+  await options.locator("#ui-scale").focus();
+  await options.keyboard.press("End");
+  const maxScale = await options.locator("#ui-scale").getAttribute("max");
+  await options.waitForFunction(async (v) => (await chrome.storage.local.get("persist:uiScale"))["persist:uiScale"] === v, maxScale);
+  await options.evaluate(() => chrome.storage.local.set({ "persist:knownWords": JSON.stringify(["seq:jitendex:10", "seq:jitendex:11"]) }));
+  await options.getByText("2 words marked known.", { exact: true }).waitFor();
+  await options.locator("#dim-known").check();
+  const options2 = await ctx.newPage();
+  await options2.goto(options.url());
+  await options2.waitForFunction(() => document.querySelector("#hover-action")?.value === "meaning");
+  assert.equal(await options2.locator("#dim-known").isChecked(), true);
+  assert.equal(await options2.locator("#ui-scale").inputValue(), maxScale);
+  await options2.locator("#hover-action").selectOption("both");
+  await options.waitForFunction(() => document.querySelector("#hover-action")?.value === "both");
+  await options.getByRole("button", { name: "Forget all", exact: true }).click();
+  await options2.getByText("0 words marked known.", { exact: true }).waitFor();
+  assert.equal(await options.locator("#dim-known").isChecked(), true, "Forget all must not toggle dimming");
+  await options.reload();
+  await options.waitForFunction(() => document.querySelector("#hover-action")?.value === "both");
+  assert.equal(await options.locator("#secondary-subs").inputValue(), "translate");
+  await options.setViewportSize({ width: 1280, height: 800 });
+  await options.getByRole("button", { name: "About", exact: true }).click();
+  await options.waitForTimeout(800);
+  assert.equal(await options.locator('.settings-nav-item[aria-current="location"]').textContent(), "About");
+  await options.evaluate(() => document.querySelector("#settings-readings").scrollIntoView({ behavior: "instant" }));
+  await options.waitForFunction(() => document.querySelector('.settings-nav-item[aria-current="location"]')?.textContent === "Furigana & readings");
+  await options.evaluate(() => window.scrollTo(0, 0));
+  await options.waitForFunction(() => document.querySelector('.settings-nav-item[aria-current="location"]')?.textContent === "Words");
+  await options.screenshot({ path: "/tmp/himotoki-audit-options-desktop.png", fullPage: true });
+  for (const width of [720, 360, 320]) {
+    await options.setViewportSize({ width, height: 800 });
+    assert.ok(await options.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Options overflow at ${width}px`);
+  }
+  await options.screenshot({ path: "/tmp/himotoki-audit-options-mobile.png", fullPage: true });
+  console.log("PASS Options preserve controls, persist values, sync across pages, navigate sections, and fit narrow windows");
   assert.deepEqual(errors, [], "Browser runtime errors");
   console.log(`PASS browser runtime errors: ${errors.length}`);
 } finally {

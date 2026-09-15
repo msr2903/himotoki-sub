@@ -53,7 +53,7 @@ A prebuilt copy is kept at `/tmp/himotoki-dict/` (basic) and `/tmp/himotoki-dict
 
 ## Testing
 
-`pnpm test` runs deterministic Chromium regression checks against a built `dist/`: model startup, coverage races, replay timing, loop/auto-pause interaction, popup entry switching, known words, and offline-only sentence breakdown. Verification is: **type-check + build + the Playwright e2e scripts + a manual pass in real Chrome.**
+`pnpm test` runs deterministic Chromium regression checks against a built `dist/`: model startup, coverage races, replay timing, loop/auto-pause interaction, popup entry switching, known words, offline-only sentence breakdown, and options-page persistence, synchronization, navigation and responsive layout. Verification is: **type-check + build + the Playwright e2e scripts + a manual pass in real Chrome.**
 
 ### End-to-end: YouTube (the main check)
 
