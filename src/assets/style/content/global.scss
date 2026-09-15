@@ -189,6 +189,72 @@
     padding: 5px 12px;
     &:hover { background: var(--hm-accent-muted); }
   }
+  // Searchable transcript panel (toggled with T).
+  .es-transcript {
+    margin: 8px auto 0;
+    width: min(560px, 90%);
+    max-height: 44vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--hm-raised);
+    border: 1px solid var(--hm-border);
+    border-radius: var(--hm-radius-md);
+    box-shadow: var(--hm-shadow);
+    color: var(--hm-ink);
+    font-family: var(--hm-font-body);
+    font-size: 0.5em;
+    text-align: left;
+    cursor: default;
+    zoom: var(--es-ui-scale, 1);
+    overflow: hidden;
+  }
+  .es-transcript-search {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--hm-border);
+
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 8px;
+      border: 1px solid var(--hm-border);
+      border-radius: var(--hm-radius-sm);
+      background: var(--hm-surface);
+      color: var(--hm-ink);
+      font: inherit;
+
+      &:focus {
+        outline: none;
+        border-color: var(--hm-accent);
+      }
+    }
+  }
+  .es-transcript-rows {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    padding: 4px 0;
+  }
+  .es-transcript-row {
+    display: grid;
+    grid-template-columns: 3.5em 1fr;
+    gap: 10px;
+    align-items: baseline;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: var(--hm-ink);
+    font: inherit;
+    text-align: left;
+    padding: 6px 12px;
+    cursor: pointer;
+
+    &:hover { background: var(--hm-accent-muted); }
+    &--active { background: var(--hm-accent-muted); }
+    &--active .es-transcript-time { color: var(--hm-accent); font-weight: 600; }
+  }
+  .es-transcript-time { color: var(--hm-ink-muted); font-variant-numeric: tabular-nums; }
+  .es-transcript-text { line-height: 1.4; }
+
   .es-breakdown-surface { display: flex; flex-direction: column; }
   .es-breakdown-word { font-family: var(--hm-font-display); font-weight: 600; }
   .es-breakdown-reading { font-size: 0.8em; color: var(--hm-ink-muted); }
