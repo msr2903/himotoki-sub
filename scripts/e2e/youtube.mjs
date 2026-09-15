@@ -2,6 +2,7 @@
 // captions, and checks split rendering, the dictionary popup, settings, and keyboard navigation.
 // Usage: pnpm build && npx playwright install chromium && node scripts/e2e/youtube.mjs [videoUrl]
 // YouTube intermittently refuses captions to automated browsers; rerun if the player itself gets no data.
+import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import fs from "node:fs";
 
@@ -340,7 +341,54 @@ if (nbox) {
 
 await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 await page.waitForFunction(() => { const p = document.querySelector(".es-word-translation"); return p && !/Looking up/.test(p.textContent); }, null, { timeout: 15000 }).catch(() => {});
+assert.equal((await state()).pinned, 1, "Word click must pin the popup");
 log("after click (expect popup, pinned=1):", JSON.stringify(await state()));
+log("popup depth:", JSON.stringify(await page.evaluate(() => {
+  const p = document.querySelector(".es-word-translation");
+  if (!p) return null;
+  return {
+    entrySwitch: p.querySelector(".es-entry-count")?.textContent ?? null,
+    playFromVideo: !!p.querySelector(".es-popup-speak[title*='video']"),
+  };
+})));
+await page.screenshot({ path: "/tmp/hf-pf-popup.png" });
+log("pitch/freq/jlpt tags:", JSON.stringify(await page.evaluate(() => {
+  const p = document.querySelector(".es-word-translation");
+  if (!p) return null;
+  return {
+    pitch: !!p.querySelector(".es-pitch-diagram, .es-pitch-num"),
+    pitchMorae: [...p.querySelectorAll(".es-pitch-mora")].map((m) => m.className.includes("high") ? "H" : "L").join(""),
+    freq: p.querySelector(".es-tag-freq")?.textContent ?? null,
+    jlpt: [...p.querySelectorAll(".es-tag")].map((t) => t.textContent).filter((t) => /^N[1-5]$/.test(t)),
+  };
+})));
+// Grammar (idea 12): the deconjugation chain renders from data (no click needed).
+await page.evaluate(() => document.querySelector("video")?.pause());
+await page.waitForTimeout(200);
+log("conjugation chain:", JSON.stringify(await page.evaluate(() =>
+  document.querySelector(".es-conj-chain")?.textContent?.replace(/\s+/g, " ").trim() ?? null)));
+// Conjugation table: flip showConj in-place and read it, tolerant of popup timing.
+await page.evaluate(() => document.querySelector(".es-conj .es-word-more")?.click());
+await page.waitForTimeout(1200);
+
+// Known words (idea 16): mark from the pop-up, verify storage, then dim.
+await page.evaluate(() => {
+  const b = [...document.querySelectorAll(".es-word-translation .es-popup-btn")].find((x) => /Mark known/.test(x.textContent));
+  b && b.click();
+});
+await page.waitForTimeout(300);
+log("known words in storage after mark:", JSON.stringify(await popup.evaluate(() => chrome.storage.local.get("persist:knownWords"))));
+log("known button label now:", JSON.stringify(await page.evaluate(() =>
+  [...document.querySelectorAll(".es-word-translation .es-popup-btn")].map((x) => x.textContent).filter((t) => /Known|Mark known/.test(t)))));
+await popup.evaluate(() => chrome.storage.local.set({ "persist:dimKnownWords": JSON.stringify(true) }));
+await page.waitForTimeout(700);
+log("dimmed tokens with dim on:", await page.evaluate(() => document.querySelectorAll(".es-sub-item--known").length));
+await popup.evaluate(() => chrome.storage.local.set({ "persist:dimKnownWords": JSON.stringify(false), "persist:knownWords": JSON.stringify([]) }));
+log("conjugation table:", JSON.stringify(await page.evaluate(() => ({
+  rows: document.querySelectorAll(".es-conj-table tr").length,
+  sample: [...document.querySelectorAll(".es-conj-table tr")].slice(0, 3).map((r) => r.textContent.replace(/\s+/g, " ").trim()),
+  status: document.querySelector(".es-conj-status")?.textContent ?? null,
+}))));
 log("popup fit:", JSON.stringify(await page.evaluate(() => { const p = document.querySelector(".es-word-translation"); const pl = document.querySelector(".html5-video-player"); if (!p || !pl) return null; const r = p.getBoundingClientRect(), q = pl.getBoundingClientRect(); return { insideTop: r.top >= q.top, insideLeft: r.left >= q.left, insideRight: r.right <= q.right, maxHeight: p.style.maxHeight, scrollable: p.classList.contains("es-word-translation--scrollable"), senses: document.querySelectorAll(".es-sense").length, more: document.querySelector(".es-word-more")?.textContent ?? null }; })));
 await page.screenshot({ path: "/tmp/himotoki-e2e-pinned.png" });
 await popup.evaluate(() => chrome.storage.local.set({ "persist:uiScale": JSON.stringify(70) }));
@@ -353,6 +401,7 @@ await page.waitForTimeout(500);
 log("after click then leave (expect popup still pinned):", JSON.stringify(await state()));
 await page.keyboard.press("Escape");
 await page.waitForTimeout(300);
+assert.equal((await state()).pinned, 0, "Escape must dismiss the popup");
 log("after Escape (expect nothing):", JSON.stringify(await state()));
 await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 await page.waitForTimeout(800);
@@ -435,6 +484,7 @@ log(
   "settings content rendered:",
   await page.evaluate(() => !!document.querySelector("[class*=es-settings-content]")),
 );
+log("video stats:", JSON.stringify(await page.evaluate(() => document.querySelector(".es-video-stats")?.textContent ?? null)));
 log("settings panel overflow (scrollHeight > clientHeight means it scrolls):", JSON.stringify(await page.evaluate(() => { const m = document.querySelector(".es-settings-content__main"); const c = document.querySelector(".es-settings-content"); return m && c ? { mainScroll: m.scrollHeight, mainClient: m.clientHeight, panel: c.getBoundingClientRect().height, playerH: document.querySelector(".html5-video-player")?.clientHeight } : null; })));
 log("select values fully visible:", JSON.stringify(await page.evaluate(() => [...document.querySelectorAll(".es-settings-content [class*=singleValue]")].map((e) => [e.textContent, e.scrollWidth <= e.clientWidth + 1]))));
 await page.screenshot({ path: "/tmp/himotoki-e2e-settings.png" });
@@ -449,6 +499,45 @@ await page.waitForTimeout(700);
 const tAfter = await page.evaluate(() => document.querySelector("video").currentTime);
 log("ArrowLeft:", tBefore.toFixed(2), "->", tAfter.toFixed(2));
 
+// Navigation (idea 17): replay (R) and loop (L).
+await page.evaluate(() => { const v = document.querySelector("video"); v.play(); v.currentTime = 12; });
+await page.waitForTimeout(600);
+const tBeforeR = await page.evaluate(() => document.querySelector("video").currentTime);
+await page.keyboard.press("r");
+await page.waitForTimeout(700);
+const tAfterR = await page.evaluate(() => document.querySelector("video").currentTime);
+log("replay R:", tBeforeR.toFixed(2), "->", tAfterR.toFixed(2), tAfterR < tBeforeR ? "(jumped back to line start)" : "(no jump)");
+// Loop: enable at t inside a cue, jump near the end, expect it to seek back.
+await page.evaluate(() => { const v = document.querySelector("video"); v.play(); v.currentTime = 12; });
+await page.waitForTimeout(500);
+await page.keyboard.press("l");
+await page.waitForTimeout(300);
+const loopToast = await page.evaluate(() => [...document.querySelectorAll(".es-toast, [class*=toast]")].map((e) => e.textContent).join(" | ").slice(0, 80));
+await page.evaluate(() => { const v = document.querySelector("video"); v.currentTime = 15.7; });
+await page.waitForTimeout(1200);
+const tLoop = await page.evaluate(() => document.querySelector("video").currentTime);
+log("loop L: toast=", JSON.stringify(loopToast), "; currentTime after nearing end:", tLoop.toFixed(2), tLoop < 15 ? "(looped back)" : "(did not loop)");
+await page.keyboard.press("l");
+
+// Sentence breakdown (idea 14): B opens a local word list for the current line.
+await page.evaluate(() => { const v = document.querySelector("video"); v.play(); v.currentTime = 2; });
+await page.waitForTimeout(700);
+await page.evaluate(() => document.querySelector("video")?.pause());
+await page.keyboard.press("b");
+await page.waitForFunction(() => document.querySelector(".es-breakdown-row"), null, { timeout: 15000 }).catch(() => {});
+await page.waitForTimeout(500);
+log("breakdown:", JSON.stringify(await page.evaluate(() => ({
+  open: !!document.querySelector(".es-breakdown"),
+  rows: document.querySelectorAll(".es-breakdown-row").length,
+  sample: [...document.querySelectorAll(".es-breakdown-row")].slice(0, 3).map((r) => r.textContent.replace(/\s+/g, " ").trim()),
+}))));
+await page.screenshot({ path: "/tmp/hf-sent.png" });
+await page.keyboard.press("b");
+await page.waitForTimeout(300);
+log("breakdown after second B (expect closed):", await page.evaluate(() => !!document.querySelector(".es-breakdown")));
+
+assert.equal(await page.locator(".es-breakdown").count(), 0, "B must close sentence breakdown");
+assert.deepEqual(pageErrors, [], "Unexpected browser errors");
 log("page errors:", pageErrors.length, pageErrors.slice(0, 5));
 await ctx.close();
 dictServer?.close();

@@ -205,7 +205,7 @@ function remove(): void {
   status.verified = "";
 }
 
-type Request = { id: number; op: string; url?: string; expectedSha256?: string; surface?: string; surfaces?: string[]; cues?: string[][] };
+type Request = { id: number; op: string; url?: string; expectedSha256?: string; surface?: string; surfaces?: string[]; cues?: string[][]; seq?: number };
 
 self.onmessage = async (event: MessageEvent<Request>) => {
   const msg = event.data;
@@ -227,6 +227,14 @@ self.onmessage = async (event: MessageEvent<Request>) => {
         remove();
         reply(true, { ...status });
         return;
+      case "conjTable": {
+        if (!dict) {
+          reply(true, { available: false });
+          return;
+        }
+        reply(true, { available: true, forms: dict.getEntryConjugations(Number(msg.seq)) });
+        return;
+      }
       case "lookup": {
         if (!dict) {
           reply(true, { available: false });

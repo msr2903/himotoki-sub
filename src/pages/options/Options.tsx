@@ -23,6 +23,7 @@ import {
   isReadingLineMode,
 } from "@src/shared/furiganaSettings";
 import { UI_SCALE_DEFAULT, UI_SCALE_MAX, UI_SCALE_MIN, UI_SCALE_SETTING, UI_SCALE_STEP, clampUiScale } from "@src/shared/uiScale";
+import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
 import { AccountPanel } from "@src/pages/shared/AccountPanel";
 import { DictionaryPanel } from "@src/pages/shared/DictionaryPanel";
 
@@ -146,6 +147,16 @@ const Options: FC = () => {
     DEFAULT_READING_LINE,
     isReadingLineMode,
   );
+  const [dimKnown, setDimKnown] = usePersistedSetting<boolean>(
+    DIM_KNOWN_SETTING,
+    DEFAULT_DIM_KNOWN,
+    (v): v is boolean => typeof v === "boolean",
+  );
+  const [knownWords, setKnownWords] = usePersistedSetting<string[]>(
+    KNOWN_WORDS_SETTING,
+    [],
+    (v): v is string[] => Array.isArray(v) && v.every((key) => typeof key === "string"),
+  );
   const version = chrome.runtime.getManifest().version;
 
   const [activeNav, setActiveNav] = useState<string>(SETTINGS_NAV[0].id);
@@ -200,6 +211,7 @@ const Options: FC = () => {
                 key={item.id}
                 type="button"
                 className={`settings-nav-item ${activeNav === item.id ? "on" : ""}`}
+                aria-current={activeNav === item.id ? "location" : undefined}
                 onClick={() => scrollToSection(item.id)}
               >
                 {item.label}
@@ -242,6 +254,16 @@ const Options: FC = () => {
                 />
               }
             />
+            <Row
+              title="Dim known words"
+              desc="Dim words you have marked as known in the dictionary popup."
+              htmlFor="dim-known"
+              control={<input id="dim-known" type="checkbox" checked={dimKnown} onChange={(e) => setDimKnown(e.target.checked)} />}
+            />
+            <div className="row">
+              <span className="row-desc">{knownWords.length} word{knownWords.length === 1 ? "" : "s"} marked known.</span>
+              {knownWords.length > 0 && <button type="button" className="es-options-link" onClick={() => setKnownWords([])}>Forget all</button>}
+            </div>
           </Group>
 
           <Group id="readings" title="Furigana & readings">
@@ -339,8 +361,7 @@ const Options: FC = () => {
               Dictionary data: <a className="inline-link" href="https://jitendex.org/" target="_blank" rel="noreferrer">Jitendex</a> © Stephen Kraus,{" "}
               <a className="inline-link" href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer">CC BY-SA 4.0</a>, built from{" "}
               <a className="inline-link" href="https://www.edrdg.org/jmdict/j_jmdict.html" target="_blank" rel="noreferrer">JMdict</a> (EDRDG) and{" "}
-              <a className="inline-link" href="https://tatoeba.org/" target="_blank" rel="noreferrer">Tatoeba</a> examples (CC BY 2.0 FR). Nothing you
-              watch or look up leaves your device unless you use online translation or save to your account (see the{" "}
+              <a className="inline-link" href="https://tatoeba.org/" target="_blank" rel="noreferrer">Tatoeba</a> examples (CC BY 2.0 FR). Word lookups stay on your device when the offline dictionary is installed; otherwise they are sent to Himotoki. Whole-line translation and saving to your account also use online services (see the{" "}
               <a className="inline-link" href="https://github.com/msr2903/himotoki-sub/blob/master/PRIVACY.md" target="_blank" rel="noreferrer">privacy policy</a>).
             </p>
           </Group>

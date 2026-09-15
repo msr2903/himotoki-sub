@@ -24,13 +24,28 @@ import {
   $currentSecondarySubs,
   fetchSecondarySubsFx,
   updateCurrentSecondarySubsFx,
+  $loopedCue,
+  loopedCueSet,
+  $sentenceOpen,
+  $coverageKeys,
+  $coverageStatus,
+  computeCoverageFx,
 } from ".";
 import { $streaming } from "../streamings";
-import { $video, videoTimeUpdate } from "../videos";
+import {
+  $video,
+  videoTimeUpdate,
+  moveToTimeRequested,
+  moveKeyPressed,
+  replayLinePressed,
+  loopLineToggled,
+  loopCleared,
+} from "../videos";
 import { $autoPause, $secondarySubs, $translateLanguage } from "../settings";
 import type { Captions } from "../types";
 import { debug } from "patronum";
-import { notifyError } from "@src/pages/content/notify";
+import { cancelVideoClip } from "@src/utils/replayVideoClip";
+import { notifyError, notifyInfo } from "@src/pages/content/notify";
 
 split({
   source: esSubsChanged,
@@ -61,10 +76,10 @@ sample({
 });
 sample({
   clock: videoTimeUpdate,
-  source: { currentSubs: $currentSubs, video: $video, autoPause: $autoPause },
+  source: { currentSubs: $currentSubs, video: $video, autoPause: $autoPause, looped: $loopedCue },
   fn: ({ currentSubs, video, autoPause }, _) => ({ currentSubs, video, autoPause }),
-  filter: ({ currentSubs, video, autoPause }) => {
-    if (!currentSubs[0] || !video || !autoPause || video.paused || video.ended) {
+  filter: ({ currentSubs, video, autoPause, looped }) => {
+    if (looped || !currentSubs[0] || !video || !autoPause || video.paused || video.ended) {
       return false;
     }
     const timeDiff = currentSubs[0].end - video.currentTime * 1000;
@@ -131,6 +146,27 @@ $rawSubs.on(rawSubsAdded, (oldSubs, newSubs) => {
 });
 
 $rawSubs.reset(resetSubs);
+$sentenceOpen.reset(resetSubs);
+
+// Resolve every distinct word's key once the subtitles are ready, for coverage stats.
+sample({ clock: $subs, filter: (subs) => subs.length > 0, target: computeCoverageFx });
+const currentCoverageDone = sample({
+  clock: computeCoverageFx.done,
+  source: $subs,
+  filter: (subs, { params }) => subs === params,
+  fn: (_, { result }) => result,
+});
+const currentCoverageFailed = sample({
+  clock: computeCoverageFx.fail,
+  source: $subs,
+  filter: (subs, { params }) => subs === params,
+});
+$coverageKeys.on(currentCoverageDone, (_, map) => map ?? {}).reset(resetSubs, $subs.updates);
+$coverageStatus
+  .on(computeCoverageFx, () => "loading")
+  .on(currentCoverageDone, (_, map) => map === null ? "missing" : "ready")
+  .on(currentCoverageFailed, () => "error")
+  .reset(resetSubs);
 
 sample({
   clock: $rawSubs,
@@ -199,3 +235,52 @@ debug(
   processRawSubsFx.doneData,
   processJapaneseSubsFx.doneData
 );
+
+
+/* ---------- Replay / loop current line (idea 17) ---------- */
+
+// R: jump to the start of the current line and play it.
+sample({
+  clock: replayLinePressed,
+  source: $currentSubs,
+  filter: (currentSubs) => currentSubs.length > 0,
+  fn: (currentSubs) => currentSubs[0]!.start,
+  target: moveToTimeRequested,
+});
+replayLinePressed.watch(() => {
+  cancelVideoClip();
+  if ($currentSubs.getState().length) void $video.getState()?.play().catch(() => {});
+});
+resetSubs.watch(cancelVideoClip);
+loopLineToggled.watch(cancelVideoClip);
+
+// L: toggle looping the current line. Toggling off (or with no current line) clears it.
+sample({
+  clock: loopLineToggled,
+  source: { currentSubs: $currentSubs, looped: $loopedCue },
+  fn: ({ currentSubs, looped }) => (looped ? null : (currentSubs[0] ?? null)),
+  target: loopedCueSet,
+});
+$loopedCue.on(loopedCueSet, (_, cue) => cue).reset(loopCleared, resetSubs, moveKeyPressed);
+
+// While looping, seek back to the cue start whenever playback leaves the cue window.
+sample({
+  clock: videoTimeUpdate,
+  source: { looped: $loopedCue, video: $video },
+  filter: ({ looped, video }) => {
+    if (!looped || !video) return false;
+    const t = video.currentTime * 1000;
+    return t >= looped.end || t < looped.start - 500;
+  },
+  fn: ({ looped }) => looped!.start,
+  target: moveToTimeRequested,
+});
+
+let loopWasOn = false;
+$loopedCue.watch((cue) => {
+  const on = Boolean(cue);
+  if (on !== loopWasOn) {
+    loopWasOn = on;
+    notifyInfo(on ? "Looping this line (L to stop)" : "Loop off");
+  }
+});

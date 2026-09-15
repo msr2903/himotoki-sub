@@ -2,15 +2,18 @@ import { FC, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useUnit } from "effector-react";
 import toast from "react-hot-toast";
 
-import { $learningService } from "@src/models/settings";
+import { $knownWords, $learningService, wordMarkedKnown, wordUnmarkedKnown } from "@src/models/settings";
 import { tokenUnpinned } from "@src/models/translations";
-import { $video } from "@src/models/videos";
+import { knownKeyOf } from "@src/shared/knownWords";
+import { $video, replayCueRequested } from "@src/models/videos";
 import { useLookup } from "@src/pages/content/hooks/useLookup";
-import { TSubItem, TWordTranslationItem } from "@src/models/types";
+import { TSubItem, TWordTranslation, TWordTranslationItem } from "@src/models/types";
 import ILearningService from "@src/learning-service/learningService";
 import { getLearningService } from "@src/utils/getLearningService";
 import { HIMOTOKI_API_BASE } from "@src/shared/himotokiConfig";
 import { SoundIcon } from "./assets/SoundIcon";
+import { ConjugationTable } from "./ConjugationTable";
+import { FrequencyBadge, PitchAccent } from "./PitchAccent";
 
 const SENSE_LIMIT = 3;
 const SERVICE_LABEL: Record<string, string> = { himotoki: "Save to Himotoki", anki: "Save to Anki" };
@@ -30,28 +33,52 @@ const ExampleText: FC<{ text: string; keyword?: string }> = ({ text, keyword }) 
 
 /**
  * Dictionary pop-up for one token. Layout follows the entry card on himotoki.my.id: headword,
- * reading, tags, numbered senses with part of speech, one example, then actions.
+ * reading, pitch, tags, numbered senses, one example, then actions. When the surface matches more
+ * than one dictionary entry, a ‹ n/m › switcher pages between them.
  */
 export const SubItemTranslation: FC<{
   subItem: TSubItem;
   contextSentence?: string;
+  /** Cue timing (ms) for replaying the line's audio from the video. */
+  cueStart?: number;
+  cueEnd?: number;
   /** Opened by click: stays until dismissed, shows Close. */
   pinned?: boolean;
-}> = ({ subItem, contextSentence, pinned }) => {
+}> = ({ subItem, contextSentence, cueStart, cueEnd, pinned }) => {
   const text = subItem.cleanedText || subItem.text;
   const { translation, pending } = useLookup(subItem);
-  const [learningService, video, unpin] = useUnit([$learningService, $video, tokenUnpinned]);
+  const [learningService, video, unpin, knownWords, markKnown, unmarkKnown] = useUnit([
+    $learningService,
+    $video,
+    tokenUnpinned,
+    $knownWords,
+    wordMarkedKnown,
+    wordUnmarkedKnown,
+  ]);
 
   const [service, setService] = useState<ILearningService>(null);
   const [showAll, setShowAll] = useState(false);
+  const [entryIndex, setEntryIndex] = useState(0);
+  const [showConj, setShowConj] = useState(false);
   const popupRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setService(getLearningService(learningService));
   }, [learningService]);
 
-  // Keep the popup inside the player: cap its height to the space above the word and shift it
-  // horizontally away from the player edges. Re-run whenever the content changes.
+  // Reset entry paging and "show more" when the token changes.
+  useEffect(() => {
+    setEntryIndex(0);
+    setShowAll(false);
+    setShowConj(false);
+  }, [text]);
+
+  useEffect(() => {
+    setShowAll(false);
+    setShowConj(false);
+  }, [entryIndex]);
+
+  // Keep the popup inside the player: cap height to the space above the word, shift off the edges.
   const fitPopup = () => {
     const el = popupRef.current;
     if (!el) return;
@@ -60,7 +87,6 @@ export const SubItemTranslation: FC<{
     if (!token || !player) return;
     const tokenRect = token.getBoundingClientRect();
     const playerRect = player.getBoundingClientRect();
-    // The popup is scaled with CSS zoom (pop-up size setting); its own px units are zoomed units.
     const zoom = Number(getComputedStyle(el).zoom) || 1;
     const available = Math.floor(tokenRect.top - playerRect.top - 12);
     el.style.maxHeight = `${Math.max(120, available / zoom)}px`;
@@ -118,6 +144,12 @@ export const SubItemTranslation: FC<{
     );
   }
 
+  // The switcher pages across the token's dictionary entries; token-level fields (conjugation note,
+  // lookup source) stay on the primary translation.
+  const entries: TWordTranslation[] = [translation, ...(translation.alternatives ?? [])];
+  const current = entries[Math.min(entryIndex, entries.length - 1)]!;
+  const hasClip = video != null && cueStart != null && cueEnd != null && cueEnd > cueStart;
+
   const miningContext = {
     contextSentence: contextSentence || "",
     sourceUrl: typeof location !== "undefined" ? location.href : "",
@@ -128,56 +160,115 @@ export const SubItemTranslation: FC<{
   const handleAddWord = (sense: TWordTranslationItem) => {
     if (!service) return;
     service
-      .addWord(translation.source, sense.word, {
+      .addWord(current.source, sense.word, {
         partOfSpeech: sense.partOfSpeech,
         context: miningContext.contextSentence,
         ...miningContext,
-        himotokiSave: translation.himotokiSave
-          ? { ...translation.himotokiSave, gloss: sense.word || translation.himotokiSave.gloss }
+        himotokiSave: current.himotokiSave
+          ? { ...current.himotokiSave, gloss: sense.word || current.himotokiSave.gloss }
           : undefined,
       })
-      .then((value) => toast.success(value))
+      .then((value) => {
+        const key = knownKeyOf(current);
+        if (key) markKnown(key);
+        toast.success(value);
+      })
       .catch((error) => toast.error(typeof error === "string" ? error : error?.message || String(error)));
   };
 
   const handlePlaySound = () => {
     const msg = new SpeechSynthesisUtterance();
-    msg.text = translation.headword || translation.source;
+    msg.text = current.headword || current.source;
     msg.lang = "ja-JP";
     msg.rate = 0.8;
     window.speechSynthesis.speak(msg);
   };
 
-  const headword = translation.headword || translation.source || text;
-  const reading = translation.reading && translation.reading !== headword ? translation.reading : null;
-  const senses = translation.translations.length
-    ? translation.translations
-    : [{ word: translation.mainTranslation, partOfSpeech: "unknown" as const, synonyms: [], popularity: 0 }];
+  // Replay the subtitle line's own audio from the video (native pronunciation in context).
+  const handlePlayClip = () => {
+    if (!hasClip || !video) return;
+    replayCueRequested({ start: cueStart!, end: cueEnd! });
+  };
+
+  const headword = current.headword || current.source || text;
+  const reading = current.reading && current.reading !== headword ? current.reading : null;
+  const senses = current.translations.length
+    ? current.translations
+    : [{ word: current.mainTranslation, partOfSpeech: "unknown" as const, synonyms: [], popularity: 0 }];
   const visibleSenses = showAll ? senses : senses.slice(0, SENSE_LIMIT);
   const hiddenCount = senses.length - visibleSenses.length;
-  const himotokiQuery = encodeURIComponent(translation.himotokiSave?.headword || headword);
+  const himotokiQuery = encodeURIComponent(current.himotokiSave?.headword || headword);
   const saveLabel = SERVICE_LABEL[learningService] ?? "Save";
+  const knownKey = knownKeyOf(current);
+  const isKnown = knownKey != null && knownWords.includes(knownKey);
+  const chain = translation.conjugation;
+  const conjugable = senses.some(
+    (sense) => sense.partOfSpeech === "verb" || sense.partOfSpeech === "adjective",
+  );
+  const conjSeq = (entryIndex === 0 ? chain?.rootSeq : null) ?? (typeof current.himotokiSave?.seq === "number" ? current.himotokiSave.seq : null);
 
   return (
     <div className="es-word-translation" onClick={stop} ref={popupRef}>
+      {entries.length > 1 && (
+        <div className="es-entry-switch">
+          <button
+            className="es-entry-arrow"
+            title="Previous entry"
+            onClick={() => setEntryIndex((i) => (i - 1 + entries.length) % entries.length)}
+          >
+            ‹
+          </button>
+          <span className="es-entry-count">
+            {entryIndex + 1} / {entries.length}
+          </span>
+          <button
+            className="es-entry-arrow"
+            title="Next entry"
+            onClick={() => setEntryIndex((i) => (i + 1) % entries.length)}
+          >
+            ›
+          </button>
+        </div>
+      )}
       <header className="es-popup-head">
         <div className="es-popup-title">
           <span className="es-popup-word">{headword}</span>
-          <button className="es-popup-speak" title="Pronounce" onClick={handlePlaySound}>
+          {hasClip && (
+            <button className="es-popup-speak" title="Replay this line from the video" onClick={handlePlayClip}>
+              ▶
+            </button>
+          )}
+          <button className="es-popup-speak" title="Pronounce (synthesized)" onClick={handlePlaySound}>
             <SoundIcon />
           </button>
         </div>
         {reading && <p className="es-popup-reading">{reading}</p>}
-        {(translation.pitch || translation.common || translation.jlpt?.length || translation.conjugationNote) && (
+        {(current.pitch ||
+          current.common ||
+          current.jlpt?.length ||
+          current.frequency ||
+          translation.conjugationNote) && (
           <div className="es-popup-tags">
-            {translation.pitch && <span className="es-tag es-tag-pitch">[{translation.pitch}]</span>}
-            {translation.common && <span className="es-tag">common</span>}
-            {translation.jlpt?.map((level) => (
+            {current.pitch && <PitchAccent pitch={current.pitch} reading={current.reading} />}
+            {current.jlpt?.map((level) => (
               <span key={level} className="es-tag">
                 {level.toUpperCase()}
               </span>
             ))}
+            {current.frequency != null && <FrequencyBadge rank={current.frequency} />}
+            {current.common && <span className="es-tag">common</span>}
             {translation.conjugationNote && <span className="es-popup-conj">{translation.conjugationNote}</span>}
+          </div>
+        )}
+        {chain && chain.steps.length > 0 && (
+          <div className="es-conj-chain">
+            <span className="es-conj-root">{chain.rootText}</span>
+            {chain.steps.map((step, i) => (
+              <span key={i} className="es-conj-step" title={step.tip || undefined}>
+                <span className="es-conj-arrow">→</span>
+                {step.label}
+              </span>
+            ))}
           </div>
         )}
       </header>
@@ -209,18 +300,27 @@ export const SubItemTranslation: FC<{
         </button>
       )}
 
-      {translation.example && (
+      {current.example && (
         <div className="es-popup-example">
           <span className="es-ex-label">Example</span>
           <p className="es-ex-jp">
-            <ExampleText text={translation.example.jp} keyword={translation.example.keyword} />
+            <ExampleText text={current.example.jp} keyword={current.example.keyword} />
           </p>
-          {translation.example.en && (
+          {current.example.en && (
             <p className="es-ex-en">
               <span className="es-ex-lang">EN</span>
-              {translation.example.en}
+              {current.example.en}
             </p>
           )}
+        </div>
+      )}
+
+      {conjugable && conjSeq != null && (
+        <div className="es-conj">
+          <button className="es-word-more" onClick={() => setShowConj((v) => !v)}>
+            {showConj ? "Hide conjugations" : "Conjugations"}
+          </button>
+          {showConj && <ConjugationTable seq={conjSeq} />}
         </div>
       )}
 
@@ -232,6 +332,14 @@ export const SubItemTranslation: FC<{
             onClick={() => handleAddWord(senses[0]!)}
           >
             {saveLabel}
+          </button>
+        )}
+        {knownKey && (
+          <button
+            className={`es-popup-btn ${isKnown ? "es-popup-btn--known" : ""}`}
+            onClick={() => (isKnown ? unmarkKnown(knownKey) : markKnown(knownKey))}
+          >
+            {isKnown ? "Known ✓" : "Mark known"}
           </button>
         )}
         <a className="es-popup-btn" href={`${HIMOTOKI_API_BASE}/?q=${himotokiQuery}`} target="_blank" rel="noreferrer">

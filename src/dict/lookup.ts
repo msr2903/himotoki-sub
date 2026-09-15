@@ -12,7 +12,9 @@ import {
   conjStepToDict,
   deconjugate_recursive,
   expected_pos_from_step,
+  forward_conjugate,
   godan_dict_ending,
+  PARADIGM_KEYS,
   pos_class,
   reconstruct_forms,
 } from "./conj_rules";
@@ -40,6 +42,8 @@ export type DictEntry = {
   forms?: string[];
   pitch?: number[];
   pitch_display?: string;
+  freq?: number;
+  jlpt?: string[];
   examples?: Array<Record<string, unknown>>;
   _vs_compound?: boolean;
   _vs_lemma?: string;
@@ -274,6 +278,15 @@ function groupTermsToEntry(rows: TermRow[], entryKeyNum: number): DictEntry | nu
     entry.pitch_display = pitch.map(String).join("/");
   }
   if (examples.length) entry.examples = examples;
+
+  // Pitch accent, frequency rank and JLPT level folded into the term table at build time.
+  const pitchCol = rows.map((r) => r.pitch).find((v) => v != null && v !== "");
+  if (pitchCol != null && !entry.pitch_display) entry.pitch_display = String(pitchCol);
+  const freqs = rows.map((r) => Number(r.freq)).filter((n) => Number.isFinite(n) && n > 0);
+  if (freqs.length) entry.freq = Math.min(...freqs);
+  const jlptCol = rows.map((r) => r.jlpt).find((v) => v != null && v !== "");
+  if (jlptCol != null) entry.jlpt = [String(jlptCol)];
+
   void payload;
   return entry;
 }
@@ -541,7 +554,15 @@ export class Dictionary {
   private treeCache = new Map<string, ConjugationTree | null>();
   private exactCache = new Map<string, boolean>();
 
-  constructor(private query: Query) {}
+  private termColumns: string;
+
+  constructor(private query: Query) {
+    // Older installed dictionaries do not have the optional enrichment columns.
+    const columns = new Set(query("PRAGMA table_info(term)").map((row) => row.name));
+    this.termColumns = [TERM_COLUMNS, ...["pitch", "freq", "jlpt"].map(
+      (column) => columns.has(column) ? column : `NULL AS ${column}`,
+    )].join(", ");
+  }
 
   clearCaches(): void {
     this.entryCache.clear();
@@ -565,7 +586,7 @@ export class Dictionary {
     const seenIds = new Set<number>();
     for (const prefix of prefixes) {
       const chunk = this.termRows(
-        `SELECT ${TERM_COLUMNS} FROM term
+        `SELECT ${this.termColumns} FROM term
          WHERE expression LIKE ? OR reading LIKE ?
          ORDER BY score DESC, id LIMIT 400`,
         [`${prefix}%`, `${prefix}%`],
@@ -593,7 +614,7 @@ export class Dictionary {
     variants = [...new Set(variants)];
     const placeholders = variants.map(() => "?").join(",");
     let rows = this.termRows(
-      `SELECT ${TERM_COLUMNS} FROM term
+      `SELECT ${this.termColumns} FROM term
        WHERE expression IN (${placeholders}) OR reading IN (${placeholders})
        ORDER BY score DESC, id LIMIT ?`,
       [...variants, ...variants, limit * 8],
@@ -621,16 +642,16 @@ export class Dictionary {
 
   getEntry(seq: number): DictEntry | null {
     if (this.entryCache.has(seq)) return this.entryCache.get(seq) ?? null;
-    let rows = this.termRows(`SELECT ${TERM_COLUMNS} FROM term WHERE sequence = ? ORDER BY id`, [seq]);
+    let rows = this.termRows(`SELECT ${this.termColumns} FROM term WHERE sequence = ? ORDER BY id`, [seq]);
     let entryKeyNum: number;
     if (!rows.length) {
-      const seed = this.termRows(`SELECT ${TERM_COLUMNS} FROM term WHERE id = ?`, [seq])[0];
+      const seed = this.termRows(`SELECT ${this.termColumns} FROM term WHERE id = ?`, [seq])[0];
       if (!seed) {
         this.entryCache.set(seq, null);
         return null;
       }
       rows = this.termRows(
-        `SELECT ${TERM_COLUMNS} FROM term WHERE expression = ? AND reading = ? ORDER BY score DESC, id`,
+        `SELECT ${this.termColumns} FROM term WHERE expression = ? AND reading = ? ORDER BY score DESC, id`,
         [seed.expression, seed.reading],
       );
       entryKeyNum = Number(seed.id);
@@ -735,6 +756,31 @@ export class Dictionary {
       if (tree && tree.root_seq && tree.steps?.length) return tree;
     }
     return null;
+  }
+
+  /**
+   * Full conjugation paradigm for a dictionary entry (Dictionary/Polite/Past/Te/Negative/...),
+   * generated forward from the lemma with the rules engine. Null for non-conjugable entries.
+   */
+  getEntryConjugations(seq: number): Array<{ label: string; form: string; reading: string }> | null {
+    const entry = this.getEntry(seq);
+    if (!entry) return null;
+    const posTags = entryPosTags(entry);
+    if (pos_class(posTags) == null) return null;
+    const lemma = entryLemmaText(entry);
+    const reading = entryReading(entry);
+    const forms = forward_conjugate(lemma, posTags) as Record<string, string> | null;
+    if (!forms || !Object.keys(forms).length) return null;
+    const readingForms =
+      reading && reading !== lemma ? (forward_conjugate(reading, posTags) as Record<string, string> | null) : null;
+    const out: Array<{ label: string; form: string; reading: string }> = [];
+    for (const label of PARADIGM_KEYS) {
+      const form = forms[label];
+      if (!form) continue;
+      const formReading = readingForms?.[label] ?? (reading && form === lemma ? reading : "");
+      out.push({ label, form, reading: formReading || "" });
+    }
+    return out.length ? out : null;
   }
 
   /** Per-token resolution: exact → kanji prefix → deconjugation. Mirrors analyze.ts lookupSegment. */
