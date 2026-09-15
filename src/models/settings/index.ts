@@ -6,7 +6,7 @@ import {
   addKeyboardEventsListeners,
   removeKeyboardEventsListeners,
 } from "@src/utils/keyboardHandler";
-import { TFuriganaMode, TLearningService, TReadingLineMode, TSecondarySubs, TTokenAction, TTranslationService } from "../types";
+import { TFuriganaLevel, TFuriganaMode, TLearningService, TReadingLineMode, TSecondarySubs, TTokenAction, TTranslationService } from "../types";
 import { fetchCurrentStreamingFx } from "../streamings";
 import {
   CLICK_ACTION_SETTING,
@@ -18,6 +18,7 @@ import { UI_SCALE_DEFAULT, UI_SCALE_SETTING, clampUiScale } from "@src/shared/ui
 import { DEFAULT_SECONDARY_SUBS, SECONDARY_SUBS_SETTING, nextSecondarySubs } from "@src/shared/secondarySubs";
 import { DEFAULT_FURIGANA, FURIGANA_SETTING } from "@src/shared/furiganaSettings";
 import { DEFAULT_READING_LINE, READING_LINE_SETTING } from "@src/shared/furiganaSettings";
+import { DEFAULT_FURIGANA_LEVEL, FURIGANA_LEVEL_SETTING } from "@src/shared/furiganaDifficulty";
 import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
 
 // Every persisted store carries an explicit name: it is the chrome.storage key (`persist:<name>`)
@@ -154,6 +155,11 @@ $furigana.on(furiganaChanged, (_, value) => value);
 export const $readingLine = withPersist(createStore<TReadingLineMode>(DEFAULT_READING_LINE, { name: READING_LINE_SETTING }));
 export const readingLineChanged = createEvent<TReadingLineMode>();
 $readingLine.on(readingLineChanged, (_, value) => value);
+
+/** Skip furigana on words at/below a JLPT level the learner knows (see src/shared/furiganaDifficulty.ts). */
+export const $furiganaLevel = withPersist(createStore<TFuriganaLevel>(DEFAULT_FURIGANA_LEVEL, { name: FURIGANA_LEVEL_SETTING }));
+export const furiganaLevelChanged = createEvent<TFuriganaLevel>();
+$furiganaLevel.on(furiganaLevelChanged, (_, value) => value);
 
 /** Words the user has marked as known (stable keys from knownKeyOf); persisted and synced across pages. */
 export const $knownWords = withPersist(createStore<string[]>([], { name: KNOWN_WORDS_SETTING }));
