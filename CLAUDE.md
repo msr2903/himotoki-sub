@@ -14,7 +14,7 @@ Product rule: the extension is focused on Japanese learning with Himotoki. Do no
 - `pnpm build:firefox` - Build for Firefox (note: `chrome.offscreen` is unavailable there, so the ONNX splitter falls back to `Intl.Segmenter`)
 - `pnpm dev` - Watch build with hot reload
 - `pnpm lint` - ESLint (no config file is committed yet; `npx tsc --noEmit` is the reliable check)
-- `pnpm test` - Vitest (no tests exist yet)
+- `pnpm test` - Deterministic Chromium regression checks (`scripts/e2e/regressions.mjs`); build `dist/` first
 - `pnpm test:e2e` - Playwright smoke test on YouTube (`scripts/e2e/youtube.mjs`); `node scripts/e2e/dict.mjs <dictDir>` tests the offline dictionary. Both need `npx playwright install chromium` and a built `dist/`.
 
 If `pnpm` scripts abort with `ERR_PNPM_IGNORED_BUILDS`, check `pnpm-workspace.yaml` `allowBuilds`.
@@ -39,7 +39,7 @@ If `pnpm` scripts abort with `ERR_PNPM_IGNORED_BUILDS`, check `pnpm-workspace.ya
 Hover and click are independent, user-configurable actions (`TTokenAction`: furigana, meaning, both, popup, none; options in `src/shared/tokenActions.ts`). `Subs.tsx` resolves the action per token: a pinned click result (`$pinnedWord`) wins over the transient hover (`$activeHoverWord`). Labels are rendered by `TokenLabel.tsx` (reading derived by `src/utils/furigana.ts`), the full entry by `SubItemTranslation.tsx`; both read the shared lookup cache through `useLookup`. The popup pages across a token's dictionary entries (`TWordTranslation.alternatives`, populated in `src/models/translations`) and can replay the cue's audio from the video (cue timing passed as `cueStart`/`cueEnd`).
 
 ### Known words
-`$knownWords` (persisted array of stable keys from `knownKeyOf`, `src/shared/knownWords.ts`) tracks words the user marked known via the pop-up (also set on save). `$dimKnownWords` (opt-in) dims those tokens; `Subs.tsx` resolves each visible token via `useLookup(subItem, enabled)` only when dimming is on.
+`$knownWords` (persisted array of stable keys from `knownKeyOf`, `src/shared/knownWords.ts`) tracks words the user marked known via the pop-up (also set on save). `$dimKnownWords` (opt-in) dims those tokens; `Subs.tsx` resolves each visible token via `useLookup(subItem, enabled)` only when dimming is on. Per-video coverage (`$videoStats`) is derived from `$coverageKeys` (every distinct word resolved once by `computeCoverageFx` via a batch lookup) and `$knownWords`; shown by `VideoStats` in the panel.
 
 ### Settings persistence
 `withPersist` stores each setting in `chrome.storage.local` as `persist:<name>` (JSON) and syncs live across extension pages. Every persisted store must be created with an explicit `name`; without the effector babel plugin, `shortName` is a creation-order counter. The options page (`src/pages/options/`) reads and writes the same keys through `src/shared/persistedSettings.ts`, so it never imports the content-script models.
@@ -73,3 +73,6 @@ Hover and click are independent, user-configurable actions (`TTokenAction`: furi
 - `src/split/postprocess.ts` - segment fix-ups (known compounds, pronoun+particle peeling)
 - Playback hotkeys live in `src/utils/keyboardHandler.ts`: arrows (prev/next/repeat), D (second line), R (replay line), L (loop line), B (sentence breakdown, `$sentenceOpen` + `SentenceBreakdown.tsx`, local dictionary only)
 - `src/shared/himotokiConfig.ts` - API base URL, dictionaries, Convex URL, OAuth client ID
+
+### Model initialization
+Cross-model video event wiring lives in `src/models/videos/init.ts` and coverage derivation in `src/models/stats`. Keep eager store wiring out of cyclic model imports; browser regression tests cover startup.

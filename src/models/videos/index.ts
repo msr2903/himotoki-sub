@@ -1,7 +1,7 @@
-import { createStore, createEffect, createEvent, StoreValue, sample } from "effector";
-import { debug } from "patronum";
+import { createStore, createEffect, createEvent, StoreValue } from "effector";
 import { $currentSubs, $subs } from "../subs";
 import { TMoveDirection } from "../types";
+import { replayVideoClip } from "@src/utils/replayVideoClip";
 import { moveVideoToTime } from "@src/utils/moveVideoToTime";
 import { $streaming } from "../streamings";
 
@@ -96,25 +96,12 @@ export const moveToTimeFx = createEffect<
   moveVideoToTime(video, streaming, time);
 });
 
-sample({
-  clock: moveToTimeRequested,
-  source: { video: $video, streaming: $streaming },
-  fn: ({ video, streaming }, time) => ({ video, streaming, time }),
-  target: moveToTimeFx,
+export const replayCueRequested = createEvent<{ start: number; end: number }>();
+export const replayCueFx = createEffect(({ video, streaming, start, end }: {
+  video: HTMLVideoElement | null;
+  streaming: StoreValue<typeof $streaming>;
+  start: number;
+  end: number;
+}) => {
+  if (video) replayVideoClip(video, start, end, (time) => moveVideoToTime(video, streaming, time));
 });
-
-sample({
-  clock: moveKeyPressed,
-  source: { video: $video, subs: $subs, currentSubs: $currentSubs, streaming: $streaming },
-  fn: ({ video, subs, currentSubs, streaming }, { direction, force }) => ({
-    video,
-    subs,
-    currentSubs,
-    streaming,
-    direction,
-    force,
-  }),
-  target: moveFx,
-});
-
-debug($video, moveKeyPressed, moveFx, $wasPaused);

@@ -19,6 +19,7 @@ import { UiScale } from "./UiScale";
 import { SecondarySubsSelect } from "./SecondarySubsSelect";
 import { FuriganaSelect, ReadingLineSelect } from "./FuriganaSelect";
 import { DimKnownToggle } from "./DimKnownToggle";
+import { VideoStats } from "./VideoStats";
 import { useClickOutside } from "@src/hooks/useClickOutside";
 import { useUnit } from "effector-react";
 import {
@@ -133,6 +134,9 @@ export const SettingsContent: FC<{ onClose: () => void }> = ({ onClose }) => {
               </div>
               <div className="es-settings-content__item">
                 <LearningService />
+              </div>
+              <div className="es-settings-content__item">
+                <VideoStats />
               </div>
               <div className="es-settings-content__item">
                 <OpenOptionsPage />

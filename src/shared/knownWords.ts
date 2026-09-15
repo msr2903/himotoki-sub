@@ -10,7 +10,7 @@ export const DEFAULT_DIM_KNOWN = false;
  * differences), otherwise the headword. Null when the entry is not resolved to a dictionary word.
  */
 export const knownKeyOf = (t: TWordTranslation | null | undefined): string | null => {
-  if (!t) return null;
+  if (!t || t.error || (!t.himotokiSave && !t.headword)) return null;
   const save = t.himotokiSave;
   if (save && save.seq !== undefined && save.seq !== null) return `seq:${save.source || "jitendex"}:${save.seq}`;
   const hw = t.headword || t.source;
