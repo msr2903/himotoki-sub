@@ -15,19 +15,51 @@ const cleanCueText = (text: string): string => {
 const KANJI_RE = /[一-鿿々〆ヶ]/;
 const NON_KANA_RE = /[^぀-ヿ゠-ヿ・ー\s、。！？!?,.]/u;
 
+/** Katakana → hiragana so a katakana surface and its hiragana reading compare equal. */
+const toHiragana = (text: string): string =>
+  text.replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+
+/** Only the (normalised) kana of a string, dropping kanji, spaces and punctuation. */
+const kanaOnly = (text: string): string => {
+  const out: string[] = [];
+  for (const ch of toHiragana(text)) if (ch >= "ぁ" && ch <= "ゖ") out.push(ch);
+  return out.join("");
+};
+
+/** Is `sub` a subsequence of `full` (same order, gaps allowed)? */
+const isSubsequence = (sub: string, full: string): boolean => {
+  let i = 0;
+  for (let j = 0; j < full.length && i < sub.length; j++) if (full[j] === sub[i]) i++;
+  return i === sub.length;
+};
+
+/**
+ * A genuine reading line reproduces the original line with every kanji replaced by its kana reading,
+ * so the kanji line's own kana must appear, in order, within the reading line, and the reading line
+ * must add kana (the kanji readings) on top. This rejects unrelated two-line dialogue that merely
+ * happens to have a kana-only second line.
+ */
+const isPlausibleReadingOf = (kanjiLine: string, kanaLine: string): boolean => {
+  const bodyKana = kanaOnly(kanjiLine);
+  const readingKana = kanaOnly(kanaLine);
+  if (readingKana.length <= bodyKana.length) return false;
+  return isSubsequence(bodyKana, readingKana);
+};
+
 /**
  * Some learning channels print a kana reading line under the kanji line, e.g.
  *   皆さんは朝起きたら何をしますか\nみなさん あさおきたら なにをしますか
  * Detect that: exactly two newline-separated groups, the first containing kanji and the second
- * being all kana (a plausible reading). Returns the kanji body and the kana line separately so the
- * reading line never reaches the segmenter and can be hidden or shown per the readingLine setting.
+ * being all kana that is a plausible reading of the first (`isPlausibleReadingOf`). Returns the
+ * kanji body and the kana line separately so the reading line never reaches the segmenter and can
+ * be hidden or shown per the readingLine setting.
  */
-const splitReadingLine = (cleaned: string): { body: string; readingLine: string | null } => {
+export const splitReadingLine = (cleaned: string): { body: string; readingLine: string | null } => {
   const lines = cleaned.split(/\n+/).map((l) => l.trim()).filter(Boolean);
   if (lines.length !== 2) return { body: cleaned, readingLine: null };
   const [first, second] = lines as [string, string];
   const secondIsKana = !NON_KANA_RE.test(second) && /[぀-ヿ]/.test(second);
-  if (KANJI_RE.test(first) && secondIsKana && second.length >= first.length * 0.5) {
+  if (KANJI_RE.test(first) && secondIsKana && isPlausibleReadingOf(first, second)) {
     return { body: first, readingLine: second };
   }
   return { body: cleaned, readingLine: null };
@@ -39,7 +71,7 @@ type Chunk = { kind: "text"; text: string } | { kind: "space" } | { kind: "newli
  * Split a cue into text runs, spaces (ASCII or ideographic U+3000) and line breaks.
  * Only text runs are segmented; whitespace never reaches the model, so it cannot be glued to a token.
  */
-const chunkCue = (cleaned: string): Chunk[] => {
+export const chunkCue = (cleaned: string): Chunk[] => {
   const chunks: Chunk[] = [];
   const re = /(\n+)|([ \t　]+)/g;
   let last = 0;
