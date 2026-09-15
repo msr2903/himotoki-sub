@@ -1,4 +1,4 @@
-import { FC, useEffect, useState } from "react";
+import { FC, ReactNode, useEffect, useRef, useState } from "react";
 
 import type { TFuriganaMode, TReadingLineMode, TSecondarySubs, TTokenAction } from "@src/models/types";
 import { onPersistedChange, readPersisted, writePersisted } from "@src/shared/persistedSettings";
@@ -42,29 +42,82 @@ function usePersistedSetting<T>(name: string, fallback: T, validate: (v: unknown
   return [value, update] as const;
 }
 
-const ActionSelect: FC<{ id: string; value: TTokenAction; onChange: (v: TTokenAction) => void }> = ({
+/** Sidebar sections, matching the himotoki.my.id settings layout. */
+const SETTINGS_NAV = [
+  { id: "words", label: "Words" },
+  { id: "readings", label: "Furigana & readings" },
+  { id: "appearance", label: "Appearance" },
+  { id: "dictionary", label: "Dictionary" },
+  { id: "account", label: "Account" },
+  { id: "about", label: "About" },
+] as const;
+
+/** A titled card section that the jump-nav scrolls to. */
+const Group: FC<{ id: string; title: string; lede?: ReactNode; children: ReactNode }> = ({
   id,
-  value,
-  onChange,
+  title,
+  lede,
+  children,
 }) => (
-  <select
-    id={id}
-    className="es-options-select"
-    value={value}
-    onChange={(e) => {
-      const next = e.target.value;
-      if (isTokenAction(next)) onChange(next);
-    }}
-  >
-    {TOKEN_ACTIONS.map((a) => (
-      <option key={a.value} value={a.value}>
-        {a.label}
-      </option>
-    ))}
-  </select>
+  <section id={`settings-${id}`} className="group" aria-labelledby={`${id}-heading`}>
+    <h2 id={`${id}-heading`}>{title}</h2>
+    {lede && <p className="group-lede">{lede}</p>}
+    {children}
+  </section>
 );
 
-const describe = (value: TTokenAction) => TOKEN_ACTIONS.find((a) => a.value === value)?.description ?? "";
+/** One row: title + description on the left, a control on the right. */
+const Row: FC<{ title: string; desc?: ReactNode; control: ReactNode; htmlFor?: string }> = ({
+  title,
+  desc,
+  control,
+  htmlFor,
+}) => (
+  <label className="row" htmlFor={htmlFor}>
+    <span className="row-text">
+      <span className="row-title">{title}</span>
+      {desc && <span className="row-desc">{desc}</span>}
+    </span>
+    {control}
+  </label>
+);
+
+type Option<T extends string> = { value: T; label: string; description?: string };
+
+function SettingSelect<T extends string>({
+  id,
+  value,
+  options,
+  onChange,
+  guard,
+}: {
+  id: string;
+  value: T;
+  options: ReadonlyArray<Option<T>>;
+  onChange: (v: T) => void;
+  guard: (v: unknown) => v is T;
+}) {
+  return (
+    <select
+      id={id}
+      className="lang-select"
+      value={value}
+      onChange={(e) => {
+        if (guard(e.target.value)) onChange(e.target.value);
+      }}
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+const actionDesc = (value: TTokenAction) => TOKEN_ACTIONS.find((a) => a.value === value)?.description ?? "";
+const optionDesc = <T extends string>(options: ReadonlyArray<Option<T>>, value: T) =>
+  options.find((o) => o.value === value)?.description ?? "";
 
 const Options: FC = () => {
   const [hoverAction, setHoverAction] = usePersistedSetting<TTokenAction>(
@@ -95,141 +148,204 @@ const Options: FC = () => {
   );
   const version = chrome.runtime.getManifest().version;
 
+  const [activeNav, setActiveNav] = useState<string>(SETTINGS_NAV[0].id);
+  const suppressObserver = useRef(false);
+
+  // Highlight the nav item for whichever section is in view (like himotoki.my.id).
+  useEffect(() => {
+    const nodes = SETTINGS_NAV.map((item) => document.getElementById(`settings-${item.id}`)).filter(
+      (n): n is HTMLElement => Boolean(n),
+    );
+    if (!nodes.length) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (suppressObserver.current) return;
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+        const id = visible[0]?.target?.id?.replace(/^settings-/, "");
+        if (id) setActiveNav(id);
+      },
+      { rootMargin: "-20% 0px -60% 0px", threshold: [0.1, 0.35, 0.6] },
+    );
+    for (const node of nodes) observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  const scrollToSection = (id: string) => {
+    const el = document.getElementById(`settings-${id}`);
+    if (!el) return;
+    setActiveNav(id);
+    // Don't let the observer fight the smooth scroll's intermediate sections.
+    suppressObserver.current = true;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => {
+      suppressObserver.current = false;
+    }, 600);
+  };
+
   return (
     <div className="es-options">
-      <header className="es-options-header">
-        <span className="header-brand">Himotoki</span>
-        <span className="header-sub">Sub · settings · v{version}</span>
+      <header className="page-head">
+        <h1>Settings</h1>
+        <p className="lede">Himotoki Sub · Japanese subtitles, word split and dictionary · v{version}</p>
       </header>
 
-      <section className="es-options-section">
-        <h2>Subtitle words</h2>
-        <p className="es-popup-hint">
-          What happens when you hover or click a word in the subtitles. Hover results disappear when the pointer
-          leaves; click results stay until you press Escape, click elsewhere, or the subtitle changes.
-        </p>
-        <div className="es-options-row">
-          <label htmlFor="hover-action">On hover</label>
-          <div>
-            <ActionSelect id="hover-action" value={hoverAction} onChange={setHoverAction} />
-            <div className="es-options-help">{describe(hoverAction)}</div>
+      <div className="settings-shell">
+        <nav className="settings-nav" aria-label="Settings sections">
+          <p className="settings-nav-label">Jump to</p>
+          <div className="settings-nav-list">
+            {SETTINGS_NAV.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`settings-nav-item ${activeNav === item.id ? "on" : ""}`}
+                onClick={() => scrollToSection(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
-        </div>
-        <div className="es-options-row">
-          <label htmlFor="click-action">On click</label>
-          <div>
-            <ActionSelect id="click-action" value={clickAction} onChange={setClickAction} />
-            <div className="es-options-help">{describe(clickAction)}</div>
-          </div>
-        </div>
-        <div className="es-options-row">
-          <label htmlFor="ui-scale">Pop-up size</label>
-          <div>
-            <div className="es-options-range">
-              <input
-                id="ui-scale"
-                type="range"
-                min={UI_SCALE_MIN}
-                max={UI_SCALE_MAX}
-                step={UI_SCALE_STEP}
-                value={uiScale}
-                onChange={(e) => setUiScale(clampUiScale(e.target.value))}
-              />
-              <span>{uiScale}%</span>
-            </div>
-            <div className="es-options-help">Size of the dictionary pop-up, hover labels and the in-player panel.</div>
-          </div>
-        </div>
-        <div className="es-options-row">
-          <label htmlFor="furigana">Furigana</label>
-          <div>
-            <select
-              id="furigana"
-              className="es-options-select"
-              value={furigana}
-              onChange={(e) => isFuriganaMode(e.target.value) && setFurigana(e.target.value)}
-            >
-              {FURIGANA_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-            <div className="es-options-help">{FURIGANA_OPTIONS.find((o) => o.value === furigana)?.description}</div>
-          </div>
-        </div>
-        <div className="es-options-row">
-          <label htmlFor="reading-line">Reading line</label>
-          <div>
-            <select
-              id="reading-line"
-              className="es-options-select"
-              value={readingLine}
-              onChange={(e) => isReadingLineMode(e.target.value) && setReadingLine(e.target.value)}
-            >
-              {READING_LINE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-            <div className="es-options-help">{READING_LINE_OPTIONS.find((o) => o.value === readingLine)?.description}</div>
-          </div>
-        </div>
-        <div className="es-options-row">
-          <label htmlFor="secondary-subs">Second line</label>
-          <div>
-            <select
-              id="secondary-subs"
-              className="es-options-select"
-              value={secondary}
-              onChange={(e) => isSecondarySubs(e.target.value) && setSecondary(e.target.value)}
-            >
-              {SECONDARY_SUBS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-            <div className="es-options-help">
-              {SECONDARY_SUBS_OPTIONS.find((o) => o.value === secondary)?.description} Press D in the player to cycle.
-            </div>
-          </div>
-        </div>
-        <p className="es-popup-hint">
-          Subtitle size, position, delay, playback pausing and translation language are in the settings panel inside
-          the video player (the Himotoki button in the player controls).
-        </p>
-      </section>
+        </nav>
 
-      <section className="es-options-section">
-        <h2>Offline dictionary</h2>
-        <DictionaryPanel />
-      </section>
+        <div className="settings-main">
+          <Group
+            id="words"
+            title="Words"
+            lede="What happens when you hover or click a word in the subtitles. Hover results disappear when the pointer leaves; click results stay until you press Escape, click elsewhere, or the subtitle changes."
+          >
+            <Row
+              title="On hover"
+              desc={actionDesc(hoverAction)}
+              htmlFor="hover-action"
+              control={
+                <SettingSelect
+                  id="hover-action"
+                  value={hoverAction}
+                  options={TOKEN_ACTIONS}
+                  onChange={setHoverAction}
+                  guard={isTokenAction}
+                />
+              }
+            />
+            <Row
+              title="On click"
+              desc={actionDesc(clickAction)}
+              htmlFor="click-action"
+              control={
+                <SettingSelect
+                  id="click-action"
+                  value={clickAction}
+                  options={TOKEN_ACTIONS}
+                  onChange={setClickAction}
+                  guard={isTokenAction}
+                />
+              }
+            />
+          </Group>
 
-      <section className="es-options-section">
-        <h2>Himotoki account</h2>
-        <AccountPanel />
-      </section>
+          <Group id="readings" title="Furigana & readings">
+            <Row
+              title="Furigana"
+              desc={optionDesc(FURIGANA_OPTIONS, furigana)}
+              htmlFor="furigana"
+              control={
+                <SettingSelect
+                  id="furigana"
+                  value={furigana}
+                  options={FURIGANA_OPTIONS}
+                  onChange={setFurigana}
+                  guard={isFuriganaMode}
+                />
+              }
+            />
+            <Row
+              title="Reading line"
+              desc={optionDesc(READING_LINE_OPTIONS, readingLine)}
+              htmlFor="reading-line"
+              control={
+                <SettingSelect
+                  id="reading-line"
+                  value={readingLine}
+                  options={READING_LINE_OPTIONS}
+                  onChange={setReadingLine}
+                  guard={isReadingLineMode}
+                />
+              }
+            />
+            <Row
+              title="Second line"
+              desc={
+                <>
+                  {optionDesc(SECONDARY_SUBS_OPTIONS, secondary)} Press D in the player to cycle.
+                </>
+              }
+              htmlFor="secondary-subs"
+              control={
+                <SettingSelect
+                  id="secondary-subs"
+                  value={secondary}
+                  options={SECONDARY_SUBS_OPTIONS}
+                  onChange={setSecondary}
+                  guard={isSecondarySubs}
+                />
+              }
+            />
+          </Group>
 
-      <section className="es-options-section">
-        <h2>About</h2>
-        <p className="es-popup-hint">
-          Japanese subtitles are split into words with a local model and looked up in Jitendex. Whole-line
-          translation uses Google Translate or DeepL.{" "}
-          <a href={HIMOTOKI_API_BASE} target="_blank" rel="noreferrer">
-            himotoki.my.id
-          </a>
-        </p>
-        <p className="es-popup-hint">
-          Dictionary data: <a href="https://jitendex.org/" target="_blank" rel="noreferrer">Jitendex</a> © Stephen Kraus,{" "}
-          <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer">CC BY-SA 4.0</a>, built from{" "}
-          <a href="https://www.edrdg.org/jmdict/j_jmdict.html" target="_blank" rel="noreferrer">JMdict</a> (EDRDG) and{" "}
-          <a href="https://tatoeba.org/" target="_blank" rel="noreferrer">Tatoeba</a> examples (CC BY 2.0 FR). Nothing you
-          watch or look up leaves your device unless you use online translation or save to your account (see the{" "}
-          <a href="https://github.com/msr2903/himotoki-sub/blob/master/PRIVACY.md" target="_blank" rel="noreferrer">privacy policy</a>).
-        </p>
-      </section>
+          <Group
+            id="appearance"
+            title="Appearance"
+            lede="Subtitle size, position, delay, playback pausing and translation language live in the settings panel inside the video player (the Himotoki button in the player controls)."
+          >
+            <Row
+              title="Pop-up size"
+              desc="Size of the dictionary pop-up, hover labels and the in-player panel."
+              htmlFor="ui-scale"
+              control={
+                <div className="range-control">
+                  <input
+                    id="ui-scale"
+                    type="range"
+                    min={UI_SCALE_MIN}
+                    max={UI_SCALE_MAX}
+                    step={UI_SCALE_STEP}
+                    value={uiScale}
+                    onChange={(e) => setUiScale(clampUiScale(e.target.value))}
+                  />
+                  <span className="range-value">{uiScale}%</span>
+                </div>
+              }
+            />
+          </Group>
+
+          <Group id="dictionary" title="Dictionary">
+            <DictionaryPanel />
+          </Group>
+
+          <Group id="account" title="Account">
+            <AccountPanel />
+          </Group>
+
+          <Group id="about" title="About">
+            <p className="row-desc">
+              Japanese subtitles are split into words with a local model and looked up in Jitendex. Whole-line
+              translation uses Google Translate or DeepL.{" "}
+              <a className="inline-link" href={HIMOTOKI_API_BASE} target="_blank" rel="noreferrer">
+                himotoki.my.id
+              </a>
+            </p>
+            <p className="row-desc">
+              Dictionary data: <a className="inline-link" href="https://jitendex.org/" target="_blank" rel="noreferrer">Jitendex</a> © Stephen Kraus,{" "}
+              <a className="inline-link" href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer">CC BY-SA 4.0</a>, built from{" "}
+              <a className="inline-link" href="https://www.edrdg.org/jmdict/j_jmdict.html" target="_blank" rel="noreferrer">JMdict</a> (EDRDG) and{" "}
+              <a className="inline-link" href="https://tatoeba.org/" target="_blank" rel="noreferrer">Tatoeba</a> examples (CC BY 2.0 FR). Nothing you
+              watch or look up leaves your device unless you use online translation or save to your account (see the{" "}
+              <a className="inline-link" href="https://github.com/msr2903/himotoki-sub/blob/master/PRIVACY.md" target="_blank" rel="noreferrer">privacy policy</a>).
+            </p>
+          </Group>
+        </div>
+      </div>
     </div>
   );
 };
