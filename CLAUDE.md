@@ -14,6 +14,7 @@ Product rule: the extension is focused on Japanese learning with Himotoki. Do no
 - `pnpm build:firefox` - Build for Firefox (note: `chrome.offscreen` is unavailable there, so the ONNX splitter falls back to `Intl.Segmenter`)
 - `pnpm dev` - Watch build with hot reload
 - `pnpm lint` - ESLint (no config file is committed yet; `npx tsc --noEmit` is the reliable check)
+- `pnpm test:unit` - Vitest unit tests for pure logic (`src/**/*.test.ts`, node env, no DOM/extension APIs). Runs in CI.
 - `pnpm test` - Deterministic Chromium regression checks (`scripts/e2e/regressions.mjs`); build `dist/` first
 - `pnpm test:e2e` - Playwright smoke test on YouTube (`scripts/e2e/youtube.mjs`); `node scripts/e2e/dict.mjs <dictDir>` tests the offline dictionary. Both need `npx playwright install chromium` and a built `dist/`.
 
