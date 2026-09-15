@@ -17,7 +17,7 @@ import { EnableAutoStop } from "./EnableAutoStop";
 import { ClickActionSelect, HoverActionSelect, OpenOptionsPage } from "./TokenActionSelect";
 import { UiScale } from "./UiScale";
 import { SecondarySubsSelect } from "./SecondarySubsSelect";
-import { FuriganaSelect, ReadingLineSelect } from "./FuriganaSelect";
+import { FuriganaSelect, FuriganaLevelSelect, ReadingLineSelect } from "./FuriganaSelect";
 import { DimKnownToggle } from "./DimKnownToggle";
 import { VideoStats } from "./VideoStats";
 import { useClickOutside } from "@src/hooks/useClickOutside";
@@ -107,6 +107,9 @@ export const SettingsContent: FC<{ onClose: () => void }> = ({ onClose }) => {
               </div>
               <div className="es-settings-content__item">
                 <FuriganaSelect />
+              </div>
+              <div className="es-settings-content__item">
+                <FuriganaLevelSelect />
               </div>
               <div className="es-settings-content__item">
                 <ReadingLineSelect />

@@ -1,6 +1,6 @@
 import { FC, ReactNode, useEffect, useRef, useState } from "react";
 
-import type { TFuriganaMode, TReadingLineMode, TSecondarySubs, TTokenAction } from "@src/models/types";
+import type { TFuriganaLevel, TFuriganaMode, TReadingLineMode, TSecondarySubs, TTokenAction } from "@src/models/types";
 import { onPersistedChange, readPersisted, writePersisted } from "@src/shared/persistedSettings";
 import {
   CLICK_ACTION_SETTING,
@@ -23,6 +23,12 @@ import {
   isReadingLineMode,
 } from "@src/shared/furiganaSettings";
 import { UI_SCALE_DEFAULT, UI_SCALE_MAX, UI_SCALE_MIN, UI_SCALE_SETTING, UI_SCALE_STEP, clampUiScale } from "@src/shared/uiScale";
+import {
+  DEFAULT_FURIGANA_LEVEL,
+  FURIGANA_LEVEL_OPTIONS,
+  FURIGANA_LEVEL_SETTING,
+  isFuriganaLevel,
+} from "@src/shared/furiganaDifficulty";
 import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
 import { AccountPanel } from "@src/pages/shared/AccountPanel";
 import { DictionaryPanel } from "@src/pages/shared/DictionaryPanel";
@@ -142,6 +148,11 @@ const Options: FC = () => {
     isSecondarySubs,
   );
   const [furigana, setFurigana] = usePersistedSetting<TFuriganaMode>(FURIGANA_SETTING, DEFAULT_FURIGANA, isFuriganaMode);
+  const [furiganaLevel, setFuriganaLevel] = usePersistedSetting<TFuriganaLevel>(
+    FURIGANA_LEVEL_SETTING,
+    DEFAULT_FURIGANA_LEVEL,
+    isFuriganaLevel,
+  );
   const [readingLine, setReadingLine] = usePersistedSetting<TReadingLineMode>(
     READING_LINE_SETTING,
     DEFAULT_READING_LINE,
@@ -278,6 +289,20 @@ const Options: FC = () => {
                   options={FURIGANA_OPTIONS}
                   onChange={setFurigana}
                   guard={isFuriganaMode}
+                />
+              }
+            />
+            <Row
+              title="Furigana difficulty"
+              desc={optionDesc(FURIGANA_LEVEL_OPTIONS, furiganaLevel)}
+              htmlFor="furigana-level"
+              control={
+                <SettingSelect
+                  id="furigana-level"
+                  value={furiganaLevel}
+                  options={FURIGANA_LEVEL_OPTIONS}
+                  onChange={setFuriganaLevel}
+                  guard={isFuriganaLevel}
                 />
               }
             />
