@@ -28,24 +28,14 @@ Shipped on `master`: local ONNX word split, offline Jitendex (SQLite WASM),
 hover/click configurable actions, dictionary popup, whole-line translation,
 dual subtitles, furigana ruby + reading-line control, settings/options pages.
 
-In-flight as a stacked set of PRs (ideas 11–20, being merged by others): popup
-entry switcher + line-audio replay, deconjugation chain + conjugation table,
-pitch/frequency/JLPT badges, sentence breakdown, known-word tracking + dimming,
-line replay/loop hotkeys, per-video coverage & i+1 stats. **Do not re-implement
-these**; check open PRs first.
+Also shipped in PRs #2–#8: popup entry switcher + line-audio replay,
+deconjugation chain + conjugation table, pitch/frequency/JLPT badges,
+local sentence breakdown, known-word tracking + dimming, replay/loop hotkeys,
+and per-video coverage & i+1 stats. Check open PRs before starting new work.
 
 ---
 
 ## P0 — Bugs (fix first)
-
-### 1. Pinned popup closes when clicking its own controls
-`src/pages/content/components/Subs/Subs.tsx` dismisses a pinned word on any
-outside click using `rootRef.current.contains(event.target)`. With
-`react-draggable` re-parenting, `contains` returns false for controls inside the
-popup, so clicking Save / entry arrows / the conjugation toggle closes it.
-**Fix:** use `event.composedPath()` and check for `closest("#es-subs")` (this fix
-already exists on the `feat/grammar` branch — port it to `master` if that branch
-is not merged first).
 
 ### 2. Always-on furigana hammers the API before the dictionary is installed
 `DEFAULT_FURIGANA` is `"always"` (`src/shared/furiganaSettings.ts`), so on a
@@ -65,8 +55,9 @@ unit tests for both the intended reading-line case and false-positive dialogue.
 
 ## P1 — Correctness & robustness
 
-### 4. Add a real test suite
-There are no Vitest tests. Add unit tests for the pure logic that is easy to
+### 4. Expand logic tests and add CI
+`pnpm test` now runs deterministic Chromium regressions for startup, coverage,
+replay, popup interaction and local sentence breakdown. Add unit tests for the pure logic that is easy to
 regress: `src/utils/furigana.ts` (`surfaceReading`, okurigana alignment, 来る),
 `src/dict/conj_rules.ts` / deinflection, `src/utils/convertRawSubs.ts`
 (`splitReadingLine`, `chunkCue`), and `src/utils/himotokiTypes.ts` mapping. Wire
@@ -100,14 +91,15 @@ not running. Respect the Japanese-only product rule.
 ### 9. Per-cue i+1 highlight
 Building on known-word tracking, visually highlight cues that contain exactly one
 unknown word (i+1), so learners can target comprehensible input. Add a toggle in
-settings. Coordinate with the known-words / stats PRs already in flight.
+settings. Use the known-word keys and coverage model merged in PRs #5 and #8.
 
 ### 10. Save-context: store the sentence with the word
-When saving to Himotoki favorites or Anki, include the full subtitle line and a
-timestamped deep link back to the video, so review has context.
+The popup already passes the subtitle line, source URL and video timestamp to
+the learning service. Verify both Himotoki and Anki preserve that context and
+render timestamped video links during review; fix any missing mapping.
 
 ### 11. Keyboard-first navigation
-Expand hotkeys (replay/loop line already in flight) with: focus next/previous
+Expand hotkeys (replay/loop line already shipped) with: focus next/previous
 word, open popup for the focused word, save focused word, toggle furigana. Show a
 discoverable hotkey cheatsheet from the in-player panel.
 
@@ -161,5 +153,7 @@ recipes for the popup, furigana, dual subs, and dictionary flows.
 - Configurable hover/click token actions; dictionary popup; whole-line translation.
 - Dual subtitles; furigana ruby + reading-line control.
 - Settings/options/welcome pages; Himotoki + Anki learning-service scaffolding.
-</content>
-</invoke>
+- Popup entry switching, cue replay, conjugation chain/table, and pitch/frequency/JLPT badges (PRs #2–#6).
+- Known-word tracking, local sentence breakdown, replay/loop hotkeys, and coverage/i+1 counts (PRs #4–#8).
+- Popup controls preserve the pinned entry; regression checks cover entry switching and mark-known.
+- Audit fixes for old dictionary compatibility, circular model startup, replay media timing, and stale coverage results.
