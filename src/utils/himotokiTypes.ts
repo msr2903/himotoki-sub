@@ -18,6 +18,7 @@ export type HimotokiEntry = {
   jlpt?: string | string[] | null;
   pitch?: number[];
   pitch_display?: string;
+  freq?: number;
 };
 
 export type HimotokiConjugation = {
@@ -133,6 +134,7 @@ export const himotokiEntryToWordTranslation = (
     common: Boolean(entry.common),
     pitch: entry.pitch_display || (entry.pitch?.length ? entry.pitch.join("/") : undefined),
     jlpt,
+    frequency: typeof entry.freq === "number" ? entry.freq : undefined,
     conjugationNote: conjNote || undefined,
     example: firstExample ? { jp: firstExample.jp, en: firstExample.en, keyword: firstExample.keyword } : undefined,
   };

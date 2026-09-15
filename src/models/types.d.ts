@@ -84,6 +84,8 @@ export type TWordTranslation = {
   common?: boolean;
   pitch?: string;
   jlpt?: string[];
+  /** Frequency rank (smaller = more common), from the folded frequency list. */
+  frequency?: number;
   /** Other dictionary entries for the same surface (multi-entry switcher). Never nested. */
   alternatives?: TWordTranslation[];
   /** "飲みます → 飲む (Polite)" when the surface was deconjugated. */

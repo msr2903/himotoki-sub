@@ -349,6 +349,17 @@ log("popup depth:", JSON.stringify(await page.evaluate(() => {
     playFromVideo: !!p.querySelector(".es-popup-speak[title*='video']"),
   };
 })));
+await page.screenshot({ path: "/tmp/hf-pf-popup.png" });
+log("pitch/freq/jlpt tags:", JSON.stringify(await page.evaluate(() => {
+  const p = document.querySelector(".es-word-translation");
+  if (!p) return null;
+  return {
+    pitch: !!p.querySelector(".es-pitch-diagram, .es-pitch-num"),
+    pitchMorae: [...p.querySelectorAll(".es-pitch-mora")].map((m) => m.className.includes("high") ? "H" : "L").join(""),
+    freq: p.querySelector(".es-tag-freq")?.textContent ?? null,
+    jlpt: [...p.querySelectorAll(".es-tag")].map((t) => t.textContent).filter((t) => /^N[1-5]$/.test(t)),
+  };
+})));
 // Grammar (idea 12): the deconjugation chain renders from data (no click needed).
 await page.evaluate(() => document.querySelector("video")?.pause());
 await page.waitForTimeout(200);
