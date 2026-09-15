@@ -21,6 +21,7 @@ import { SecondarySubsSelect } from "./SecondarySubsSelect";
 import { FuriganaSelect, FuriganaLevelSelect, ReadingLineSelect } from "./FuriganaSelect";
 import { DimKnownToggle } from "./DimKnownToggle";
 import { DifficultyColorToggle } from "./DifficultyColorToggle";
+import { MeaningSize } from "./MeaningSize";
 import { VideoStats } from "./VideoStats";
 import { useClickOutside } from "@src/hooks/useClickOutside";
 import { useUnit } from "effector-react";
@@ -128,6 +129,9 @@ export const SettingsContent: FC<{ onClose: () => void }> = ({ onClose }) => {
               </div>
               <div className="es-settings-content__item">
                 <ClickActionSelect />
+              </div>
+              <div className="es-settings-content__item">
+                <MeaningSize />
               </div>
               <div className="es-settings-content__item">
                 <FuriganaSelect />

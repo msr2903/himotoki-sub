@@ -20,6 +20,7 @@ import {
   $dimKnownWords,
   $knownWords,
   $colorByDifficulty,
+  $meaningSize,
 } from "@src/models/settings";
 import {
   $activeHoverWord,
@@ -87,7 +88,7 @@ export const Subs: FC<TSubsProps> = () => {
   // Without the offline dictionary, "always" would look up every kanji token over the HTTP API;
   // fall back to "hover" (one lookup at a time) until it is installed.
   const effectiveFurigana: TFuriganaMode = furigana === "always" && !dictReady ? "hover" : furigana;
-  const [subsBackground, subsBackgroundOpacity] = useUnit([$subsBackground, $subsBackgroundOpacity]);
+  const [subsBackground, subsBackgroundOpacity, meaningSize] = useUnit([$subsBackground, $subsBackgroundOpacity, $meaningSize]);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -155,7 +156,7 @@ export const Subs: FC<TSubsProps> = () => {
         ref={rootRef}
         onMouseLeave={handleOnMouseLeave}
         onMouseEnter={handleOnMouseEnter}
-        style={{ fontSize: `${fontSizePx}px`, "--es-ui-scale": String(uiScale / 100) } as React.CSSProperties}
+        style={{ fontSize: `${fontSizePx}px`, "--es-ui-scale": String(uiScale / 100), "--es-meaning-scale": String(meaningSize / 100) } as React.CSSProperties}
       >
         {currentSubs.map((sub) => (
           <Sub key={sub.id} sub={sub} secondary={secondaryMode === "translate"} furigana={effectiveFurigana} readingLine={readingLine} />
