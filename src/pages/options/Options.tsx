@@ -24,6 +24,14 @@ import {
 } from "@src/shared/furiganaSettings";
 import { UI_SCALE_DEFAULT, UI_SCALE_MAX, UI_SCALE_MIN, UI_SCALE_SETTING, UI_SCALE_STEP, clampUiScale } from "@src/shared/uiScale";
 import {
+  MEANING_SIZE_DEFAULT,
+  MEANING_SIZE_MAX,
+  MEANING_SIZE_MIN,
+  MEANING_SIZE_SETTING,
+  MEANING_SIZE_STEP,
+  clampMeaningSize,
+} from "@src/shared/labelSettings";
+import {
   DEFAULT_FURIGANA_LEVEL,
   FURIGANA_LEVEL_OPTIONS,
   FURIGANA_LEVEL_SETTING,
@@ -141,6 +149,11 @@ const Options: FC = () => {
   const [uiScale, setUiScale] = usePersistedSetting<number>(
     UI_SCALE_SETTING,
     UI_SCALE_DEFAULT,
+    (v): v is number => typeof v === "number" && Number.isFinite(v),
+  );
+  const [meaningSize, setMeaningSize] = usePersistedSetting<number>(
+    MEANING_SIZE_SETTING,
+    MEANING_SIZE_DEFAULT,
     (v): v is number => typeof v === "number" && Number.isFinite(v),
   );
   const [secondary, setSecondary] = usePersistedSetting<TSecondarySubs>(
@@ -269,6 +282,25 @@ const Options: FC = () => {
                   onChange={setClickAction}
                   guard={isTokenAction}
                 />
+              }
+            />
+            <Row
+              title="Meaning size"
+              desc="Size of the short meaning shown in the hover label above a word."
+              htmlFor="meaning-size"
+              control={
+                <div className="range-control">
+                  <input
+                    id="meaning-size"
+                    type="range"
+                    min={MEANING_SIZE_MIN}
+                    max={MEANING_SIZE_MAX}
+                    step={MEANING_SIZE_STEP}
+                    value={meaningSize}
+                    onChange={(e) => setMeaningSize(clampMeaningSize(e.target.value))}
+                  />
+                  <span className="range-value">{meaningSize}%</span>
+                </div>
               }
             />
             <Row

@@ -15,6 +15,7 @@ import {
   HOVER_ACTION_SETTING,
 } from "@src/shared/tokenActions";
 import { UI_SCALE_DEFAULT, UI_SCALE_SETTING, clampUiScale } from "@src/shared/uiScale";
+import { MEANING_SIZE_DEFAULT, MEANING_SIZE_SETTING, clampMeaningSize } from "@src/shared/labelSettings";
 import { DEFAULT_SECONDARY_SUBS, SECONDARY_SUBS_SETTING, nextSecondarySubs } from "@src/shared/secondarySubs";
 import { DEFAULT_FURIGANA, FURIGANA_SETTING } from "@src/shared/furiganaSettings";
 import { DEFAULT_READING_LINE, READING_LINE_SETTING } from "@src/shared/furiganaSettings";
@@ -138,6 +139,11 @@ $clickAction.on(clickActionChanged, (_, value) => value);
 export const $uiScale = withPersist(createStore<number>(UI_SCALE_DEFAULT, { name: UI_SCALE_SETTING }));
 export const uiScaleChanged = createEvent<number>();
 $uiScale.on(uiScaleChanged, (_, value) => clampUiScale(value));
+
+/** Size of the meaning text in the hover label, in percent (see src/shared/labelSettings.ts). */
+export const $meaningSize = withPersist(createStore<number>(MEANING_SIZE_DEFAULT, { name: MEANING_SIZE_SETTING }));
+export const meaningSizeChanged = createEvent<number>();
+$meaningSize.on(meaningSizeChanged, (_, value) => clampMeaningSize(value));
 
 /** Second subtitle line: off, subtitle track in the translate-to language, or machine translation. */
 export const $secondarySubs = withPersist(
