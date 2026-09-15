@@ -8,6 +8,8 @@ Himotoki Sub is a Japanese-only browser extension forked from EasySubs. It overl
 
 Product rule: the extension is focused on Japanese learning with Himotoki. Do not add or revive features that only make sense for other languages (Google word translation, phrasal verbs, English dictionaries, other learning services). Prefer deleting inherited EasySubs code over extending it.
 
+UI-change rule: for any UI/UX refinement or visual bug fix, always show the user a screenshot of the result plus a short list of what changed — they want visual proof the change was applied, not just a description. Capture it before considering the task done (see "Showing UI changes to the user" in SKILLS.md for how to screenshot extension pages and the in-player UI); show before/after when it clarifies the fix.
+
 ## Development Commands
 
 - `pnpm build` - Build extension for Chrome (runs `tsc --noEmit` first)

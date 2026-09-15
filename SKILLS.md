@@ -103,7 +103,14 @@ Serves the built dictionary locally, installs it through the extension, then che
 
 ### Hotkeys to exercise
 
-`←` / `→` previous / next line (with `alt` to force), `↓` repeat line, `D` cycle the second subtitle line, `R` replay the current line, `L` loop the current line, `B` open the local sentence breakdown. All are ignored while typing in an input.
+`←` / `→` previous / next line (with `alt` to force), `↓` repeat line, `D` cycle the second subtitle line, `R` replay the current line, `L` loop the current line, `B` open the local sentence breakdown, `T` open the searchable transcript. All are ignored while typing in an input.
+
+## Showing UI changes to the user (required)
+
+For **any UI/UX refinement or visual bug fix**, the reply to the user must include **a screenshot of the result** and **a short list of what changed** — the user wants visual proof the change was actually applied, not just a description. Capture the screenshot before treating the task as done; show before/after when it clarifies the fix.
+
+- **Extension pages** (options/settings, popup, welcome): `pnpm build`, serve `dist/` (`python3 -m http.server 8971 --directory dist`), then open the page in headed Playwright Chromium (`chromium.launch({ headless: false })`) with a `window.chrome` shim — `runtime.getManifest`, `storage.local.get/set` returning promises, `runtime.sendMessage` returning a resolved promise — and seed the relevant `persist:<name>` keys; screenshot full page. Playwright is installed in `/tmp/ext-test`.
+- **In-player UI** (subtitles, furigana, token labels, dictionary pop-up, in-player panel): run `scripts/e2e/youtube.mjs` with `HIMOTOKI_DICT_DIR` and the relevant `persist:*` settings; screenshots are written to `/tmp/himotoki-e2e-*.png` and `/tmp/hf-*.png`.
 
 ## Feature status
 
