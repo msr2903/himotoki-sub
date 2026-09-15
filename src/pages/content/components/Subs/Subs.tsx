@@ -23,6 +23,7 @@ import {
 } from "@src/models/settings";
 import {
   $activeHoverWord,
+  $dictReady,
   $pinnedWord,
   subItemMouseEntered,
   subItemMouseLeft,
@@ -61,6 +62,7 @@ export const Subs: FC<TSubsProps> = () => {
     furigana,
     readingLine,
     sentenceOpen,
+    dictReady,
   ] = useUnit([
     $video,
     $currentSubs,
@@ -77,7 +79,11 @@ export const Subs: FC<TSubsProps> = () => {
     $furigana,
     $readingLine,
     $sentenceOpen,
+    $dictReady,
   ]);
+  // Without the offline dictionary, "always" would look up every kanji token over the HTTP API;
+  // fall back to "hover" (one lookup at a time) until it is installed.
+  const effectiveFurigana: TFuriganaMode = furigana === "always" && !dictReady ? "hover" : furigana;
   const [subsBackground, subsBackgroundOpacity] = useUnit([$subsBackground, $subsBackgroundOpacity]);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -149,7 +155,7 @@ export const Subs: FC<TSubsProps> = () => {
         style={{ fontSize: `${fontSizePx}px`, "--es-ui-scale": String(uiScale / 100) } as React.CSSProperties}
       >
         {currentSubs.map((sub) => (
-          <Sub key={sub.id} sub={sub} secondary={secondaryMode === "translate"} furigana={furigana} readingLine={readingLine} />
+          <Sub key={sub.id} sub={sub} secondary={secondaryMode === "translate"} furigana={effectiveFurigana} readingLine={readingLine} />
         ))}
         {secondaryMode === "track" && currentSubs.length > 0 && currentSecondary.length > 0 && (
           <div className="es-sub es-sub--secondary" style={{ background: `rgba(0, 0, 0, ${subsBackgroundAlpha(subsBackground, subsBackgroundOpacity)})` }}>
