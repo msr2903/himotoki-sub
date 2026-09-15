@@ -2,7 +2,7 @@ import { FC, useEffect, useRef, useState } from "react";
 import { useUnit } from "effector-react";
 import Draggable from "react-draggable";
 
-import { $currentSecondarySubs, $currentSubs, $sentenceOpen } from "@src/models/subs";
+import { $currentSecondarySubs, $currentSubs, $sentenceOpen, $transcriptOpen } from "@src/models/subs";
 import { $video, $wasPaused, wasPausedChanged } from "@src/models/videos";
 import { TFuriganaMode, TSub, TSubItem, TTokenAction } from "@src/models/types";
 import {
@@ -33,6 +33,7 @@ import { SubItemTranslation } from "./SubItemTranslation";
 import { SecondaryTranslation, SubFullTranslation } from "./SubFullTranslation";
 import { TokenLabel } from "./TokenLabel";
 import { SentenceBreakdown } from "./SentenceBreakdown";
+import { Transcript } from "./Transcript";
 import { TokenRuby } from "./TokenRuby";
 import { hasKanji } from "@src/utils/furigana";
 import { useLookup } from "@src/pages/content/hooks/useLookup";
@@ -59,6 +60,7 @@ export const Subs: FC<TSubsProps> = () => {
     furigana,
     readingLine,
     sentenceOpen,
+    transcriptOpen,
   ] = useUnit([
     $video,
     $currentSubs,
@@ -75,6 +77,7 @@ export const Subs: FC<TSubsProps> = () => {
     $furigana,
     $readingLine,
     $sentenceOpen,
+    $transcriptOpen,
   ]);
   const [subsBackground, subsBackgroundOpacity] = useUnit([$subsBackground, $subsBackgroundOpacity]);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -155,6 +158,7 @@ export const Subs: FC<TSubsProps> = () => {
           </div>
         )}
         {sentenceOpen && <SentenceBreakdown />}
+        {transcriptOpen && <Transcript />}
       </div>
     </Draggable>
   );

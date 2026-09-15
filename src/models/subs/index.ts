@@ -134,6 +134,12 @@ export const sentenceToggled = createEvent<void>();
 export const sentenceClosed = createEvent<void>();
 $sentenceOpen.on(sentenceToggled, (v) => !v).reset(sentenceClosed);
 
+/** Whether the searchable transcript panel is open (toggled with T). */
+export const $transcriptOpen = createStore<boolean>(false);
+export const transcriptToggled = createEvent<void>();
+export const transcriptClosed = createEvent<void>();
+$transcriptOpen.on(transcriptToggled, (v) => !v).reset(transcriptClosed);
+
 export const $subsDelay = createStore<number>(0);
 export const subsDelayButtonPressed = createEvent<number>();
 export const subsDelayChangeFx = createEffect<number, number>((value) => value);

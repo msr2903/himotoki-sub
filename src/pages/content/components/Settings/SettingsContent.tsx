@@ -15,6 +15,7 @@ import { MoveBySubs } from "./MoveBySubs";
 import { AutoPauseBySubs } from "./AutoPauseBySubs";
 import { EnableAutoStop } from "./EnableAutoStop";
 import { ClickActionSelect, HoverActionSelect, OpenOptionsPage } from "./TokenActionSelect";
+import { OpenTranscript } from "./OpenTranscript";
 import { UiScale } from "./UiScale";
 import { SecondarySubsSelect } from "./SecondarySubsSelect";
 import { FuriganaSelect, ReadingLineSelect } from "./FuriganaSelect";
@@ -137,6 +138,9 @@ export const SettingsContent: FC<{ onClose: () => void }> = ({ onClose }) => {
               </div>
               <div className="es-settings-content__item">
                 <VideoStats />
+              </div>
+              <div className="es-settings-content__item">
+                <OpenTranscript onOpen={onClose} />
               </div>
               <div className="es-settings-content__item">
                 <OpenOptionsPage />
