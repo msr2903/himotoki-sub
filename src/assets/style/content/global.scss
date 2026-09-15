@@ -135,6 +135,11 @@
     color: var(--hm-accent);
     z-index: 60;
   }
+  // When ruby furigana is drawn over the token, lift the hover label clear of the reading
+  // (both the ruby and this label scale with the same em, so the offset stays correct at any size).
+  .es-token-label--above-ruby {
+    margin-bottom: 1.8em;
+  }
   .es-token-label-meaning {
     color: var(--hm-ink);
     font-size: 0.92em;

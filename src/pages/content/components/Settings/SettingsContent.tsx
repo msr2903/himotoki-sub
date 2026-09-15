@@ -64,30 +64,21 @@ export const SettingsContent: FC<{ onClose: () => void }> = ({ onClose }) => {
 
   useClickOutside(contentRef, onClose);
 
-  // Persisted tab index may point at the removed "Experiments" tab.
-  const tab = activeSettingsTab === 1 ? 1 : 0;
+  // Three tabs: General (app/playback), Words (word behaviour), Subtitles (appearance).
+  const tab = activeSettingsTab === 1 || activeSettingsTab === 2 ? activeSettingsTab : 0;
 
   return (
     <>
       <div className="es-settings-content" ref={contentRef} style={{ zoom: uiScale / 100 } as React.CSSProperties}>
         <div className="es-settings-content__menu">
           <div className="es-settings-content__menu__items">
-            <Tab
-              isActive={tab === 0}
-              tabId={0}
-              onClick={() => {
-                handleActiveSettingsTabChanged(0);
-              }}
-            >
+            <Tab isActive={tab === 0} tabId={0} onClick={() => handleActiveSettingsTabChanged(0)}>
               General
             </Tab>
-            <Tab
-              isActive={tab === 1}
-              tabId={1}
-              onClick={() => {
-                handleActiveSettingsTabChanged(1);
-              }}
-            >
+            <Tab isActive={tab === 1} tabId={1} onClick={() => handleActiveSettingsTabChanged(1)}>
+              Words
+            </Tab>
+            <Tab isActive={tab === 2} tabId={2} onClick={() => handleActiveSettingsTabChanged(2)}>
               Subtitles
             </Tab>
           </div>
@@ -97,30 +88,6 @@ export const SettingsContent: FC<{ onClose: () => void }> = ({ onClose }) => {
             <>
               <div className="es-settings-content__item">
                 <EnableToggle />
-              </div>
-              <div className="es-settings-content__item">
-                <HoverActionSelect />
-              </div>
-              <div className="es-settings-content__item">
-                <ClickActionSelect />
-              </div>
-              <div className="es-settings-content__item">
-                <SecondarySubsSelect />
-              </div>
-              <div className="es-settings-content__item">
-                <FuriganaSelect />
-              </div>
-              <div className="es-settings-content__item">
-                <FuriganaLevelSelect />
-              </div>
-              <div className="es-settings-content__item">
-                <ReadingLineSelect />
-              </div>
-              <div className="es-settings-content__item">
-                <DimKnownToggle />
-              </div>
-              <div className="es-settings-content__item">
-                <DifficultyColorToggle />
               </div>
               <div className="es-settings-content__item">
                 <EnableAutoStop />
@@ -155,6 +122,34 @@ export const SettingsContent: FC<{ onClose: () => void }> = ({ onClose }) => {
             </>
           )}
           {tab === 1 && (
+            <>
+              <div className="es-settings-content__item">
+                <HoverActionSelect />
+              </div>
+              <div className="es-settings-content__item">
+                <ClickActionSelect />
+              </div>
+              <div className="es-settings-content__item">
+                <FuriganaSelect />
+              </div>
+              <div className="es-settings-content__item">
+                <FuriganaLevelSelect />
+              </div>
+              <div className="es-settings-content__item">
+                <ReadingLineSelect />
+              </div>
+              <div className="es-settings-content__item">
+                <SecondarySubsSelect />
+              </div>
+              <div className="es-settings-content__item">
+                <DimKnownToggle />
+              </div>
+              <div className="es-settings-content__item">
+                <DifficultyColorToggle />
+              </div>
+            </>
+          )}
+          {tab === 2 && (
             <>
               <div className="es-settings-content__item">
                 <SubsFontSize />

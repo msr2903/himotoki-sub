@@ -10,7 +10,9 @@ export const TokenLabel: FC<{
   mode: "furigana" | "meaning" | "both";
   /** When ruby already shows the reading over this token, suppress the label's reading to avoid duplication. */
   showReading?: boolean;
-}> = ({ subItem, mode, showReading = true }) => {
+  /** When ruby is drawn over this token, lift the label above the ruby so they do not overlap. */
+  offsetForRuby?: boolean;
+}> = ({ subItem, mode, showReading = true, offsetForRuby = false }) => {
   const { translation, pending } = useLookup(subItem);
   if (pending || !translation || translation.error) return null;
 
@@ -22,7 +24,7 @@ export const TokenLabel: FC<{
   if (!reading && !meaning) return null;
 
   return (
-    <span className="es-token-label">
+    <span className={`es-token-label${offsetForRuby ? " es-token-label--above-ruby" : ""}`}>
       {reading && <span className="es-token-label-reading">{reading}</span>}
       {meaning && <span className="es-token-label-meaning">{meaning}</span>}
     </span>
