@@ -35,6 +35,7 @@ const DICT_OPS: Record<string, string> = {
   himotokiLookup: "lookup",
   himotokiLookupBatch: "lookupBatch",
   himotokiRepairSegments: "repair",
+  himotokiConjTable: "conjTable",
 };
 
 import "webext-dynamic-content-scripts";

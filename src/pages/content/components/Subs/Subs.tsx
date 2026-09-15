@@ -2,7 +2,7 @@ import { FC, useEffect, useRef, useState } from "react";
 import { useUnit } from "effector-react";
 import Draggable from "react-draggable";
 
-import { $currentSecondarySubs, $currentSubs } from "@src/models/subs";
+import { $currentSecondarySubs, $currentSubs, $sentenceOpen } from "@src/models/subs";
 import { $video, $wasPaused, wasPausedChanged } from "@src/models/videos";
 import { TFuriganaMode, TSub, TSubItem, TTokenAction } from "@src/models/types";
 import {
@@ -17,6 +17,8 @@ import {
   $uiScale,
   $furigana,
   $readingLine,
+  $dimKnownWords,
+  $knownWords,
 } from "@src/models/settings";
 import {
   $activeHoverWord,
@@ -30,8 +32,11 @@ import { addKeyboardEventsListeners, removeKeyboardEventsListeners } from "@src/
 import { SubItemTranslation } from "./SubItemTranslation";
 import { SecondaryTranslation, SubFullTranslation } from "./SubFullTranslation";
 import { TokenLabel } from "./TokenLabel";
+import { SentenceBreakdown } from "./SentenceBreakdown";
 import { TokenRuby } from "./TokenRuby";
 import { hasKanji } from "@src/utils/furigana";
+import { useLookup } from "@src/pages/content/hooks/useLookup";
+import { knownKeyOf } from "@src/shared/knownWords";
 
 type TSubsProps = {};
 
@@ -53,6 +58,7 @@ export const Subs: FC<TSubsProps> = () => {
     currentSecondary,
     furigana,
     readingLine,
+    sentenceOpen,
   ] = useUnit([
     $video,
     $currentSubs,
@@ -68,6 +74,7 @@ export const Subs: FC<TSubsProps> = () => {
     $currentSecondarySubs,
     $furigana,
     $readingLine,
+    $sentenceOpen,
   ]);
   const [subsBackground, subsBackgroundOpacity] = useUnit([$subsBackground, $subsBackgroundOpacity]);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -87,7 +94,12 @@ export const Subs: FC<TSubsProps> = () => {
       if (event.key === "Escape") unpin();
     };
     const onClick = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) unpin();
+      const root = rootRef.current;
+      if (!root) return;
+      // Composed path handles Draggable/portal edge cases better than contains().
+      const path = (event.composedPath && event.composedPath()) || [];
+      const inside = path.includes(root) || root.contains(event.target as Node) || (event.target as HTMLElement)?.closest?.("#es-subs") != null;
+      if (!inside) unpin();
     };
     document.addEventListener("keydown", onKey, true);
     document.addEventListener("click", onClick, true);
@@ -142,6 +154,7 @@ export const Subs: FC<TSubsProps> = () => {
             <div className="es-sub-secondary">{currentSecondary.map((cue) => cue.text).join(" ")}</div>
           </div>
         )}
+        {sentenceOpen && <SentenceBreakdown />}
       </div>
     </Draggable>
   );
@@ -182,6 +195,8 @@ const Sub: FC<{ sub: TSub; secondary: boolean; furigana: TFuriganaMode; readingL
             subItem={item}
             contextSentence={sub.cleanedText}
             furigana={furigana}
+            cueStart={sub.start}
+            cueEnd={sub.end}
           />
         );
       })}
@@ -198,10 +213,12 @@ type TSubItemProps = {
   hoverKey: string;
   contextSentence?: string;
   furigana: TFuriganaMode;
+  cueStart?: number;
+  cueEnd?: number;
 };
 
-const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furigana }) => {
-  const [activeHoverWord, pinnedWord, hoverAction, clickAction, handleSubItemMouseEntered, handleSubItemMouseLeft, pinToggle] =
+const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furigana, cueStart, cueEnd }) => {
+  const [activeHoverWord, pinnedWord, hoverAction, clickAction, handleSubItemMouseEntered, handleSubItemMouseLeft, pinToggle, dimKnownWords, knownWords] =
     useUnit([
       $activeHoverWord,
       $pinnedWord,
@@ -210,6 +227,8 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
       subItemMouseEntered,
       subItemMouseLeft,
       tokenPinToggled,
+      $dimKnownWords,
+      $knownWords,
     ]);
   const leaveTimer = useRef<number | null>(null);
   const itemRef = useRef<HTMLPreElement | null>(null);
@@ -220,6 +239,10 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
   const action: TTokenAction = pinned ? clickAction : hovered ? hoverAction : "none";
   // Inline ruby over kanji tokens: always, or only while hovered.
   const showRuby = isWord && hasKanji(subItem.text) && (furigana === "always" || (furigana === "hover" && hovered));
+  // Dim words already marked known (opt-in; resolves the token so this only looks up when enabled).
+  const { translation: knownTx } = useLookup(subItem, isWord && dimKnownWords);
+  const knownKey = knownTx ? knownKeyOf(knownTx) : null;
+  const isKnown = Boolean(dimKnownWords && knownKey && knownWords.includes(knownKey));
 
   useEffect(() => {
     // After ONNX upgrade remount, restore hover state if the pointer is still over this token.
@@ -253,6 +276,8 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
   };
 
   const handleClick = (event: React.MouseEvent) => {
+    // Clicks inside the pop-up (buttons, switcher, conjugation toggle) must never toggle the pin.
+    if ((event.target as HTMLElement).closest(".es-word-translation")) return;
     // With click set to "No action" the click falls through to the line (whole-line translation).
     if (!isWord || clickAction === "none") return;
     event.stopPropagation();
@@ -265,11 +290,19 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
       ref={itemRef}
       onMouseEnter={handleOnMouseEnter}
       onMouseLeave={handleOnMouseLeave}
-      className={`es-sub-item ${subItem.tag} ${action !== "none" ? "es-sub-item-active" : ""} ${pinned ? "es-sub-item-pinned" : ""}`}
+      className={`es-sub-item ${subItem.tag} ${action !== "none" ? "es-sub-item-active" : ""} ${pinned ? "es-sub-item-pinned" : ""} ${isKnown ? "es-sub-item--known" : ""}`}
       onClick={handleClick}
     >
       {showRuby ? <TokenRuby subItem={subItem} /> : subItem.text}
-      {action === "popup" && <SubItemTranslation subItem={subItem} contextSentence={contextSentence} pinned={pinned} />}
+      {action === "popup" && (
+        <SubItemTranslation
+          subItem={subItem}
+          contextSentence={contextSentence}
+          cueStart={cueStart}
+          cueEnd={cueEnd}
+          pinned={pinned}
+        />
+      )}
       {(action === "furigana" || action === "meaning" || action === "both") && (
         <TokenLabel subItem={subItem} mode={action} showReading={!showRuby} />
       )}

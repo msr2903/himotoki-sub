@@ -88,3 +88,25 @@ body {
     accent-color: var(--hm-accent);
   }
 }
+
+.es-options-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--hm-ink);
+
+  input {
+    accent-color: var(--hm-accent);
+  }
+}
+
+.es-options-link {
+  margin-left: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--hm-accent);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-decoration: underline;
+}

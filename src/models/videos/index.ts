@@ -83,6 +83,11 @@ export const moveFx = createEffect<TMoveFX, void>(({ video, subs, streaming, dir
 });
 
 export const moveToTimeRequested = createEvent<number>();
+
+/** Replay the current subtitle line from its start; loop it for shadowing (toggle). */
+export const replayLinePressed = createEvent<void>();
+export const loopLineToggled = createEvent<void>();
+export const loopCleared = createEvent<void>();
 export const moveToTimeFx = createEffect<
   { video: StoreValue<typeof $video>; streaming: StoreValue<typeof $streaming>; time: number },
   void

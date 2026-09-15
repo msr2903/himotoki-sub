@@ -23,6 +23,7 @@ import {
   isReadingLineMode,
 } from "@src/shared/furiganaSettings";
 import { UI_SCALE_DEFAULT, UI_SCALE_MAX, UI_SCALE_MIN, UI_SCALE_SETTING, UI_SCALE_STEP, clampUiScale } from "@src/shared/uiScale";
+import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
 import { AccountPanel } from "@src/pages/shared/AccountPanel";
 import { DictionaryPanel } from "@src/pages/shared/DictionaryPanel";
 
@@ -92,6 +93,16 @@ const Options: FC = () => {
     READING_LINE_SETTING,
     DEFAULT_READING_LINE,
     isReadingLineMode,
+  );
+  const [dimKnown, setDimKnown] = usePersistedSetting<boolean>(
+    DIM_KNOWN_SETTING,
+    DEFAULT_DIM_KNOWN,
+    (v): v is boolean => typeof v === "boolean",
+  );
+  const [knownWords, setKnownWords] = usePersistedSetting<string[]>(
+    KNOWN_WORDS_SETTING,
+    [],
+    (v): v is string[] => Array.isArray(v),
   );
   const version = chrome.runtime.getManifest().version;
 
@@ -174,6 +185,28 @@ const Options: FC = () => {
               ))}
             </select>
             <div className="es-options-help">{READING_LINE_OPTIONS.find((o) => o.value === readingLine)?.description}</div>
+          </div>
+        </div>
+        <div className="es-options-row">
+          <label htmlFor="dim-known">Known words</label>
+          <div>
+            <label className="es-options-check">
+              <input
+                id="dim-known"
+                type="checkbox"
+                checked={dimKnown}
+                onChange={(e) => setDimKnown(e.target.checked)}
+              />
+              Dim words I have marked as known
+            </label>
+            <div className="es-options-help">
+              {knownWords.length} word{knownWords.length === 1 ? "" : "s"} marked known.
+              {knownWords.length > 0 && (
+                <button className="es-options-link" onClick={() => setKnownWords([])}>
+                  Forget all
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <div className="es-options-row">
