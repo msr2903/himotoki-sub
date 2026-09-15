@@ -84,6 +84,8 @@ export type TWordTranslation = {
   common?: boolean;
   pitch?: string;
   jlpt?: string[];
+  /** Other dictionary entries for the same surface (multi-entry switcher). Never nested. */
+  alternatives?: TWordTranslation[];
   /** "飲みます → 飲む (Polite)" when the surface was deconjugated. */
   conjugationNote?: string;
   /** First example sentence of the first sense, when the dictionary has one. */

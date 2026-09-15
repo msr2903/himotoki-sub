@@ -341,6 +341,14 @@ if (nbox) {
 await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 await page.waitForFunction(() => { const p = document.querySelector(".es-word-translation"); return p && !/Looking up/.test(p.textContent); }, null, { timeout: 15000 }).catch(() => {});
 log("after click (expect popup, pinned=1):", JSON.stringify(await state()));
+log("popup depth:", JSON.stringify(await page.evaluate(() => {
+  const p = document.querySelector(".es-word-translation");
+  if (!p) return null;
+  return {
+    entrySwitch: p.querySelector(".es-entry-count")?.textContent ?? null,
+    playFromVideo: !!p.querySelector(".es-popup-speak[title*='video']"),
+  };
+})));
 log("popup fit:", JSON.stringify(await page.evaluate(() => { const p = document.querySelector(".es-word-translation"); const pl = document.querySelector(".html5-video-player"); if (!p || !pl) return null; const r = p.getBoundingClientRect(), q = pl.getBoundingClientRect(); return { insideTop: r.top >= q.top, insideLeft: r.left >= q.left, insideRight: r.right <= q.right, maxHeight: p.style.maxHeight, scrollable: p.classList.contains("es-word-translation--scrollable"), senses: document.querySelectorAll(".es-sense").length, more: document.querySelector(".es-word-more")?.textContent ?? null }; })));
 await page.screenshot({ path: "/tmp/himotoki-e2e-pinned.png" });
 await popup.evaluate(() => chrome.storage.local.set({ "persist:uiScale": JSON.stringify(70) }));

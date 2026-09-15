@@ -182,6 +182,8 @@ const Sub: FC<{ sub: TSub; secondary: boolean; furigana: TFuriganaMode; readingL
             subItem={item}
             contextSentence={sub.cleanedText}
             furigana={furigana}
+            cueStart={sub.start}
+            cueEnd={sub.end}
           />
         );
       })}
@@ -198,9 +200,11 @@ type TSubItemProps = {
   hoverKey: string;
   contextSentence?: string;
   furigana: TFuriganaMode;
+  cueStart?: number;
+  cueEnd?: number;
 };
 
-const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furigana }) => {
+const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furigana, cueStart, cueEnd }) => {
   const [activeHoverWord, pinnedWord, hoverAction, clickAction, handleSubItemMouseEntered, handleSubItemMouseLeft, pinToggle] =
     useUnit([
       $activeHoverWord,
@@ -269,7 +273,15 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
       onClick={handleClick}
     >
       {showRuby ? <TokenRuby subItem={subItem} /> : subItem.text}
-      {action === "popup" && <SubItemTranslation subItem={subItem} contextSentence={contextSentence} pinned={pinned} />}
+      {action === "popup" && (
+        <SubItemTranslation
+          subItem={subItem}
+          contextSentence={contextSentence}
+          cueStart={cueStart}
+          cueEnd={cueEnd}
+          pinned={pinned}
+        />
+      )}
       {(action === "furigana" || action === "meaning" || action === "both") && (
         <TokenLabel subItem={subItem} mode={action} showReading={!showRuby} />
       )}
