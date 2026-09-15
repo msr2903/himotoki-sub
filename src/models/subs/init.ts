@@ -27,7 +27,9 @@ import {
   $loopedCue,
   loopedCueSet,
   $sentenceOpen,
-  sentenceClosed,
+  $coverageKeys,
+  $coverageStatus,
+  computeCoverageFx,
 } from ".";
 import { $streaming } from "../streamings";
 import {
@@ -42,6 +44,7 @@ import {
 import { $autoPause, $secondarySubs, $translateLanguage } from "../settings";
 import type { Captions } from "../types";
 import { debug } from "patronum";
+import { cancelVideoClip } from "@src/utils/replayVideoClip";
 import { notifyError, notifyInfo } from "@src/pages/content/notify";
 
 split({
@@ -73,10 +76,10 @@ sample({
 });
 sample({
   clock: videoTimeUpdate,
-  source: { currentSubs: $currentSubs, video: $video, autoPause: $autoPause },
+  source: { currentSubs: $currentSubs, video: $video, autoPause: $autoPause, looped: $loopedCue },
   fn: ({ currentSubs, video, autoPause }, _) => ({ currentSubs, video, autoPause }),
-  filter: ({ currentSubs, video, autoPause }) => {
-    if (!currentSubs[0] || !video || !autoPause || video.paused || video.ended) {
+  filter: ({ currentSubs, video, autoPause, looped }) => {
+    if (looped || !currentSubs[0] || !video || !autoPause || video.paused || video.ended) {
       return false;
     }
     const timeDiff = currentSubs[0].end - video.currentTime * 1000;
@@ -144,6 +147,26 @@ $rawSubs.on(rawSubsAdded, (oldSubs, newSubs) => {
 
 $rawSubs.reset(resetSubs);
 $sentenceOpen.reset(resetSubs);
+
+// Resolve every distinct word's key once the subtitles are ready, for coverage stats.
+sample({ clock: $subs, filter: (subs) => subs.length > 0, target: computeCoverageFx });
+const currentCoverageDone = sample({
+  clock: computeCoverageFx.done,
+  source: $subs,
+  filter: (subs, { params }) => subs === params,
+  fn: (_, { result }) => result,
+});
+const currentCoverageFailed = sample({
+  clock: computeCoverageFx.fail,
+  source: $subs,
+  filter: (subs, { params }) => subs === params,
+});
+$coverageKeys.on(currentCoverageDone, (_, map) => map ?? {}).reset(resetSubs, $subs.updates);
+$coverageStatus
+  .on(computeCoverageFx, () => "loading")
+  .on(currentCoverageDone, (_, map) => map === null ? "missing" : "ready")
+  .on(currentCoverageFailed, () => "error")
+  .reset(resetSubs);
 
 sample({
   clock: $rawSubs,
@@ -225,8 +248,11 @@ sample({
   target: moveToTimeRequested,
 });
 replayLinePressed.watch(() => {
-  void $video.getState()?.play();
+  cancelVideoClip();
+  if ($currentSubs.getState().length) void $video.getState()?.play().catch(() => {});
 });
+resetSubs.watch(cancelVideoClip);
+loopLineToggled.watch(cancelVideoClip);
 
 // L: toggle looping the current line. Toggling off (or with no current line) clears it.
 sample({

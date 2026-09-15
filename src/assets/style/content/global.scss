@@ -102,7 +102,7 @@
   }
 
   // Words the user has marked as known (dim-known-words setting).
-  .es-sub-item--known {
+  .es-sub-item--known:not(.es-sub-item-active) {
     opacity: 0.45;
   }
 
@@ -145,7 +145,7 @@
     box-shadow: var(--hm-shadow);
     color: var(--hm-ink);
     font-family: var(--hm-font-body);
-    font-size: calc(0.5em * var(--es-ui-scale, 1));
+    font-size: 0.5em;
     text-align: left;
     cursor: default;
     zoom: var(--es-ui-scale, 1);
@@ -175,7 +175,7 @@
   .es-breakdown-rows { padding: 4px 0; }
   .es-breakdown-row {
     display: grid;
-    grid-template-columns: 40% 60%;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
     gap: 12px;
     align-items: baseline;
     padding: 5px 12px;

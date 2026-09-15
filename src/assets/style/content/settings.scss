@@ -308,3 +308,11 @@
     background: var(--hm-accent-muted);
   }
 }
+
+.es-video-stats {
+  font-size: 13px;
+  color: var(--hm-ink);
+}
+.es-video-stats-empty {
+  color: var(--hm-ink-muted);
+}

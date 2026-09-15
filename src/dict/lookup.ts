@@ -94,7 +94,7 @@ const CONJ_STEP_PRIORITY: Record<string, number> = Object.fromEntries(
 );
 
 const TERM_COLUMNS =
-  "id, expression, reading, def_tags, rules, score, sequence, term_tags, glossary_json, expression_raw, pitch, freq, jlpt";
+  "id, expression, reading, def_tags, rules, score, sequence, term_tags, glossary_json, expression_raw";
 
 /* ---------------- kana / query variants ---------------- */
 
@@ -554,7 +554,15 @@ export class Dictionary {
   private treeCache = new Map<string, ConjugationTree | null>();
   private exactCache = new Map<string, boolean>();
 
-  constructor(private query: Query) {}
+  private termColumns: string;
+
+  constructor(private query: Query) {
+    // Older installed dictionaries do not have the optional enrichment columns.
+    const columns = new Set(query("PRAGMA table_info(term)").map((row) => row.name));
+    this.termColumns = [TERM_COLUMNS, ...["pitch", "freq", "jlpt"].map(
+      (column) => columns.has(column) ? column : `NULL AS ${column}`,
+    )].join(", ");
+  }
 
   clearCaches(): void {
     this.entryCache.clear();
@@ -578,7 +586,7 @@ export class Dictionary {
     const seenIds = new Set<number>();
     for (const prefix of prefixes) {
       const chunk = this.termRows(
-        `SELECT ${TERM_COLUMNS} FROM term
+        `SELECT ${this.termColumns} FROM term
          WHERE expression LIKE ? OR reading LIKE ?
          ORDER BY score DESC, id LIMIT 400`,
         [`${prefix}%`, `${prefix}%`],
@@ -606,7 +614,7 @@ export class Dictionary {
     variants = [...new Set(variants)];
     const placeholders = variants.map(() => "?").join(",");
     let rows = this.termRows(
-      `SELECT ${TERM_COLUMNS} FROM term
+      `SELECT ${this.termColumns} FROM term
        WHERE expression IN (${placeholders}) OR reading IN (${placeholders})
        ORDER BY score DESC, id LIMIT ?`,
       [...variants, ...variants, limit * 8],
@@ -634,16 +642,16 @@ export class Dictionary {
 
   getEntry(seq: number): DictEntry | null {
     if (this.entryCache.has(seq)) return this.entryCache.get(seq) ?? null;
-    let rows = this.termRows(`SELECT ${TERM_COLUMNS} FROM term WHERE sequence = ? ORDER BY id`, [seq]);
+    let rows = this.termRows(`SELECT ${this.termColumns} FROM term WHERE sequence = ? ORDER BY id`, [seq]);
     let entryKeyNum: number;
     if (!rows.length) {
-      const seed = this.termRows(`SELECT ${TERM_COLUMNS} FROM term WHERE id = ?`, [seq])[0];
+      const seed = this.termRows(`SELECT ${this.termColumns} FROM term WHERE id = ?`, [seq])[0];
       if (!seed) {
         this.entryCache.set(seq, null);
         return null;
       }
       rows = this.termRows(
-        `SELECT ${TERM_COLUMNS} FROM term WHERE expression = ? AND reading = ? ORDER BY score DESC, id`,
+        `SELECT ${this.termColumns} FROM term WHERE expression = ? AND reading = ? ORDER BY score DESC, id`,
         [seed.expression, seed.reading],
       );
       entryKeyNum = Number(seed.id);

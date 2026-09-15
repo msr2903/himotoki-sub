@@ -53,13 +53,14 @@ A prebuilt copy is kept at `/tmp/himotoki-dict/` (basic) and `/tmp/himotoki-dict
 
 ## Testing
 
-There are no unit tests yet (`pnpm test` runs Vitest but the suite is empty). Verification is: **type-check + build + the Playwright e2e scripts + a manual pass in real Chrome.**
+`pnpm test` runs deterministic Chromium regression checks against a built `dist/`: model startup, coverage races, replay timing, loop/auto-pause interaction, popup entry switching, known words, and offline-only sentence breakdown. Verification is: **type-check + build + the Playwright e2e scripts + a manual pass in real Chrome.**
 
 ### End-to-end: YouTube (the main check)
 
 ```bash
 npx playwright install chromium         # once
 pnpm build                              # e2e loads dist/
+pnpm test                               # deterministic regression checks
 pnpm test:e2e                           # = node scripts/e2e/youtube.mjs [videoUrl]
 ```
 

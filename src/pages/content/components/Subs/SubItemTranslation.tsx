@@ -2,10 +2,10 @@ import { FC, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useUnit } from "effector-react";
 import toast from "react-hot-toast";
 
-import { $dimKnownWords, $knownWords, $learningService, wordMarkedKnown, wordUnmarkedKnown } from "@src/models/settings";
+import { $knownWords, $learningService, wordMarkedKnown, wordUnmarkedKnown } from "@src/models/settings";
 import { tokenUnpinned } from "@src/models/translations";
 import { knownKeyOf } from "@src/shared/knownWords";
-import { $video } from "@src/models/videos";
+import { $video, replayCueRequested } from "@src/models/videos";
 import { useLookup } from "@src/pages/content/hooks/useLookup";
 import { TSubItem, TWordTranslation, TWordTranslationItem } from "@src/models/types";
 import ILearningService from "@src/learning-service/learningService";
@@ -61,7 +61,6 @@ export const SubItemTranslation: FC<{
   const [entryIndex, setEntryIndex] = useState(0);
   const [showConj, setShowConj] = useState(false);
   const popupRef = useRef<HTMLDivElement | null>(null);
-  const clipTimer = useRef<number | null>(null);
 
   useEffect(() => {
     setService(getLearningService(learningService));
@@ -74,9 +73,10 @@ export const SubItemTranslation: FC<{
     setShowConj(false);
   }, [text]);
 
-  useEffect(() => () => {
-    if (clipTimer.current != null) window.clearTimeout(clipTimer.current);
-  }, []);
+  useEffect(() => {
+    setShowAll(false);
+    setShowConj(false);
+  }, [entryIndex]);
 
   // Keep the popup inside the player: cap height to the space above the word, shift off the edges.
   const fitPopup = () => {
@@ -187,16 +187,7 @@ export const SubItemTranslation: FC<{
   // Replay the subtitle line's own audio from the video (native pronunciation in context).
   const handlePlayClip = () => {
     if (!hasClip || !video) return;
-    if (clipTimer.current != null) window.clearTimeout(clipTimer.current);
-    video.currentTime = cueStart! / 1000;
-    void video.play();
-    clipTimer.current = window.setTimeout(
-      () => {
-        video.pause();
-        clipTimer.current = null;
-      },
-      cueEnd! - cueStart! + 150,
-    );
+    replayCueRequested({ start: cueStart!, end: cueEnd! });
   };
 
   const headword = current.headword || current.source || text;
@@ -214,7 +205,7 @@ export const SubItemTranslation: FC<{
   const conjugable = senses.some(
     (sense) => sense.partOfSpeech === "verb" || sense.partOfSpeech === "adjective",
   );
-  const conjSeq = chain?.rootSeq ?? (typeof current.himotokiSave?.seq === "number" ? current.himotokiSave.seq : null);
+  const conjSeq = (entryIndex === 0 ? chain?.rootSeq : null) ?? (typeof current.himotokiSave?.seq === "number" ? current.himotokiSave.seq : null);
 
   return (
     <div className="es-word-translation" onClick={stop} ref={popupRef}>

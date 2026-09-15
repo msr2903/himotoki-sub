@@ -2,6 +2,7 @@
 // with CORS, loads dist/ into Playwright Chromium, installs the dictionary through the extension
 // popup page, then times lookups and segment repair through the extension's own message API.
 // Usage: pnpm build && node scripts/e2e/dict.mjs [dictDir=/tmp/himotoki-dict]
+import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import fs from "node:fs";
 import http from "node:http";
@@ -82,6 +83,9 @@ for (const surface of probes) {
   const resp = await send({ type: "himotokiLookup", surface });
   const d = resp?.data;
   const best = d?.best;
+  assert.equal(resp?.ok, true, `lookup ${surface}: ${resp?.error}`);
+  if (["食べた", "皆さん", "行きました", "起きたら", "は", "カーテン", "あさごはん", "食べられなかった"].includes(surface))
+    assert.ok(best, `No dictionary match for ${surface}`);
   log(
     `lookup ${surface} (${Date.now() - t} ms):`,
     best
@@ -90,6 +94,22 @@ for (const surface of probes) {
           ` | ${d.entries?.length} entries`
       : `NO RESULT ${JSON.stringify(resp).slice(0, 200)}`,
   );
+}
+
+// New grammar endpoint must work with both old and enriched dictionaries.
+const verb = await send({ type: "himotokiLookup", surface: "食べた" });
+const conj = await send({ type: "himotokiConjTable", seq: verb.data.best.seq });
+assert.equal(conj?.ok, true, conj?.error);
+assert.ok(conj.data.forms.some((f) => f.form === "食べた"), "Missing past conjugation");
+const batch = await send({ type: "himotokiLookupBatch", surfaces: ["食べた", "顔"] });
+assert.equal(batch?.ok, true, batch?.error);
+assert.equal(batch.data.results.length, 2);
+assert.ok(batch.data.results.every((r) => r.best));
+const manifest = JSON.parse(fs.readFileSync(path.join(DICT_DIR, "jitendex-lite.json"), "utf8"));
+if (manifest.pitchRows && manifest.freqRows && manifest.jlptRows) {
+  assert.ok(verb.data.best.pitch_display, "Missing pitch");
+  assert.ok(verb.data.best.freq > 0, "Missing frequency");
+  assert.ok(verb.data.best.jlpt?.length, "Missing JLPT");
 }
 
 // Warm cache: second call should be near-instant
@@ -101,6 +121,9 @@ const repairIn = [["朝", "ご飯", "を", "食べる"], ["あさご", "はん",
 const t2 = Date.now();
 const repair = await send({ type: "himotokiRepairSegments", cues: repairIn });
 log("repair (ms):", Date.now() - t2, JSON.stringify(repair?.data?.cues));
+
+assert.equal(repair?.ok, true, repair?.error);
+assert.deepEqual(repair.data.cues[0], ["朝ご飯", "を", "食べる"]);
 
 // Popup UI reflects state
 await popup.reload();
@@ -123,6 +146,8 @@ log("status after relaunch:", after?.data?.state, after?.data?.terms, "entries; 
 const t4 = Date.now();
 const again = await popup2.evaluate(() => chrome.runtime.sendMessage({ type: "himotokiLookup", surface: "食べた" }));
 log("lookup after relaunch (ms):", Date.now() - t4, again?.data?.best?.kanji?.[0]);
+assert.equal(again?.ok, true, again?.error);
+assert.equal(again.data.best.kanji[0], "食べる");
 await ctx2.close();
 server.close();
 if (after?.data?.state !== "ready") {
