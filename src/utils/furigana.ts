@@ -39,6 +39,63 @@ export const surfaceReading = (surface: string, headword?: string, reading?: str
   return null;
 };
 
+/** Katakana → hiragana so a katakana surface char matches its hiragana reading. */
+const toHiragana = (text: string): string =>
+  text.replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+
+/** A run of the surface: either plain text or a kanji run that carries a reading above it. */
+export type RubySegment = { text: string; rt?: string };
+
+/**
+ * Align a surface with its reading so ruby sits only over the kanji runs, leaving kana (okurigana)
+ * as plain text: 食べた → 食「た」べた, not 食べた「たべた」. Returns null when there is nothing to
+ * annotate. Falls back to a single ruby over the whole surface if the kana anchors do not line up.
+ */
+export const furiganaSegments = (surface: string, headword?: string, reading?: string): RubySegment[] | null => {
+  const full = surfaceReading(surface, headword, reading);
+  if (!full) return null;
+
+  // Split the surface into alternating kanji / non-kanji runs.
+  const runs: Array<{ kanji: boolean; text: string }> = [];
+  for (const ch of surface) {
+    const kanji = hasKanji(ch);
+    const last = runs[runs.length - 1];
+    if (last && last.kanji === kanji) last.text += ch;
+    else runs.push({ kanji, text: ch });
+  }
+
+  const whole: RubySegment[] = [{ text: surface, rt: full }];
+  const fullH = toHiragana(full);
+  const segments: RubySegment[] = [];
+  let p = 0; // pointer into full / fullH
+  for (let i = 0; i < runs.length; i++) {
+    const run = runs[i]!;
+    if (!run.kanji) {
+      // A kana run must appear verbatim (katakana-normalised) at the current point in the reading.
+      const runH = toHiragana(run.text);
+      if (!fullH.startsWith(runH, p)) return whole;
+      segments.push({ text: run.text });
+      p += runH.length;
+      continue;
+    }
+    const next = runs[i + 1];
+    if (!next) {
+      // Trailing kanji run takes the rest of the reading.
+      const rt = full.slice(p);
+      segments.push(rt ? { text: run.text, rt } : { text: run.text });
+      p = full.length;
+      continue;
+    }
+    // Kanji run reading is everything up to where the following kana run begins in the reading.
+    const idx = fullH.indexOf(toHiragana(next.text), p);
+    if (idx < p) return whole;
+    const rt = full.slice(p, idx);
+    segments.push(rt ? { text: run.text, rt } : { text: run.text });
+    p = idx;
+  }
+  return segments;
+};
+
 /** First gloss, trimmed for an inline label. */
 export const shortGloss = (gloss: string, maxLength = 26): string => {
   const first = (gloss || "").split(/;|,/)[0]?.trim() ?? "";

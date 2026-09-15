@@ -22,6 +22,23 @@ export const lookupRequested = createEvent<TSubItem | string>();
 export const lookupKeyOf = (payload: TSubItem | string): string =>
   typeof payload === "string" ? payload : payload.cleanedText || payload.text;
 
+/* ---------- Offline dictionary availability ---------- */
+
+/**
+ * Whether the offline dictionary is installed and ready. Used to gate always-on furigana: without
+ * the local dictionary every kanji token would fall back to the Himotoki HTTP API, so "always"
+ * behaves like "hover" until the dictionary is ready (see Subs.tsx).
+ */
+export const $dictReady = createStore<boolean>(false);
+
+/** Ask the offscreen worker (via the background) whether the dictionary is ready. */
+export const checkDictReadyFx = createEffect<void, boolean>(async () => {
+  const resp = await chrome.runtime.sendMessage({ type: "himotokiDictStatus" });
+  return Boolean(resp?.ok) && (resp.data as { state?: string } | undefined)?.state === "ready";
+});
+
+$dictReady.on(checkDictReadyFx.doneData, (_, ready) => ready);
+
 /* ---------- Token interaction state ---------- */
 
 export const subItemMouseEntered = createEvent<string>();
@@ -132,6 +149,10 @@ sample({
 });
 
 $lookups.on(fetchWordTranslationFx.doneData, (all, translation) => ({ ...all, [translation.source]: translation }));
+// Any resolved lookup tells us for free whether the local dictionary is currently serving.
+$dictReady.on(fetchWordTranslationFx.doneData, (ready, translation) =>
+  translation.lookupSource === "local" ? true : translation.lookupSource === "api" ? false : ready,
+);
 $lookupPendings.on(fetchWordTranslationFx, (pendings, { source }) => ({ ...pendings, [source]: true }));
 $lookupPendings.on(fetchWordTranslationFx.finally, (pendings, { params: { source } }) => {
   const copy = { ...pendings };

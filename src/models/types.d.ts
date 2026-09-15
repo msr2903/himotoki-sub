@@ -108,6 +108,9 @@ export type TTokenAction = "furigana" | "meaning" | "both" | "popup" | "none";
 
 /** Inline ruby furigana over kanji tokens. */
 export type TFuriganaMode = "always" | "hover" | "never";
+
+/** "Hide furigana for words I already know up to this JLPT level" (off = annotate every word). */
+export type TFuriganaLevel = "off" | "n5" | "n4" | "n3" | "n2" | "n1";
 /** The kana "reading line" some channels print under the kanji line. */
 export type TReadingLineMode = "hide" | "text";
 

@@ -106,6 +106,14 @@
     opacity: 0.45;
   }
 
+  // Colour words by JLPT difficulty (color-by-difficulty setting): easy green → hard red.
+  // Applied to the base text; the active/pinned states still win via their own rules.
+  .es-sub-item.es-jlpt-n5:not(.es-sub-item-active) { color: #8fd6a6; }
+  .es-sub-item.es-jlpt-n4:not(.es-sub-item-active) { color: #bcd98a; }
+  .es-sub-item.es-jlpt-n3:not(.es-sub-item-active) { color: #e6cf7e; }
+  .es-sub-item.es-jlpt-n2:not(.es-sub-item-active) { color: #e8ab6f; }
+  .es-sub-item.es-jlpt-n1:not(.es-sub-item-active) { color: #e79191; }
+
   // Furigana / meaning annotation above a token (hover or pinned click action).
   .es-token-label {
     position: absolute;
