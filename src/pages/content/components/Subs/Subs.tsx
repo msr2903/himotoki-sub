@@ -318,7 +318,7 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
         />
       )}
       {(action === "furigana" || action === "meaning" || action === "both") && (
-        <TokenLabel subItem={subItem} mode={action} showReading={!showRuby} />
+        <TokenLabel subItem={subItem} mode={action} showReading={!showRuby} offsetForRuby={showRuby} />
       )}
     </pre>
   );
