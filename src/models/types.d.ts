@@ -88,6 +88,13 @@ export type TWordTranslation = {
   alternatives?: TWordTranslation[];
   /** "飲みます → 飲む (Polite)" when the surface was deconjugated. */
   conjugationNote?: string;
+  /** Deconjugation chain for the grammar view: dictionary form + the steps applied to it. */
+  conjugation?: {
+    rootText: string;
+    rootReading?: string;
+    rootSeq?: number;
+    steps: Array<{ label: string; tip?: string }>;
+  };
   /** First example sentence of the first sense, when the dictionary has one. */
   example?: { jp: string; en: string; keyword?: string };
 };

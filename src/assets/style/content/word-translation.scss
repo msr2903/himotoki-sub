@@ -389,3 +389,65 @@
   font-variant-numeric: tabular-nums;
 }
 
+
+.es-conj-chain {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--hm-ink-muted);
+}
+
+.es-conj-root {
+  color: var(--hm-ink);
+  font-weight: 600;
+}
+
+.es-conj-step {
+  white-space: nowrap;
+}
+
+.es-conj-arrow {
+  margin: 0 3px;
+  color: var(--hm-accent);
+}
+
+.es-conj {
+  margin-top: 8px;
+}
+
+.es-conj-status {
+  font-size: 12px;
+  color: var(--hm-ink-muted);
+  padding: 4px 0;
+}
+
+.es-conj-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  margin-top: 4px;
+
+  th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--hm-ink-muted);
+    padding: 2px 8px 2px 0;
+    white-space: nowrap;
+    vertical-align: top;
+  }
+
+  td {
+    padding: 2px 0;
+    width: 100%;
+  }
+}
+
+.es-conj-form {
+  color: var(--hm-ink);
+}
+
+.es-conj-reading {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--hm-ink-muted);
+}

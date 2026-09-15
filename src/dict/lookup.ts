@@ -12,7 +12,9 @@ import {
   conjStepToDict,
   deconjugate_recursive,
   expected_pos_from_step,
+  forward_conjugate,
   godan_dict_ending,
+  PARADIGM_KEYS,
   pos_class,
   reconstruct_forms,
 } from "./conj_rules";
@@ -735,6 +737,31 @@ export class Dictionary {
       if (tree && tree.root_seq && tree.steps?.length) return tree;
     }
     return null;
+  }
+
+  /**
+   * Full conjugation paradigm for a dictionary entry (Dictionary/Polite/Past/Te/Negative/...),
+   * generated forward from the lemma with the rules engine. Null for non-conjugable entries.
+   */
+  getEntryConjugations(seq: number): Array<{ label: string; form: string; reading: string }> | null {
+    const entry = this.getEntry(seq);
+    if (!entry) return null;
+    const posTags = entryPosTags(entry);
+    if (pos_class(posTags) == null) return null;
+    const lemma = entryLemmaText(entry);
+    const reading = entryReading(entry);
+    const forms = forward_conjugate(lemma, posTags) as Record<string, string> | null;
+    if (!forms || !Object.keys(forms).length) return null;
+    const readingForms =
+      reading && reading !== lemma ? (forward_conjugate(reading, posTags) as Record<string, string> | null) : null;
+    const out: Array<{ label: string; form: string; reading: string }> = [];
+    for (const label of PARADIGM_KEYS) {
+      const form = forms[label];
+      if (!form) continue;
+      const formReading = readingForms?.[label] ?? (reading && form === lemma ? reading : "");
+      out.push({ label, form, reading: formReading || "" });
+    }
+    return out.length ? out : null;
   }
 
   /** Per-token resolution: exact → kanji prefix → deconjugation. Mirrors analyze.ts lookupSegment. */

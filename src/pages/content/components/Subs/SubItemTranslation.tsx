@@ -11,6 +11,7 @@ import ILearningService from "@src/learning-service/learningService";
 import { getLearningService } from "@src/utils/getLearningService";
 import { HIMOTOKI_API_BASE } from "@src/shared/himotokiConfig";
 import { SoundIcon } from "./assets/SoundIcon";
+import { ConjugationTable } from "./ConjugationTable";
 
 const SENSE_LIMIT = 3;
 const SERVICE_LABEL: Record<string, string> = { himotoki: "Save to Himotoki", anki: "Save to Anki" };
@@ -49,6 +50,7 @@ export const SubItemTranslation: FC<{
   const [service, setService] = useState<ILearningService>(null);
   const [showAll, setShowAll] = useState(false);
   const [entryIndex, setEntryIndex] = useState(0);
+  const [showConj, setShowConj] = useState(false);
   const popupRef = useRef<HTMLDivElement | null>(null);
   const clipTimer = useRef<number | null>(null);
 
@@ -60,6 +62,7 @@ export const SubItemTranslation: FC<{
   useEffect(() => {
     setEntryIndex(0);
     setShowAll(false);
+    setShowConj(false);
   }, [text]);
 
   useEffect(() => () => {
@@ -192,6 +195,11 @@ export const SubItemTranslation: FC<{
   const hiddenCount = senses.length - visibleSenses.length;
   const himotokiQuery = encodeURIComponent(current.himotokiSave?.headword || headword);
   const saveLabel = SERVICE_LABEL[learningService] ?? "Save";
+  const chain = translation.conjugation;
+  const conjugable = senses.some(
+    (sense) => sense.partOfSpeech === "verb" || sense.partOfSpeech === "adjective",
+  );
+  const conjSeq = chain?.rootSeq ?? (typeof current.himotokiSave?.seq === "number" ? current.himotokiSave.seq : null);
 
   return (
     <div className="es-word-translation" onClick={stop} ref={popupRef}>
@@ -241,6 +249,17 @@ export const SubItemTranslation: FC<{
             {translation.conjugationNote && <span className="es-popup-conj">{translation.conjugationNote}</span>}
           </div>
         )}
+        {chain && chain.steps.length > 0 && (
+          <div className="es-conj-chain">
+            <span className="es-conj-root">{chain.rootText}</span>
+            {chain.steps.map((step, i) => (
+              <span key={i} className="es-conj-step" title={step.tip || undefined}>
+                <span className="es-conj-arrow">→</span>
+                {step.label}
+              </span>
+            ))}
+          </div>
+        )}
       </header>
 
       <ol className="es-popup-senses">
@@ -282,6 +301,15 @@ export const SubItemTranslation: FC<{
               {current.example.en}
             </p>
           )}
+        </div>
+      )}
+
+      {conjugable && conjSeq != null && (
+        <div className="es-conj">
+          <button className="es-word-more" onClick={() => setShowConj((v) => !v)}>
+            {showConj ? "Hide conjugations" : "Conjugations"}
+          </button>
+          {showConj && <ConjugationTable seq={conjSeq} />}
         </div>
       )}
 
