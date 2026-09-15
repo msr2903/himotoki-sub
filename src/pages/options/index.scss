@@ -1,76 +1,205 @@
 @import "../popup/index.scss";
 
+/* Options page rebuilt to mirror the himotoki.my.id settings layout, using the
+   extension's dark --hm-* tokens instead of the web app's light --color-* ones. */
+
 body {
   width: auto;
   min-height: 100vh;
   font-size: 14px;
+  background-image: radial-gradient(ellipse 90% 55% at 50% -10%, rgba(61, 190, 176, 0.08), transparent);
 }
 
 .es-options {
-  max-width: 640px;
+  max-width: 56rem;
   margin: 0 auto;
-  padding: 24px 24px 48px;
+  padding: 24px 20px 64px;
+  box-sizing: border-box;
 }
 
-.es-options-header {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 0 0 16px;
-  border-bottom: 1px solid var(--hm-border);
-  margin-bottom: 8px;
-}
-
-.es-options-section {
-  padding: 20px 0;
-  border-bottom: 1px solid var(--hm-border);
-
-  h2 {
-    margin: 0 0 8px;
-    font-family: var(--hm-font-display);
-    font-size: 17px;
-    font-weight: 600;
-  }
-
-  .es-popup-hint {
-    margin: 4px 0 10px;
-  }
-
-  .es-popup-btn {
-    width: auto;
-    min-width: 200px;
-  }
-}
-
-.es-options-row {
-  display: grid;
-  grid-template-columns: 120px 1fr;
-  align-items: start;
-  gap: 12px;
-  margin: 10px 0;
-
-  label {
-    padding-top: 6px;
-    color: var(--hm-ink);
-  }
-}
-
-.es-options-select {
-  width: 260px;
-  padding: 6px 8px;
-  font: inherit;
+.page-head h1 {
+  margin: 0 0 6px;
+  font-family: var(--hm-font-display);
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   color: var(--hm-ink);
-  background: var(--hm-raised);
-  border: 1px solid var(--hm-border);
-  border-radius: var(--hm-radius-sm);
 }
 
-.es-options-help {
-  margin-top: 4px;
-  font-size: 12px;
+.page-head .lede {
+  margin: 0;
+  color: var(--hm-ink-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.settings-shell {
+  display: grid;
+  grid-template-columns: 12rem minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  margin-top: 20px;
+  min-width: 0;
+}
+
+.settings-nav {
+  position: sticky;
+  top: 16px;
+  padding: 8px 0;
+  min-width: 0;
+}
+
+.settings-nav-label {
+  margin: 0 0 8px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
   color: var(--hm-ink-muted);
 }
 
+.settings-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-nav-item {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 7px 11px;
+  border: none;
+  border-radius: var(--hm-radius-sm);
+  background: transparent;
+  color: var(--hm-ink-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--hm-duration), color var(--hm-duration);
+
+  &:hover {
+    color: var(--hm-ink);
+    background: var(--hm-accent-muted);
+  }
+
+  &.on {
+    color: var(--hm-accent);
+    background: var(--hm-accent-muted);
+  }
+}
+
+.settings-main {
+  min-width: 0;
+  max-width: 40rem;
+}
+
+.group {
+  margin-bottom: 20px;
+  padding: 14px 18px;
+  border: 1px solid var(--hm-border);
+  border-radius: var(--hm-radius-md);
+  background: var(--hm-raised);
+  scroll-margin-top: 16px;
+
+  h2 {
+    margin: 0 0 12px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--hm-accent);
+  }
+}
+
+.group-lede {
+  margin: -4px 0 12px;
+  font-size: 13px;
+  color: var(--hm-ink-muted);
+  line-height: 1.45;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 44px;
+  cursor: default;
+
+  & + .row {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--hm-border);
+  }
+}
+
+.row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.row-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--hm-ink);
+}
+
+.row-desc {
+  font-size: 12.5px;
+  color: var(--hm-ink-muted);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.lang-select {
+  flex-shrink: 0;
+  max-width: 13rem;
+  border: 1px solid var(--hm-border);
+  border-radius: var(--hm-radius-sm);
+  background: var(--hm-surface);
+  color: var(--hm-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 9px;
+  cursor: pointer;
+}
+
+.range-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+
+  input[type="range"] {
+    width: 180px;
+    accent-color: var(--hm-accent);
+  }
+}
+
+.range-value {
+  min-width: 3ch;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--hm-ink);
+}
+
+.inline-link {
+  color: var(--hm-accent);
+  font-weight: 600;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+/* Shared panels rendered inside a group card. */
 .es-dict-panel,
 .es-account-panel {
   display: flex;
@@ -78,25 +207,43 @@ body {
   gap: 8px;
 }
 
-.es-options-range {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-
-  input[type="range"] {
-    width: 220px;
-    accent-color: var(--hm-accent);
+@media (max-width: 720px) {
+  .settings-shell {
+    display: block;
+    margin-top: 12px;
   }
-}
 
-.es-options-check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--hm-ink);
+  .settings-nav {
+    position: static;
+    margin-bottom: 12px;
+    padding: 0;
+  }
 
-  input {
-    accent-color: var(--hm-accent);
+  .settings-nav-label {
+    display: none;
+  }
+
+  .settings-nav-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .settings-nav-item {
+    width: auto;
+    border: 1px solid var(--hm-border);
+    border-radius: 999px;
+    padding: 6px 12px;
+  }
+
+  .settings-main {
+    max-width: none;
+  }
+
+  .row:not(:has(.lang-select)) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
   }
 }
 
@@ -109,4 +256,16 @@ body {
   font: inherit;
   padding: 0;
   text-decoration: underline;
+}
+
+.row input[type="checkbox"] { accent-color: var(--hm-accent); }
+
+@media (max-width: 520px) {
+  .row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .lang-select { width: 100%; max-width: none; }
+  .row input[type="checkbox"] { align-self: flex-start; }
 }
