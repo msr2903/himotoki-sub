@@ -2,6 +2,7 @@
 // captions, and checks split rendering, the dictionary popup, settings, and keyboard navigation.
 // Usage: pnpm build && npx playwright install chromium && node scripts/e2e/youtube.mjs [videoUrl]
 // YouTube intermittently refuses captions to automated browsers; rerun if the player itself gets no data.
+import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import fs from "node:fs";
 
@@ -340,6 +341,7 @@ if (nbox) {
 
 await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 await page.waitForFunction(() => { const p = document.querySelector(".es-word-translation"); return p && !/Looking up/.test(p.textContent); }, null, { timeout: 15000 }).catch(() => {});
+assert.equal((await state()).pinned, 1, "Word click must pin the popup");
 log("after click (expect popup, pinned=1):", JSON.stringify(await state()));
 log("popup depth:", JSON.stringify(await page.evaluate(() => {
   const p = document.querySelector(".es-word-translation");
@@ -399,6 +401,7 @@ await page.waitForTimeout(500);
 log("after click then leave (expect popup still pinned):", JSON.stringify(await state()));
 await page.keyboard.press("Escape");
 await page.waitForTimeout(300);
+assert.equal((await state()).pinned, 0, "Escape must dismiss the popup");
 log("after Escape (expect nothing):", JSON.stringify(await state()));
 await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 await page.waitForTimeout(800);
@@ -533,6 +536,8 @@ await page.keyboard.press("b");
 await page.waitForTimeout(300);
 log("breakdown after second B (expect closed):", await page.evaluate(() => !!document.querySelector(".es-breakdown")));
 
+assert.equal(await page.locator(".es-breakdown").count(), 0, "B must close sentence breakdown");
+assert.deepEqual(pageErrors, [], "Unexpected browser errors");
 log("page errors:", pageErrors.length, pageErrors.slice(0, 5));
 await ctx.close();
 dictServer?.close();
