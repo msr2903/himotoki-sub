@@ -90,6 +90,10 @@ export const updateCurrentSecondarySubsFx = createEffect<
   return subs.filter((cue) => Number(cue.start) <= time && Number(cue.end) >= time);
 });
 
+/** The cue currently being looped for shadowing (null when not looping). */
+export const $loopedCue = createStore<TSub | null>(null);
+export const loopedCueSet = createEvent<TSub | null>();
+
 export const $subsDelay = createStore<number>(0);
 export const subsDelayButtonPressed = createEvent<number>();
 export const subsDelayChangeFx = createEffect<number, number>((value) => value);

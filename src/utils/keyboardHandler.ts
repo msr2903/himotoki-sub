@@ -1,6 +1,7 @@
 import { $streaming } from "@src/models/streamings";
 import { moveKeyPressed } from "@src/models/videos";
 import { secondarySubsCycled } from "@src/models/settings";
+import { replayLinePressed, loopLineToggled } from "@src/models/videos";
 
 const isEditable = (target: EventTarget | null): boolean => {
   const el = target as HTMLElement | null;
@@ -17,6 +18,18 @@ export const keyboardHandler = (event: KeyboardEvent) => {
     event.stopPropagation();
     event.preventDefault();
     if (event.type === "keydown") secondarySubsCycled();
+    return;
+  }
+  if (event.code === "KeyR" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+    event.stopPropagation();
+    event.preventDefault();
+    if (event.type === "keydown") replayLinePressed();
+    return;
+  }
+  if (event.code === "KeyL" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+    event.stopPropagation();
+    event.preventDefault();
+    if (event.type === "keydown") loopLineToggled();
     return;
   }
   if (event.code === "ArrowLeft") {

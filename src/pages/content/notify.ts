@@ -4,3 +4,8 @@ import toast from "react-hot-toast";
 export const notifyError = (message: string, id?: string): void => {
   toast.error(message, { id, duration: 6000 });
 };
+
+/** Brief neutral notice (e.g. loop toggled). */
+export const notifyInfo = (message: string, id?: string): void => {
+  toast(message, { id, duration: 2000 });
+};
