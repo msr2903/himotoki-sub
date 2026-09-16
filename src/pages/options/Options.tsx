@@ -187,6 +187,12 @@ const Options: FC = () => {
     [],
     (v): v is string[] => Array.isArray(v) && v.every((key) => typeof key === "string"),
   );
+  // Persist key from src/models/history; kept as a literal so the options bundle avoids the content model.
+  const [lookupHistory, setLookupHistory] = usePersistedSetting<unknown[]>(
+    "lookupHistory",
+    [],
+    (v): v is unknown[] => Array.isArray(v),
+  );
   const version = chrome.runtime.getManifest().version;
 
   const [activeNav, setActiveNav] = useState<string>(SETTINGS_NAV[0].id);
@@ -312,6 +318,10 @@ const Options: FC = () => {
             <div className="row">
               <span className="row-desc">{knownWords.length} word{knownWords.length === 1 ? "" : "s"} marked known.</span>
               {knownWords.length > 0 && <button type="button" className="es-options-link" onClick={() => setKnownWords([])}>Forget all</button>}
+            </div>
+            <div className="row">
+              <span className="row-desc">{lookupHistory.length} recent lookup{lookupHistory.length === 1 ? "" : "s"} saved. Open the in-player panel to browse and jump back to them.</span>
+              {lookupHistory.length > 0 && <button type="button" className="es-options-link" onClick={() => setLookupHistory([])}>Clear history</button>}
             </div>
           </Group>
 
