@@ -371,19 +371,33 @@ log("conjugation chain:", JSON.stringify(await page.evaluate(() =>
 await page.evaluate(() => document.querySelector(".es-conj .es-word-more")?.click());
 await page.waitForTimeout(1200);
 
-// Known words (idea 16): mark from the pop-up, verify storage, then dim.
+// Word status (New/Learning/Known/Ignored): set from the pop-up, verify storage, then dim.
 await page.evaluate(() => {
-  const b = [...document.querySelectorAll(".es-word-translation .es-popup-btn")].find((x) => /Mark known/.test(x.textContent));
+  const b = document.querySelector(".es-word-translation .es-status-btn--known");
   b && b.click();
 });
 await page.waitForTimeout(300);
-log("known words in storage after mark:", JSON.stringify(await popup.evaluate(() => chrome.storage.local.get("persist:knownWords"))));
-log("known button label now:", JSON.stringify(await page.evaluate(() =>
-  [...document.querySelectorAll(".es-word-translation .es-popup-btn")].map((x) => x.textContent).filter((t) => /Known|Mark known/.test(t)))));
+log("word statuses in storage after Known:", JSON.stringify(await popup.evaluate(() => chrome.storage.local.get(["persist:wordStatuses", "persist:knownWords"]))));
+log("active status button now:", JSON.stringify(await page.evaluate(() =>
+  [...document.querySelectorAll(".es-word-translation .es-status-btn--active")].map((x) => x.textContent))));
+// Scroll the pop-up to its footer so the New/Learning/Known/Ignored row is in frame.
+await page.evaluate(() => { const p = document.querySelector(".es-word-translation"); if (p) p.scrollTop = p.scrollHeight; });
+await page.waitForTimeout(200);
+await page.screenshot({ path: "/tmp/himotoki-unitB-popup.png" });
 await popup.evaluate(() => chrome.storage.local.set({ "persist:dimKnownWords": JSON.stringify(true) }));
 await page.waitForTimeout(700);
 log("dimmed tokens with dim on:", await page.evaluate(() => document.querySelectorAll(".es-sub-item--known").length));
-await popup.evaluate(() => chrome.storage.local.set({ "persist:dimKnownWords": JSON.stringify(false), "persist:knownWords": JSON.stringify([]) }));
+// Mark the same word "learning" (dim off) to show the underline highlight on the line.
+await popup.evaluate((key) => chrome.storage.local.set({
+  "persist:dimKnownWords": JSON.stringify(false),
+  "persist:wordStatuses": JSON.stringify({ [key]: "learning" }),
+}), "seq:jitendex:1217730");
+await page.mouse.move(10, 10);
+await page.keyboard.press("Escape");
+await page.waitForTimeout(600);
+log("learning tokens on line:", await page.evaluate(() => document.querySelectorAll(".es-sub-item--learning").length));
+await page.screenshot({ path: "/tmp/himotoki-unitB-line.png" });
+await popup.evaluate(() => chrome.storage.local.set({ "persist:dimKnownWords": JSON.stringify(false), "persist:knownWords": JSON.stringify([]), "persist:wordStatuses": JSON.stringify({}) }));
 log("conjugation table:", JSON.stringify(await page.evaluate(() => ({
   rows: document.querySelectorAll(".es-conj-table tr").length,
   sample: [...document.querySelectorAll(".es-conj-table tr")].slice(0, 3).map((r) => r.textContent.replace(/\s+/g, " ").trim()),
