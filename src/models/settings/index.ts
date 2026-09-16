@@ -22,6 +22,7 @@ import { DEFAULT_READING_LINE, READING_LINE_SETTING } from "@src/shared/furigana
 import { DEFAULT_FURIGANA_LEVEL, FURIGANA_LEVEL_SETTING } from "@src/shared/furiganaDifficulty";
 import { COLOR_BY_DIFFICULTY_SETTING, DEFAULT_COLOR_BY_DIFFICULTY } from "@src/shared/tokenColor";
 import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
+import { PLAYBACK_RATE_DEFAULT, PLAYBACK_RATE_SETTING, PLAYBACK_RATE_STEP, clampRate, stepRate } from "@src/shared/playbackRate";
 
 // Every persisted store carries an explicit name: it is the chrome.storage key (`persist:<name>`)
 // and is shared with the options page. See src/utils/withPersist.ts.
@@ -185,6 +186,16 @@ $dimKnownWords.on(dimKnownWordsChanged, (_, value) => value);
 export const $colorByDifficulty = withPersist(createStore<boolean>(DEFAULT_COLOR_BY_DIFFICULTY, { name: COLOR_BY_DIFFICULTY_SETTING }));
 export const colorByDifficultyChanged = createEvent<boolean>();
 $colorByDifficulty.on(colorByDifficultyChanged, (_, value) => value);
+
+/** Video playback speed (see src/shared/playbackRate.ts). Applied to the video in videos/init.ts. */
+export const $playbackRate = withPersist(createStore<number>(PLAYBACK_RATE_DEFAULT, { name: PLAYBACK_RATE_SETTING }));
+export const playbackRateChanged = createEvent<number>();
+export const playbackRateSpeedUp = createEvent();
+export const playbackRateSpeedDown = createEvent();
+$playbackRate
+  .on(playbackRateChanged, (_, value) => clampRate(value))
+  .on(playbackRateSpeedUp, (rate) => stepRate(rate, PLAYBACK_RATE_STEP))
+  .on(playbackRateSpeedDown, (rate) => stepRate(rate, -PLAYBACK_RATE_STEP));
 
 export const esRenderSetings = createEvent();
 

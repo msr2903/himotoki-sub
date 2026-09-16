@@ -1,7 +1,7 @@
 import { $streaming } from "@src/models/streamings";
 import { moveKeyPressed } from "@src/models/videos";
-import { secondarySubsCycled } from "@src/models/settings";
-import { replayLinePressed, loopLineToggled } from "@src/models/videos";
+import { secondarySubsCycled, playbackRateSpeedUp, playbackRateSpeedDown } from "@src/models/settings";
+import { replayLinePressed, loopLineToggled, slowReplayRequested } from "@src/models/videos";
 import { sentenceToggled, transcriptToggled } from "@src/models/subs";
 
 const isEditable = (target: EventTarget | null): boolean => {
@@ -43,6 +43,24 @@ export const keyboardHandler = (event: KeyboardEvent) => {
     event.stopPropagation();
     event.preventDefault();
     if (event.type === "keydown") loopLineToggled();
+    return;
+  }
+  if (event.code === "Comma" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+    event.stopPropagation();
+    event.preventDefault();
+    if (event.type === "keydown") playbackRateSpeedDown();
+    return;
+  }
+  if (event.code === "Period" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+    event.stopPropagation();
+    event.preventDefault();
+    if (event.type === "keydown") playbackRateSpeedUp();
+    return;
+  }
+  if (event.code === "Backslash" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+    event.stopPropagation();
+    event.preventDefault();
+    if (event.type === "keydown") slowReplayRequested();
     return;
   }
   if (event.code === "ArrowLeft") {
