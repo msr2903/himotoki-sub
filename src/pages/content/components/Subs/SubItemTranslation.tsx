@@ -2,9 +2,10 @@ import { FC, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useUnit } from "effector-react";
 import toast from "react-hot-toast";
 
-import { $knownWords, $learningService, wordMarkedKnown, wordUnmarkedKnown } from "@src/models/settings";
+import { $knownWords, $learningService, $wordStatuses, wordStatusSet } from "@src/models/settings";
 import { tokenUnpinned } from "@src/models/translations";
 import { knownKeyOf } from "@src/shared/knownWords";
+import { WORD_STATUS_LABELS, WORD_STATUS_ORDER, statusOf } from "@src/shared/wordStatus";
 import { $video, replayCueRequested } from "@src/models/videos";
 import { useLookup } from "@src/pages/content/hooks/useLookup";
 import { TSubItem, TWordTranslation, TWordTranslationItem } from "@src/models/types";
@@ -47,13 +48,13 @@ export const SubItemTranslation: FC<{
 }> = ({ subItem, contextSentence, cueStart, cueEnd, pinned }) => {
   const text = subItem.cleanedText || subItem.text;
   const { translation, pending } = useLookup(subItem);
-  const [learningService, video, unpin, knownWords, markKnown, unmarkKnown] = useUnit([
+  const [learningService, video, unpin, knownWords, wordStatuses, setWordStatus] = useUnit([
     $learningService,
     $video,
     tokenUnpinned,
     $knownWords,
-    wordMarkedKnown,
-    wordUnmarkedKnown,
+    $wordStatuses,
+    wordStatusSet,
   ]);
 
   const [service, setService] = useState<ILearningService>(null);
@@ -170,7 +171,7 @@ export const SubItemTranslation: FC<{
       })
       .then((value) => {
         const key = knownKeyOf(current);
-        if (key) markKnown(key);
+        if (key) setWordStatus({ key, status: "known" });
         toast.success(value);
       })
       .catch((error) => toast.error(typeof error === "string" ? error : error?.message || String(error)));
@@ -200,7 +201,7 @@ export const SubItemTranslation: FC<{
   const himotokiQuery = encodeURIComponent(current.himotokiSave?.headword || headword);
   const saveLabel = SERVICE_LABEL[learningService] ?? "Save";
   const knownKey = knownKeyOf(current);
-  const isKnown = knownKey != null && knownWords.includes(knownKey);
+  const wordStatus = statusOf(wordStatuses, knownKey, knownWords);
   const chain = translation.conjugation;
   const conjugable = senses.some(
     (sense) => sense.partOfSpeech === "verb" || sense.partOfSpeech === "adjective",
@@ -324,6 +325,22 @@ export const SubItemTranslation: FC<{
         </div>
       )}
 
+      {knownKey && (
+        <div className="es-popup-status-row" role="group" aria-label="Word status">
+          {WORD_STATUS_ORDER.map((status) => (
+            <button
+              key={status}
+              type="button"
+              className={`es-status-btn es-status-btn--${status} ${wordStatus === status ? "es-status-btn--active" : ""}`}
+              aria-pressed={wordStatus === status}
+              onClick={() => setWordStatus({ key: knownKey, status })}
+            >
+              {WORD_STATUS_LABELS[status]}
+            </button>
+          ))}
+        </div>
+      )}
+
       <footer className="es-popup-actions">
         {service && (
           <button
@@ -332,14 +349,6 @@ export const SubItemTranslation: FC<{
             onClick={() => handleAddWord(senses[0]!)}
           >
             {saveLabel}
-          </button>
-        )}
-        {knownKey && (
-          <button
-            className={`es-popup-btn ${isKnown ? "es-popup-btn--known" : ""}`}
-            onClick={() => (isKnown ? unmarkKnown(knownKey) : markKnown(knownKey))}
-          >
-            {isKnown ? "Known ✓" : "Mark known"}
           </button>
         )}
         <a className="es-popup-btn" href={`${HIMOTOKI_API_BASE}/?q=${himotokiQuery}`} target="_blank" rel="noreferrer">

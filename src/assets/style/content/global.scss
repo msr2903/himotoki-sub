@@ -106,6 +106,19 @@
     opacity: 0.45;
   }
 
+  // Words the user is actively learning: subtle underline so they stand out at a glance.
+  .es-sub-item--learning:not(.es-sub-item-active) {
+    text-decoration: underline;
+    text-decoration-color: #f2c14e;
+    text-decoration-thickness: max(2px, 0.08em);
+    text-underline-offset: 0.18em;
+  }
+
+  // Ignored words: pushed further back than known, and always plain (no difficulty colour).
+  .es-sub-item--ignored:not(.es-sub-item-active) {
+    opacity: 0.3;
+  }
+
   // Colour words by JLPT difficulty (color-by-difficulty setting): easy green → hard red.
   // Applied to the base text; the active/pinned states still win via their own rules.
   .es-sub-item.es-jlpt-n5:not(.es-sub-item-active) { color: #8fd6a6; }

@@ -22,6 +22,7 @@ import { DEFAULT_READING_LINE, READING_LINE_SETTING } from "@src/shared/furigana
 import { DEFAULT_FURIGANA_LEVEL, FURIGANA_LEVEL_SETTING } from "@src/shared/furiganaDifficulty";
 import { COLOR_BY_DIFFICULTY_SETTING, DEFAULT_COLOR_BY_DIFFICULTY } from "@src/shared/tokenColor";
 import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
+import { DEFAULT_WORD_STATUSES, TWordStatus, WORD_STATUSES_SETTING, setStatus } from "@src/shared/wordStatus";
 
 // Every persisted store carries an explicit name: it is the chrome.storage key (`persist:<name>`)
 // and is shared with the options page. See src/utils/withPersist.ts.
@@ -172,9 +173,28 @@ $furiganaLevel.on(furiganaLevelChanged, (_, value) => value);
 export const $knownWords = withPersist(createStore<string[]>([], { name: KNOWN_WORDS_SETTING }));
 export const wordMarkedKnown = createEvent<string>();
 export const wordUnmarkedKnown = createEvent<string>();
+/** Per-word learning status: New / Learning / Known / Ignored (see src/shared/wordStatus.ts). */
+export const $wordStatuses = withPersist(
+  createStore<Record<string, TWordStatus>>(DEFAULT_WORD_STATUSES, { name: WORD_STATUSES_SETTING }),
+);
+export const wordStatusSet = createEvent<{ key: string; status: TWordStatus }>();
+export const wordStatusCleared = createEvent<string>();
+$wordStatuses
+  .on(wordStatusSet, (map, { key, status }) => setStatus(map, key, status))
+  .on(wordStatusCleared, (map, key) => setStatus(map, key, "new"));
+
+// Keep the legacy known-words array (coverage stats, export) mirrored to the "known" status.
 $knownWords
   .on(wordMarkedKnown, (list, key) => (list.includes(key) ? list : [...list, key]))
-  .on(wordUnmarkedKnown, (list, key) => list.filter((k) => k !== key));
+  .on(wordUnmarkedKnown, (list, key) => list.filter((k) => k !== key))
+  .on(wordStatusSet, (list, { key, status }) =>
+    status === "known"
+      ? list.includes(key)
+        ? list
+        : [...list, key]
+      : list.filter((k) => k !== key),
+  )
+  .on(wordStatusCleared, (list, key) => list.filter((k) => k !== key));
 
 /** Dim words already marked known (opt-in; requires resolving each visible token). */
 export const $dimKnownWords = withPersist(createStore<boolean>(DEFAULT_DIM_KNOWN, { name: DIM_KNOWN_SETTING }));

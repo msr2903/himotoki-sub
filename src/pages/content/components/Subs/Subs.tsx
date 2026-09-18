@@ -19,6 +19,7 @@ import {
   $readingLine,
   $dimKnownWords,
   $knownWords,
+  $wordStatuses,
   $colorByDifficulty,
   $meaningSize,
 } from "@src/models/settings";
@@ -42,6 +43,7 @@ import { hasKanji } from "@src/utils/furigana";
 import { useLookup } from "@src/pages/content/hooks/useLookup";
 import { knownKeyOf } from "@src/shared/knownWords";
 import { jlptColorClass } from "@src/shared/tokenColor";
+import { statusOf } from "@src/shared/wordStatus";
 
 type TSubsProps = {};
 
@@ -231,7 +233,7 @@ type TSubItemProps = {
 };
 
 const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furigana, cueStart, cueEnd }) => {
-  const [activeHoverWord, pinnedWord, hoverAction, clickAction, handleSubItemMouseEntered, handleSubItemMouseLeft, pinToggle, dimKnownWords, knownWords, colorByDifficulty] =
+  const [activeHoverWord, pinnedWord, hoverAction, clickAction, handleSubItemMouseEntered, handleSubItemMouseLeft, pinToggle, dimKnownWords, knownWords, wordStatuses, colorByDifficulty] =
     useUnit([
       $activeHoverWord,
       $pinnedWord,
@@ -242,6 +244,7 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
       tokenPinToggled,
       $dimKnownWords,
       $knownWords,
+      $wordStatuses,
       $colorByDifficulty,
     ]);
   const leaveTimer = useRef<number | null>(null);
@@ -253,11 +256,17 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
   const action: TTokenAction = pinned ? clickAction : hovered ? hoverAction : "none";
   // Inline ruby over kanji tokens: always, or only while hovered.
   const showRuby = isWord && hasKanji(subItem.text) && (furigana === "always" || (furigana === "hover" && hovered));
-  // Dimming and difficulty colouring both resolve the token, so look up only when either is on.
-  const { translation: tokenTx } = useLookup(subItem, isWord && (dimKnownWords || colorByDifficulty));
-  const knownKey = tokenTx ? knownKeyOf(tokenTx) : null;
-  const isKnown = Boolean(dimKnownWords && knownKey && knownWords.includes(knownKey));
-  const jlptClass = isWord && colorByDifficulty && tokenTx && !tokenTx.error ? jlptColorClass(tokenTx.jlpt) : "";
+  // Dimming, status colouring and difficulty colouring all resolve the token, so look up only when
+  // one of them needs it. Statuses are only worth resolving once the user has marked some words.
+  const hasStatuses = Object.keys(wordStatuses).length > 0;
+  const { translation: tokenTx } = useLookup(subItem, isWord && (dimKnownWords || colorByDifficulty || hasStatuses));
+  const knownKey = tokenTx && !tokenTx.error ? knownKeyOf(tokenTx) : null;
+  const status = statusOf(wordStatuses, knownKey, knownWords);
+  const isKnown = dimKnownWords && status === "known";
+  const isLearning = status === "learning";
+  const isIgnored = status === "ignored";
+  // Ignored words never carry difficulty colour (the user has opted them out of attention).
+  const jlptClass = isWord && colorByDifficulty && tokenTx && !tokenTx.error && !isIgnored ? jlptColorClass(tokenTx.jlpt) : "";
 
   useEffect(() => {
     // After ONNX upgrade remount, restore hover state if the pointer is still over this token.
@@ -305,7 +314,7 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
       ref={itemRef}
       onMouseEnter={handleOnMouseEnter}
       onMouseLeave={handleOnMouseLeave}
-      className={`es-sub-item ${subItem.tag} ${action !== "none" ? "es-sub-item-active" : ""} ${pinned ? "es-sub-item-pinned" : ""} ${isKnown ? "es-sub-item--known" : ""} ${jlptClass}`}
+      className={`es-sub-item ${subItem.tag} ${action !== "none" ? "es-sub-item-active" : ""} ${pinned ? "es-sub-item-pinned" : ""} ${isKnown ? "es-sub-item--known" : ""} ${isLearning ? "es-sub-item--learning" : ""} ${isIgnored ? "es-sub-item--ignored" : ""} ${jlptClass}`}
       onClick={handleClick}
     >
       {showRuby ? <TokenRuby subItem={subItem} /> : subItem.text}

@@ -358,6 +358,56 @@
   }
 }
 
+/* ---------- word status (New / Learning / Known / Ignored) ---------- */
+
+.es-popup-status-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.es-status-btn {
+  min-height: 26px;
+  padding: 3px 4px;
+  border: 1px solid var(--hm-border);
+  border-radius: var(--hm-radius-sm);
+  background: var(--hm-surface);
+  color: var(--hm-ink-muted);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--hm-duration), border-color var(--hm-duration), color var(--hm-duration);
+
+  &:hover {
+    border-color: var(--hm-accent);
+    color: var(--hm-ink);
+  }
+
+  &--active {
+    color: #141413;
+    border-color: transparent;
+  }
+
+  &--learning.es-status-btn--active {
+    background: #f2c14e;
+  }
+
+  &--known.es-status-btn--active {
+    background: var(--hm-accent);
+  }
+
+  &--ignored.es-status-btn--active {
+    background: #8a8a86;
+  }
+
+  &--new.es-status-btn--active {
+    background: var(--hm-border);
+    color: var(--hm-ink);
+  }
+}
+
 .es-word-hint {
   margin-top: 8px;
   font-size: 11px;
