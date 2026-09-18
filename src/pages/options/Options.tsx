@@ -39,6 +39,7 @@ import {
 } from "@src/shared/furiganaDifficulty";
 import { COLOR_BY_DIFFICULTY_SETTING, DEFAULT_COLOR_BY_DIFFICULTY } from "@src/shared/tokenColor";
 import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
+import { buildRows, toCsv, toJson } from "@src/shared/exportWords";
 import { AccountPanel } from "@src/pages/shared/AccountPanel";
 import { DictionaryPanel } from "@src/pages/shared/DictionaryPanel";
 
@@ -131,6 +132,19 @@ function SettingSelect<T extends string>({
   );
 }
 
+/** Trigger a client-side file download of some text. */
+const downloadText = (filename: string, text: string, mime: string) => {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
+
 const actionDesc = (value: TTokenAction) => TOKEN_ACTIONS.find((a) => a.value === value)?.description ?? "";
 const optionDesc = <T extends string>(options: ReadonlyArray<Option<T>>, value: T) =>
   options.find((o) => o.value === value)?.description ?? "";
@@ -187,7 +201,21 @@ const Options: FC = () => {
     [],
     (v): v is string[] => Array.isArray(v) && v.every((key) => typeof key === "string"),
   );
+  // Persist key from the word-status feature; read defensively so export works with or without it.
+  const [wordStatuses] = usePersistedSetting<Record<string, string>>(
+    "wordStatuses",
+    {},
+    (v): v is Record<string, string> => typeof v === "object" && v !== null && !Array.isArray(v),
+  );
   const version = chrome.runtime.getManifest().version;
+
+  const exportCount = new Set([...knownWords, ...Object.keys(wordStatuses)]).size;
+  const exportWords = (format: "json" | "csv") => {
+    const rows = buildRows(knownWords, wordStatuses);
+    const today = new Date().toISOString().slice(0, 10);
+    if (format === "json") downloadText(`himotoki-words-${today}.json`, toJson(rows), "application/json");
+    else downloadText(`himotoki-words-${today}.csv`, toCsv(rows), "text/csv");
+  };
 
   const [activeNav, setActiveNav] = useState<string>(SETTINGS_NAV[0].id);
   const suppressObserver = useRef(false);
@@ -423,6 +451,24 @@ const Options: FC = () => {
 
           <Group id="account" title="Account">
             <AccountPanel />
+            <div className="row" id="export-words">
+              <span className="row-text">
+                <span className="row-title">Export saved words</span>
+                <span className="row-desc">
+                  {exportCount === 0
+                    ? "No saved words yet — mark words known or set a status in the dictionary pop-up."
+                    : `Download your ${exportCount} saved word${exportCount === 1 ? "" : "s"} (keys, headwords and status) as JSON or CSV.`}
+                </span>
+              </span>
+              <span className="export-actions">
+                <button type="button" className="es-options-link" disabled={exportCount === 0} onClick={() => exportWords("json")}>
+                  Export JSON
+                </button>
+                <button type="button" className="es-options-link" disabled={exportCount === 0} onClick={() => exportWords("csv")}>
+                  Export CSV
+                </button>
+              </span>
+            </div>
           </Group>
 
           <Group id="about" title="About">
