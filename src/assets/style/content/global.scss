@@ -693,3 +693,69 @@
     bottom: 90px;
   }
 }
+
+// Phrase selection (shift-click a run of tokens): highlight and an action bar to translate/save it.
+#es-subs .es-sub-item--selected {
+  background-color: var(--hm-accent-muted);
+  box-shadow: 0 0 0 2px var(--hm-accent);
+  border-radius: 3px;
+}
+
+.es-phrase-bar {
+  margin-top: 8px;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 100%;
+  padding: 8px 10px;
+  background: var(--hm-raised);
+  border: 1px solid var(--hm-border);
+  border-radius: var(--hm-radius-md);
+  color: var(--hm-ink);
+  font-family: var(--hm-font-body);
+  font-size: 14px;
+  text-align: left;
+  box-shadow: 0 12px 32px -18px rgba(0, 0, 0, 0.75);
+  cursor: default;
+}
+
+.es-phrase-bar__text {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.es-phrase-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.es-phrase-bar__btn {
+  min-height: 26px;
+  padding: 3px 10px;
+  border: 1px solid var(--hm-border);
+  border-radius: var(--hm-radius-sm);
+  background: var(--hm-surface);
+  color: var(--hm-ink);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--hm-accent);
+    background: var(--hm-accent-muted);
+  }
+
+  &--ghost {
+    color: var(--hm-ink-muted);
+    padding: 3px 8px;
+  }
+}
+
+.es-phrase-bar__translation {
+  color: var(--hm-ink-muted);
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}

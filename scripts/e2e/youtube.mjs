@@ -226,6 +226,39 @@ await page.waitForTimeout(500);
 log("furigana=never (expect ruby=0):", JSON.stringify(await furiState()));
 await setPersist({ "persist:furigana": JSON.stringify("always") });
 
+// Phrase selection (unit G): shift-click two word tokens in a cue, then Translate.
+await page.evaluate(() => { const v = document.querySelector("video"); v.currentTime = 1; v.pause(); });
+await page.waitForTimeout(500);
+{
+  const idxs = await page.evaluate(() => {
+    const items = [...document.querySelectorAll(".es-sub .es-sub-item")];
+    const out = [];
+    items.forEach((el, i) => { if (/[぀-ヿ㐀-鿿]/.test(el.textContent || "")) out.push(i); });
+    return out.slice(0, 2);
+  });
+  const items = await page.$$(".es-sub .es-sub-item");
+  if (idxs.length >= 2 && items[idxs[1]]) {
+    await items[idxs[0]].click({ modifiers: ["Shift"] });
+    await items[idxs[1]].click({ modifiers: ["Shift"] });
+    await page.waitForTimeout(400);
+    log("phrase selection:", JSON.stringify(await page.evaluate(() => ({
+      selected: document.querySelectorAll(".es-sub-item--selected").length,
+      bar: !!document.querySelector(".es-phrase-bar"),
+      phrase: document.querySelector(".es-phrase-bar__text")?.textContent || null,
+    }))));
+    await page.evaluate(() => { const b = [...document.querySelectorAll(".es-phrase-bar__btn")].find((x) => /Translate/.test(x.textContent)); b && b.click(); });
+    await page.waitForFunction(() => { const t = document.querySelector(".es-phrase-bar__translation"); return t && !/Translating/.test(t.textContent); }, null, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(300);
+    log("phrase translation:", await page.evaluate(() => document.querySelector(".es-phrase-bar__translation")?.textContent || null));
+    await page.screenshot({ path: "/tmp/himotoki-unitG-phrase.png" });
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+    log("phrase bar after Escape (expect gone):", await page.evaluate(() => !!document.querySelector(".es-phrase-bar")));
+  } else {
+    log("phrase selection: not enough word tokens to test");
+  }
+}
+
 let matched = 0;
 let total = 0;
 for (const [text, rendered] of [...seen.entries()].slice(0, 6)) {
