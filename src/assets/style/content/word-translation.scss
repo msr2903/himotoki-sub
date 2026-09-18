@@ -111,6 +111,15 @@
   &--saved {
     color: var(--es-service, var(--hm-accent));
   }
+
+  /* Distinct colours per service: Himotoki teal, Anki blue. */
+  &--himotoki {
+    --es-service: #3dbeb0;
+  }
+
+  &--anki {
+    --es-service: #0d6efd;
+  }
 }
 
 .es-popup-word {

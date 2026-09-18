@@ -9,12 +9,13 @@ import { knownKeyOf } from "@src/shared/knownWords";
 import { WORD_STATUS_LABELS, WORD_STATUS_ORDER, statusOf } from "@src/shared/wordStatus";
 import { $video, replayCueRequested } from "@src/models/videos";
 import { useLookup } from "@src/pages/content/hooks/useLookup";
-import { TSubItem, TWordTranslation, TWordTranslationItem } from "@src/models/types";
+import { TLearningService, TSubItem, TWordTranslation, TWordTranslationItem } from "@src/models/types";
 import ILearningService from "@src/learning-service/learningService";
 import { getLearningService } from "@src/utils/getLearningService";
 import { HIMOTOKI_API_BASE } from "@src/shared/himotokiConfig";
 import { SoundIcon } from "./assets/SoundIcon";
 import { SaveIcon } from "./assets/SaveIcon";
+import { AnkiIcon } from "./assets/AnkiIcon";
 import { ConjugationTable } from "./ConjugationTable";
 import { FrequencyBadge, PitchAccent } from "./PitchAccent";
 
@@ -162,11 +163,13 @@ export const SubItemTranslation: FC<{
     timestampMs: video ? Math.floor(video.currentTime * 1000) : undefined,
   };
 
-  const handleAddWord = async (sense: TWordTranslationItem) => {
-    if (!service) return;
+  // Save to a specific service (defaults to the selected one, used by the per-sense "+").
+  const handleAddWord = async (sense: TWordTranslationItem, target: TLearningService = learningService) => {
+    const svc = getLearningService(target);
+    if (!svc) return;
     // Rich Anki cards: capture a video-frame screenshot (instant) and the cue's audio (best-effort;
     // seeks/plays the video briefly, then restores it). Both degrade to null when not capturable.
-    const useRich = learningService === "anki" && ankiRichCards;
+    const useRich = target === "anki" && ankiRichCards;
     let image = null;
     let audio = null;
     if (useRich && video) {
@@ -174,7 +177,7 @@ export const SubItemTranslation: FC<{
       image = captureVideoFrame(video, base);
       if (hasClip) audio = await captureCueAudio(video, cueStart! / 1000, cueEnd! / 1000, base);
     }
-    service
+    svc
       .addWord(current.source, sense.word, {
         partOfSpeech: sense.partOfSpeech,
         context: miningContext.contextSentence,
@@ -264,17 +267,22 @@ export const SubItemTranslation: FC<{
             <button className="es-popup-speak" title="Pronounce (synthesized)" onClick={handlePlaySound}>
               <SoundIcon />
             </button>
-            {service && (
-              <button
-                className={`es-popup-save ${wordStatus === "known" ? "es-popup-save--saved" : ""}`}
-                style={{ "--es-service": service.color } as React.CSSProperties}
-                title={wordStatus === "known" ? `${saveLabel} (saved)` : saveLabel}
-                aria-label={saveLabel}
-                onClick={() => handleAddWord(senses[0]!)}
-              >
-                <SaveIcon filled={wordStatus === "known"} />
-              </button>
-            )}
+            <button
+              className={`es-popup-save es-popup-save--himotoki ${wordStatus === "known" ? "es-popup-save--saved" : ""}`}
+              title={wordStatus === "known" ? "Save to Himotoki (saved)" : "Save to Himotoki"}
+              aria-label="Save to Himotoki"
+              onClick={() => handleAddWord(senses[0]!, "himotoki")}
+            >
+              <SaveIcon filled={wordStatus === "known"} />
+            </button>
+            <button
+              className="es-popup-save es-popup-save--anki"
+              title="Save to Anki"
+              aria-label="Save to Anki"
+              onClick={() => handleAddWord(senses[0]!, "anki")}
+            >
+              <AnkiIcon />
+            </button>
           </span>
         </div>
         {reading && <p className="es-popup-reading">{reading}</p>}
