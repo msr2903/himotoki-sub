@@ -74,7 +74,7 @@ Hover and click are independent, user-configurable actions (`TTokenAction`: furi
 - `src/models/init.ts` - initializes all Effector models
 - `src/split/model.ts` - ONNX inference + Viterbi decoding
 - `src/split/postprocess.ts` - segment fix-ups (known compounds, pronoun+particle peeling)
-- Playback hotkeys live in `src/utils/keyboardHandler.ts`: arrows (prev/next/repeat), D (second line), R (replay line), L (loop line), B (sentence breakdown, `$sentenceOpen` + `SentenceBreakdown.tsx`, local dictionary only), T (searchable transcript, `$transcriptOpen` + `Transcript.tsx`, click a line to seek)
+- Playback hotkeys live in `src/utils/keyboardHandler.ts`: arrows (prev/next/repeat), D (second line), R (replay line), L (loop line), B (sentence breakdown, `$sentenceOpen` + `SentenceBreakdown.tsx`, local dictionary only), T (searchable transcript, `$transcriptOpen` + `Transcript.tsx`, click a line to seek), `,`/`.` (playback speed down/up, `$playbackRate` in settings), `\` (slow-replay the current line at 0.75×, `slowReplayRequested` in `src/models/videos`)
 - `src/shared/himotokiConfig.ts` - API base URL, dictionaries, Convex URL, OAuth client ID
 
 ### Model initialization

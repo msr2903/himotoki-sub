@@ -4,6 +4,7 @@ import { TMoveDirection } from "../types";
 import { replayVideoClip } from "@src/utils/replayVideoClip";
 import { moveVideoToTime } from "@src/utils/moveVideoToTime";
 import { $streaming } from "../streamings";
+import { SLOW_REPLAY_RATE } from "@src/shared/playbackRate";
 
 const TIME_SEEK_TIME = 5000;
 
@@ -94,6 +95,32 @@ export const moveToTimeFx = createEffect<
 >(({ video, streaming, time }) => {
   if (!video) return;
   moveVideoToTime(video, streaming, time);
+});
+
+/** Replay the current line slowed to SLOW_REPLAY_RATE (shadowing), then restore the user's rate. */
+export const slowReplayRequested = createEvent<void>();
+export const slowReplayFx = createEffect<
+  {
+    video: StoreValue<typeof $video>;
+    currentSubs: StoreValue<typeof $currentSubs>;
+    streaming: StoreValue<typeof $streaming>;
+    userRate: number;
+  },
+  void
+>(({ video, currentSubs, streaming, userRate }) => {
+  if (!video || currentSubs.length === 0) return;
+  const cue = currentSubs[0];
+  video.playbackRate = SLOW_REPLAY_RATE;
+  moveVideoToTime(video, streaming, cue.start);
+  void video.play();
+  const durationMs = Math.max(300, (cue.end - cue.start) / SLOW_REPLAY_RATE);
+  window.setTimeout(() => {
+    try {
+      video.playbackRate = userRate;
+    } catch {
+      // ignore
+    }
+  }, durationMs + 80);
 });
 
 export const replayCueRequested = createEvent<{ start: number; end: number }>();

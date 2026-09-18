@@ -520,6 +520,28 @@ log("lookup history items rendered:", await page.evaluate(() => document.querySe
   }
 }
 
+// Playback speed (unit D): switch to the Subtitles tab, screenshot the control, test , and . hotkeys.
+await page.evaluate(() => {
+  const tab = [...document.querySelectorAll(".es-settings-content__menu__item")].find((t) => /Subtitles/.test(t.textContent));
+  tab && tab.click();
+});
+await page.waitForTimeout(400);
+{
+  const panel = await page.$(".es-settings-content");
+  if (panel) await panel.screenshot({ path: "/tmp/himotoki-unitD-panel.png" }).catch(() => {});
+}
+const rate0 = await page.evaluate(() => document.querySelector("video").playbackRate);
+await page.mouse.move(10, 10);
+await page.keyboard.press("Period");
+await page.keyboard.press("Period");
+await page.waitForTimeout(300);
+const rateUp = await page.evaluate(() => document.querySelector("video").playbackRate);
+await page.keyboard.press("Comma");
+await page.waitForTimeout(300);
+const rateDown = await page.evaluate(() => document.querySelector("video").playbackRate);
+log("playback speed . . then , :", rate0, "->", rateUp, "->", rateDown, "; stored:", JSON.stringify(await popup.evaluate(() => chrome.storage.local.get("persist:playbackRate"))));
+await popup.evaluate(() => chrome.storage.local.set({ "persist:playbackRate": JSON.stringify(1) }));
+
 // Keyboard nav
 await page.mouse.move(10, 10);
 await page.evaluate(() => document.querySelector("video").play());

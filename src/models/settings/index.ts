@@ -24,6 +24,7 @@ import { COLOR_BY_DIFFICULTY_SETTING, DEFAULT_COLOR_BY_DIFFICULTY } from "@src/s
 import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
 import { DEFAULT_WORD_STATUSES, TWordStatus, WORD_STATUSES_SETTING, setStatus } from "@src/shared/wordStatus";
 import { ANKI_RICH_CARDS_SETTING, DEFAULT_ANKI_RICH_CARDS } from "@src/shared/ankiSettings";
+import { PLAYBACK_RATE_DEFAULT, PLAYBACK_RATE_SETTING, PLAYBACK_RATE_STEP, clampRate, stepRate } from "@src/shared/playbackRate";
 
 // Every persisted store carries an explicit name: it is the chrome.storage key (`persist:<name>`)
 // and is shared with the options page. See src/utils/withPersist.ts.
@@ -213,6 +214,16 @@ export const $ankiRichCards = withPersist(
 );
 export const ankiRichCardsChanged = createEvent<boolean>();
 $ankiRichCards.on(ankiRichCardsChanged, (_, value) => value);
+
+/** Video playback speed (see src/shared/playbackRate.ts). Applied to the video in videos/init.ts. */
+export const $playbackRate = withPersist(createStore<number>(PLAYBACK_RATE_DEFAULT, { name: PLAYBACK_RATE_SETTING }));
+export const playbackRateChanged = createEvent<number>();
+export const playbackRateSpeedUp = createEvent();
+export const playbackRateSpeedDown = createEvent();
+$playbackRate
+  .on(playbackRateChanged, (_, value) => clampRate(value))
+  .on(playbackRateSpeedUp, (rate) => stepRate(rate, PLAYBACK_RATE_STEP))
+  .on(playbackRateSpeedDown, (rate) => stepRate(rate, -PLAYBACK_RATE_STEP));
 
 export const esRenderSetings = createEvent();
 
