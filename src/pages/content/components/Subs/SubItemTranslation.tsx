@@ -180,6 +180,7 @@ export const SubItemTranslation: FC<{
         ...miningContext,
         reading: current.reading,
         jlpt: current.jlpt,
+        meanings: current.translations?.length ? current.translations.map((s) => s.word) : [sense.word],
         richCards: ankiRichCards,
         cardTheme: ankiCardTheme,
         image,

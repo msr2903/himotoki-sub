@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildAnkiNote, buildHimotokiFields, boldKeyword, themeClass, HIMOTOKI_MODEL_NAME } from "./ankiNote";
+import { buildAnkiNote, buildHimotokiFields, boldKeyword, themeClass, renderMeaning, HIMOTOKI_MODEL_NAME } from "./ankiNote";
 
 describe("boldKeyword", () => {
   it("escapes HTML in the sentence", () => {
@@ -21,6 +21,24 @@ describe("themeClass", () => {
     expect(themeClass(undefined)).toBe("");
     expect(themeClass("light")).toBe("himotoki--light");
     expect(themeClass("dark")).toBe("himotoki--dark");
+  });
+});
+
+describe("renderMeaning", () => {
+  it("renders a single meaning as plain escaped text", () => {
+    expect(renderMeaning("face; visage")).toBe("face; visage");
+    expect(renderMeaning("", ["face"])).toBe("face");
+  });
+
+  it("renders multiple meanings as a numbered list", () => {
+    const html = renderMeaning("face", ["face; visage; looks", "look; expression", "hon: honour; dignity"]);
+    expect(html).toBe(
+      '<ol class="hm-senses"><li>face; visage; looks</li><li>look; expression</li><li>hon: honour; dignity</li></ol>',
+    );
+  });
+
+  it("falls back to gloss when meanings is empty, and escapes HTML", () => {
+    expect(renderMeaning("a <b> & c", [])).toBe("a &lt;b&gt; &amp; c");
   });
 });
 

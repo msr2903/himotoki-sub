@@ -106,6 +106,7 @@ export class Anki implements ILearningService {
       word: headword,
       reading: rich ? aditionalData.reading || aditionalData.himotokiSave?.reading : undefined,
       gloss: translation,
+      meanings: aditionalData.meanings,
       contextSentence: rich ? aditionalData.contextSentence || aditionalData.context : undefined,
       keyword: headword,
       jlpt: rich ? aditionalData.jlpt : undefined,
