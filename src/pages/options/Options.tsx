@@ -39,6 +39,7 @@ import {
 } from "@src/shared/furiganaDifficulty";
 import { COLOR_BY_DIFFICULTY_SETTING, DEFAULT_COLOR_BY_DIFFICULTY } from "@src/shared/tokenColor";
 import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
+import { ANKI_RICH_CARDS_SETTING, DEFAULT_ANKI_RICH_CARDS } from "@src/shared/ankiSettings";
 import { AccountPanel } from "@src/pages/shared/AccountPanel";
 import { DictionaryPanel } from "@src/pages/shared/DictionaryPanel";
 
@@ -187,6 +188,11 @@ const Options: FC = () => {
     [],
     (v): v is string[] => Array.isArray(v) && v.every((key) => typeof key === "string"),
   );
+  const [ankiRichCards, setAnkiRichCards] = usePersistedSetting<boolean>(
+    ANKI_RICH_CARDS_SETTING,
+    DEFAULT_ANKI_RICH_CARDS,
+    (v): v is boolean => typeof v === "boolean",
+  );
   const version = chrome.runtime.getManifest().version;
 
   const [activeNav, setActiveNav] = useState<string>(SETTINGS_NAV[0].id);
@@ -313,6 +319,19 @@ const Options: FC = () => {
               <span className="row-desc">{knownWords.length} word{knownWords.length === 1 ? "" : "s"} marked known.</span>
               {knownWords.length > 0 && <button type="button" className="es-options-link" onClick={() => setKnownWords([])}>Forget all</button>}
             </div>
+            <Row
+              title="Rich Anki cards"
+              desc="When saving to Anki, build a sentence-mining card with the context sentence, reading, JLPT tags, a video screenshot and a cue audio clip. Off saves a plain word/meaning card."
+              htmlFor="anki-rich-cards"
+              control={
+                <input
+                  id="anki-rich-cards"
+                  type="checkbox"
+                  checked={ankiRichCards}
+                  onChange={(e) => setAnkiRichCards(e.target.checked)}
+                />
+              }
+            />
           </Group>
 
           <Group id="readings" title="Furigana & readings">

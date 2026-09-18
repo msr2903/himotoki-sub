@@ -2,7 +2,8 @@ import { FC, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useUnit } from "effector-react";
 import toast from "react-hot-toast";
 
-import { $knownWords, $learningService, $wordStatuses, wordStatusSet } from "@src/models/settings";
+import { $ankiRichCards, $knownWords, $learningService, $wordStatuses, wordStatusSet } from "@src/models/settings";
+import { captureCueAudio, captureVideoFrame } from "@src/utils/mediaCapture";
 import { tokenUnpinned } from "@src/models/translations";
 import { knownKeyOf } from "@src/shared/knownWords";
 import { WORD_STATUS_LABELS, WORD_STATUS_ORDER, statusOf } from "@src/shared/wordStatus";
@@ -48,13 +49,14 @@ export const SubItemTranslation: FC<{
 }> = ({ subItem, contextSentence, cueStart, cueEnd, pinned }) => {
   const text = subItem.cleanedText || subItem.text;
   const { translation, pending } = useLookup(subItem);
-  const [learningService, video, unpin, knownWords, wordStatuses, setWordStatus] = useUnit([
+  const [learningService, video, unpin, knownWords, wordStatuses, setWordStatus, ankiRichCards] = useUnit([
     $learningService,
     $video,
     tokenUnpinned,
     $knownWords,
     $wordStatuses,
     wordStatusSet,
+    $ankiRichCards,
   ]);
 
   const [service, setService] = useState<ILearningService>(null);
@@ -158,13 +160,28 @@ export const SubItemTranslation: FC<{
     timestampMs: video ? Math.floor(video.currentTime * 1000) : undefined,
   };
 
-  const handleAddWord = (sense: TWordTranslationItem) => {
+  const handleAddWord = async (sense: TWordTranslationItem) => {
     if (!service) return;
+    // Rich Anki cards: capture a video-frame screenshot (instant) and the cue's audio (best-effort;
+    // seeks/plays the video briefly, then restores it). Both degrade to null when not capturable.
+    const useRich = learningService === "anki" && ankiRichCards;
+    let image = null;
+    let audio = null;
+    if (useRich && video) {
+      const base = `himotoki-${Date.now()}`;
+      image = captureVideoFrame(video, base);
+      if (hasClip) audio = await captureCueAudio(video, cueStart! / 1000, cueEnd! / 1000, base);
+    }
     service
       .addWord(current.source, sense.word, {
         partOfSpeech: sense.partOfSpeech,
         context: miningContext.contextSentence,
         ...miningContext,
+        reading: current.reading,
+        jlpt: current.jlpt,
+        richCards: ankiRichCards,
+        image,
+        audio,
         himotokiSave: current.himotokiSave
           ? { ...current.himotokiSave, gloss: sense.word || current.himotokiSave.gloss }
           : undefined,

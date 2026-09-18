@@ -23,6 +23,7 @@ import { DEFAULT_FURIGANA_LEVEL, FURIGANA_LEVEL_SETTING } from "@src/shared/furi
 import { COLOR_BY_DIFFICULTY_SETTING, DEFAULT_COLOR_BY_DIFFICULTY } from "@src/shared/tokenColor";
 import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
 import { DEFAULT_WORD_STATUSES, TWordStatus, WORD_STATUSES_SETTING, setStatus } from "@src/shared/wordStatus";
+import { ANKI_RICH_CARDS_SETTING, DEFAULT_ANKI_RICH_CARDS } from "@src/shared/ankiSettings";
 
 // Every persisted store carries an explicit name: it is the chrome.storage key (`persist:<name>`)
 // and is shared with the options page. See src/utils/withPersist.ts.
@@ -205,6 +206,13 @@ $dimKnownWords.on(dimKnownWordsChanged, (_, value) => value);
 export const $colorByDifficulty = withPersist(createStore<boolean>(DEFAULT_COLOR_BY_DIFFICULTY, { name: COLOR_BY_DIFFICULTY_SETTING }));
 export const colorByDifficultyChanged = createEvent<boolean>();
 $colorByDifficulty.on(colorByDifficultyChanged, (_, value) => value);
+
+/** Build rich sentence-mining Anki cards (context + screenshot + audio) when saving to Anki. */
+export const $ankiRichCards = withPersist(
+  createStore<boolean>(DEFAULT_ANKI_RICH_CARDS, { name: ANKI_RICH_CARDS_SETTING }),
+);
+export const ankiRichCardsChanged = createEvent<boolean>();
+$ankiRichCards.on(ankiRichCardsChanged, (_, value) => value);
 
 export const esRenderSetings = createEvent();
 

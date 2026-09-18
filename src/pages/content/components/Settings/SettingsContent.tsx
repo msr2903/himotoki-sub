@@ -21,6 +21,7 @@ import { SecondarySubsSelect } from "./SecondarySubsSelect";
 import { FuriganaSelect, FuriganaLevelSelect, ReadingLineSelect } from "./FuriganaSelect";
 import { DimKnownToggle } from "./DimKnownToggle";
 import { DifficultyColorToggle } from "./DifficultyColorToggle";
+import { AnkiRichCardsToggle } from "./AnkiRichCardsToggle";
 import { MeaningSize } from "./MeaningSize";
 import { VideoStats } from "./VideoStats";
 import { useClickOutside } from "@src/hooks/useClickOutside";
@@ -150,6 +151,9 @@ export const SettingsContent: FC<{ onClose: () => void }> = ({ onClose }) => {
               </div>
               <div className="es-settings-content__item">
                 <DifficultyColorToggle />
+              </div>
+              <div className="es-settings-content__item">
+                <AnkiRichCardsToggle />
               </div>
             </>
           )}
