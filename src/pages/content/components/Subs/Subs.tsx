@@ -1,6 +1,7 @@
 import { FC, useEffect, useRef, useState } from "react";
 import { useUnit } from "effector-react";
 import Draggable from "react-draggable";
+import toast from "react-hot-toast";
 
 import { $currentSecondarySubs, $currentSubs, $sentenceOpen, $transcriptOpen } from "@src/models/subs";
 import { $video, $wasPaused, wasPausedChanged } from "@src/models/videos";
@@ -24,6 +25,7 @@ import {
   $wordStatuses,
   $colorByDifficulty,
   $meaningSize,
+  $learningService,
 } from "@src/models/settings";
 import {
   $activeHoverWord,
@@ -46,6 +48,9 @@ import { useLookup } from "@src/pages/content/hooks/useLookup";
 import { knownKeyOf } from "@src/shared/knownWords";
 import { jlptColorClass } from "@src/shared/tokenColor";
 import { statusOf } from "@src/shared/wordStatus";
+import { PhraseRange, clampRange, isIndexSelected, joinItems, rangeLength } from "@src/shared/phraseSelection";
+import { getLearningService } from "@src/utils/getLearningService";
+import { useLineTranslation } from "@src/pages/content/hooks/useLineTranslation";
 
 type TSubsProps = {};
 
@@ -186,12 +191,32 @@ const Sub: FC<{ sub: TSub; secondary: boolean; furigana: TFuriganaMode; readingL
 }) => {
   const [showTranslation, setShowTranslation] = useState(false);
   const [subsBackground, subsBackgroundOpacity] = useUnit([$subsBackground, $subsBackgroundOpacity]);
+  // Shift-click a token to anchor a phrase, shift-click another to extend it (within this cue).
+  const [selection, setSelection] = useState<{ anchor: number; extent: number } | null>(null);
+  const range: PhraseRange | null = selection ? clampRange(selection.anchor, selection.extent, sub.items.length) : null;
+
+  const handleShiftSelect = (index: number) => {
+    setSelection((prev) => (prev ? { anchor: prev.anchor, extent: index } : { anchor: index, extent: index }));
+  };
+  const clearSelection = () => setSelection(null);
+
+  // Clear the phrase selection on Escape (matches the pop-up's dismissal).
+  useEffect(() => {
+    if (!selection) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") clearSelection();
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [selection]);
 
   // Clicking the line (outside a word) shows a whole-line machine translation.
   const handleOnClick = (event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation();
     setShowTranslation(true);
   };
+
+  const phraseText = range ? joinItems(sub.items, range) : "";
 
   return (
     <div
@@ -215,12 +240,54 @@ const Sub: FC<{ sub: TSub; secondary: boolean; furigana: TFuriganaMode; readingL
             furigana={furigana}
             cueStart={sub.start}
             cueEnd={sub.end}
+            itemIndex={index}
+            selected={isIndexSelected(range, index)}
+            onShiftSelect={handleShiftSelect}
           />
         );
       })}
       {readingLine === "text" && sub.readingLine && <div className="es-sub-reading-line">{sub.readingLine}</div>}
       {secondary && <SecondaryTranslation text={sub.cleanedText} />}
       {showTranslation && !secondary && <SubFullTranslation text={sub.cleanedText} />}
+      {range && rangeLength(range) >= 2 && phraseText && (
+        <PhraseBar phrase={phraseText} contextSentence={sub.cleanedText} onClose={clearSelection} />
+      )}
+    </div>
+  );
+};
+
+/** Action bar for a selected multi-token phrase: translate it or save it, then clear. */
+const PhraseBar: FC<{ phrase: string; contextSentence?: string; onClose: () => void }> = ({ phrase, contextSentence, onClose }) => {
+  const [learningService] = useUnit([$learningService]);
+  const [showTranslation, setShowTranslation] = useState(false);
+  const { translation, pending } = useLineTranslation(showTranslation ? phrase : "");
+
+  const handleSave = () => {
+    const service = getLearningService(learningService);
+    if (!service) return;
+    service
+      .addWord(phrase, translation || phrase, { contextSentence: contextSentence || phrase, context: contextSentence || phrase })
+      .then((value) => toast.success(value))
+      .catch((error) => toast.error(typeof error === "string" ? error : error?.message || String(error)));
+  };
+
+  return (
+    <div className="es-phrase-bar" onClick={(e) => e.stopPropagation()}>
+      <div className="es-phrase-bar__text">{phrase}</div>
+      <div className="es-phrase-bar__actions">
+        <button type="button" className="es-phrase-bar__btn" onClick={() => setShowTranslation(true)}>
+          Translate
+        </button>
+        <button type="button" className="es-phrase-bar__btn" onClick={handleSave}>
+          Save phrase
+        </button>
+        <button type="button" className="es-phrase-bar__btn es-phrase-bar__btn--ghost" title="Clear selection" onClick={onClose}>
+          ×
+        </button>
+      </div>
+      {showTranslation && (
+        <div className="es-phrase-bar__translation">{pending ? "Translating…" : translation || "Translation failed"}</div>
+      )}
     </div>
   );
 };
@@ -233,9 +300,13 @@ type TSubItemProps = {
   furigana: TFuriganaMode;
   cueStart?: number;
   cueEnd?: number;
+  /** Index of this item in the cue, for shift-click phrase selection. */
+  itemIndex: number;
+  selected: boolean;
+  onShiftSelect: (index: number) => void;
 };
 
-const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furigana, cueStart, cueEnd }) => {
+const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furigana, cueStart, cueEnd, itemIndex, selected, onShiftSelect }) => {
   const [activeHoverWord, pinnedWord, hoverAction, clickAction, handleSubItemMouseEntered, handleSubItemMouseLeft, pinToggle, dimKnownWords, knownWords, wordStatuses, colorByDifficulty] =
     useUnit([
       $activeHoverWord,
@@ -305,6 +376,14 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
   const handleClick = (event: React.MouseEvent) => {
     // Clicks inside the pop-up (buttons, switcher, conjugation toggle) must never toggle the pin.
     if ((event.target as HTMLElement).closest(".es-word-translation")) return;
+    // Shift-click builds a multi-token phrase selection instead of pinning/looking up.
+    if (isWord && event.shiftKey) {
+      event.stopPropagation();
+      event.preventDefault();
+      clearLeaveTimer();
+      onShiftSelect(itemIndex);
+      return;
+    }
     // With click set to "No action" the click falls through to the line (whole-line translation).
     if (!isWord || clickAction === "none") return;
     event.stopPropagation();
@@ -317,7 +396,7 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
       ref={itemRef}
       onMouseEnter={handleOnMouseEnter}
       onMouseLeave={handleOnMouseLeave}
-      className={`es-sub-item ${subItem.tag} ${action !== "none" ? "es-sub-item-active" : ""} ${pinned ? "es-sub-item-pinned" : ""} ${isKnown ? "es-sub-item--known" : ""} ${isLearning ? "es-sub-item--learning" : ""} ${isIgnored ? "es-sub-item--ignored" : ""} ${jlptClass}`}
+      className={`es-sub-item ${subItem.tag} ${action !== "none" ? "es-sub-item-active" : ""} ${pinned ? "es-sub-item-pinned" : ""} ${isKnown ? "es-sub-item--known" : ""} ${isLearning ? "es-sub-item--learning" : ""} ${isIgnored ? "es-sub-item--ignored" : ""} ${selected ? "es-sub-item--selected" : ""} ${jlptClass}`}
       onClick={handleClick}
     >
       {showRuby ? <TokenRuby subItem={subItem} /> : subItem.text}
