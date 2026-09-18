@@ -23,7 +23,7 @@ import { SecondarySubsSelect } from "./SecondarySubsSelect";
 import { FuriganaSelect, FuriganaLevelSelect, ReadingLineSelect } from "./FuriganaSelect";
 import { DimKnownToggle } from "./DimKnownToggle";
 import { DifficultyColorToggle } from "./DifficultyColorToggle";
-import { AnkiRichCardsToggle } from "./AnkiRichCardsToggle";
+import { AnkiRichCardsToggle, AnkiCardThemeSelect } from "./AnkiRichCardsToggle";
 import { MeaningSize } from "./MeaningSize";
 import { VideoStats } from "./VideoStats";
 import { LookupHistory } from "./LookupHistory";
@@ -160,6 +160,9 @@ export const SettingsContent: FC<{ onClose: () => void }> = ({ onClose }) => {
               </div>
               <div className="es-settings-content__item">
                 <AnkiRichCardsToggle />
+              </div>
+              <div className="es-settings-content__item">
+                <AnkiCardThemeSelect />
               </div>
             </>
           )}

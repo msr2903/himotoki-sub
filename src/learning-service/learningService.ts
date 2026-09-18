@@ -11,8 +11,10 @@ export type TAditionalData = {
   reading?: string;
   /** JLPT levels, for rich Anki card tags. */
   jlpt?: string[];
-  /** When false, Anki builds a plain Front/Back card instead of a rich sentence-mining card. */
+  /** When false, Anki omits the sentence/screenshot/audio and builds a minimal card. */
   richCards?: boolean;
+  /** Anki card theme: "auto" follows Anki night mode; "light"/"dark" force it. */
+  cardTheme?: "auto" | "light" | "dark";
   /** Video-frame screenshot captured for a rich Anki card (see src/utils/mediaCapture.ts). */
   image?: TAnkiMedia | null;
   /** Cue audio clip captured for a rich Anki card. */
