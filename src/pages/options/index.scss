@@ -256,6 +256,19 @@ body {
   font: inherit;
   padding: 0;
   text-decoration: underline;
+
+  &:disabled {
+    color: var(--hm-ink-muted);
+    cursor: default;
+    text-decoration: none;
+  }
+}
+
+.export-actions {
+  display: inline-flex;
+  gap: 4px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .row input[type="checkbox"] { accent-color: var(--hm-accent); }
