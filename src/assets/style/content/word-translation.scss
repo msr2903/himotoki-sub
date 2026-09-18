@@ -72,7 +72,45 @@
 .es-popup-title {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Yomitan-style action icons in the top-right of the header. */
+.es-popup-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.es-popup-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--hm-ink-muted);
+  cursor: pointer;
+  transition: background-color var(--hm-duration), color var(--hm-duration);
+
+  svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  &:hover {
+    color: var(--es-service, var(--hm-accent));
+    background: var(--hm-accent-muted);
+  }
+
+  &--saved {
+    color: var(--es-service, var(--hm-accent));
+  }
 }
 
 .es-popup-word {

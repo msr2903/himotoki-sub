@@ -14,6 +14,7 @@ import ILearningService from "@src/learning-service/learningService";
 import { getLearningService } from "@src/utils/getLearningService";
 import { HIMOTOKI_API_BASE } from "@src/shared/himotokiConfig";
 import { SoundIcon } from "./assets/SoundIcon";
+import { SaveIcon } from "./assets/SaveIcon";
 import { ConjugationTable } from "./ConjugationTable";
 import { FrequencyBadge, PitchAccent } from "./PitchAccent";
 
@@ -254,14 +255,27 @@ export const SubItemTranslation: FC<{
       <header className="es-popup-head">
         <div className="es-popup-title">
           <span className="es-popup-word">{headword}</span>
-          {hasClip && (
-            <button className="es-popup-speak" title="Replay this line from the video" onClick={handlePlayClip}>
-              ▶
+          <span className="es-popup-tools">
+            {hasClip && (
+              <button className="es-popup-speak" title="Replay this line from the video" onClick={handlePlayClip}>
+                ▶
+              </button>
+            )}
+            <button className="es-popup-speak" title="Pronounce (synthesized)" onClick={handlePlaySound}>
+              <SoundIcon />
             </button>
-          )}
-          <button className="es-popup-speak" title="Pronounce (synthesized)" onClick={handlePlaySound}>
-            <SoundIcon />
-          </button>
+            {service && (
+              <button
+                className={`es-popup-save ${wordStatus === "known" ? "es-popup-save--saved" : ""}`}
+                style={{ "--es-service": service.color } as React.CSSProperties}
+                title={wordStatus === "known" ? `${saveLabel} (saved)` : saveLabel}
+                aria-label={saveLabel}
+                onClick={() => handleAddWord(senses[0]!)}
+              >
+                <SaveIcon filled={wordStatus === "known"} />
+              </button>
+            )}
+          </span>
         </div>
         {reading && <p className="es-popup-reading">{reading}</p>}
         {(current.pitch ||
@@ -362,15 +376,6 @@ export const SubItemTranslation: FC<{
       )}
 
       <footer className="es-popup-actions">
-        {service && (
-          <button
-            className="es-popup-btn es-popup-btn--primary"
-            style={{ "--es-service": service.color } as React.CSSProperties}
-            onClick={() => handleAddWord(senses[0]!)}
-          >
-            {saveLabel}
-          </button>
-        )}
         <a className="es-popup-btn" href={`${HIMOTOKI_API_BASE}/?q=${himotokiQuery}`} target="_blank" rel="noreferrer">
           Open entry
         </a>
