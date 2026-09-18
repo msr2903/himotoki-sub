@@ -39,6 +39,7 @@ import {
 } from "@src/shared/furiganaDifficulty";
 import { COLOR_BY_DIFFICULTY_SETTING, DEFAULT_COLOR_BY_DIFFICULTY } from "@src/shared/tokenColor";
 import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
+import { DEFAULT_LISTENING_MODE, LISTENING_MODE_SETTING } from "@src/shared/listeningMode";
 import { AccountPanel } from "@src/pages/shared/AccountPanel";
 import { DictionaryPanel } from "@src/pages/shared/DictionaryPanel";
 
@@ -186,6 +187,11 @@ const Options: FC = () => {
     KNOWN_WORDS_SETTING,
     [],
     (v): v is string[] => Array.isArray(v) && v.every((key) => typeof key === "string"),
+  );
+  const [listeningMode, setListeningMode] = usePersistedSetting<boolean>(
+    LISTENING_MODE_SETTING,
+    DEFAULT_LISTENING_MODE,
+    (v): v is boolean => typeof v === "boolean",
   );
   const version = chrome.runtime.getManifest().version;
 
@@ -412,6 +418,19 @@ const Options: FC = () => {
                   type="checkbox"
                   checked={colorByDifficulty}
                   onChange={(e) => setColorByDifficulty(e.target.checked)}
+                />
+              }
+            />
+            <Row
+              title="Listening mode"
+              desc="Blur the subtitle text for listening practice; reveal the current line on hover or with the H key."
+              htmlFor="listening-mode"
+              control={
+                <input
+                  id="listening-mode"
+                  type="checkbox"
+                  checked={listeningMode}
+                  onChange={(e) => setListeningMode(e.target.checked)}
                 />
               }
             />

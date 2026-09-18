@@ -22,6 +22,7 @@ import { DEFAULT_READING_LINE, READING_LINE_SETTING } from "@src/shared/furigana
 import { DEFAULT_FURIGANA_LEVEL, FURIGANA_LEVEL_SETTING } from "@src/shared/furiganaDifficulty";
 import { COLOR_BY_DIFFICULTY_SETTING, DEFAULT_COLOR_BY_DIFFICULTY } from "@src/shared/tokenColor";
 import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
+import { DEFAULT_LISTENING_MODE, LISTENING_MODE_SETTING } from "@src/shared/listeningMode";
 
 // Every persisted store carries an explicit name: it is the chrome.storage key (`persist:<name>`)
 // and is shared with the options page. See src/utils/withPersist.ts.
@@ -185,6 +186,16 @@ $dimKnownWords.on(dimKnownWordsChanged, (_, value) => value);
 export const $colorByDifficulty = withPersist(createStore<boolean>(DEFAULT_COLOR_BY_DIFFICULTY, { name: COLOR_BY_DIFFICULTY_SETTING }));
 export const colorByDifficultyChanged = createEvent<boolean>();
 $colorByDifficulty.on(colorByDifficultyChanged, (_, value) => value);
+
+/** Listening mode: blur subtitle text; reveal on hover or the H peek toggle (see src/shared/listeningMode.ts). */
+export const $listeningMode = withPersist(createStore<boolean>(DEFAULT_LISTENING_MODE, { name: LISTENING_MODE_SETTING }));
+export const listeningModeChanged = createEvent<boolean>();
+$listeningMode.on(listeningModeChanged, (_, value) => value);
+
+/** Transient "peek" toggle (H): reveal the blurred text until toggled off. Reset when mode changes. */
+export const $listeningPeek = createStore<boolean>(false);
+export const listeningPeekToggled = createEvent();
+$listeningPeek.on(listeningPeekToggled, (peek) => !peek).reset(listeningModeChanged);
 
 export const esRenderSetings = createEvent();
 

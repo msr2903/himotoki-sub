@@ -1,6 +1,6 @@
 import { $streaming } from "@src/models/streamings";
 import { moveKeyPressed } from "@src/models/videos";
-import { secondarySubsCycled } from "@src/models/settings";
+import { secondarySubsCycled, listeningPeekToggled } from "@src/models/settings";
 import { replayLinePressed, loopLineToggled } from "@src/models/videos";
 import { sentenceToggled, transcriptToggled } from "@src/models/subs";
 
@@ -43,6 +43,12 @@ export const keyboardHandler = (event: KeyboardEvent) => {
     event.stopPropagation();
     event.preventDefault();
     if (event.type === "keydown") loopLineToggled();
+    return;
+  }
+  if (event.code === "KeyH" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+    event.stopPropagation();
+    event.preventDefault();
+    if (event.type === "keydown") listeningPeekToggled();
     return;
   }
   if (event.code === "ArrowLeft") {

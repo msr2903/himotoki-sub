@@ -693,3 +693,23 @@
     bottom: 90px;
   }
 }
+
+// Listening mode: blur the subtitle text so the learner listens first. Reveal the whole line on hover
+// over the subtitle area, or with the H "peek" toggle. #es-subs is a unique id so this can be top-level.
+#es-subs.es-subs--listening .es-sub-item,
+#es-subs.es-subs--listening .es-sub-reading-line,
+#es-subs.es-subs--listening .es-sub-secondary {
+  filter: blur(7px);
+  opacity: 0.5;
+  transition: filter 0.12s ease, opacity 0.12s ease;
+}
+
+#es-subs.es-subs--listening:hover .es-sub-item,
+#es-subs.es-subs--listening:hover .es-sub-reading-line,
+#es-subs.es-subs--listening:hover .es-sub-secondary,
+#es-subs.es-subs--listening.es-subs--peek .es-sub-item,
+#es-subs.es-subs--listening.es-subs--peek .es-sub-reading-line,
+#es-subs.es-subs--listening.es-subs--peek .es-sub-secondary {
+  filter: none;
+  opacity: 1;
+}
