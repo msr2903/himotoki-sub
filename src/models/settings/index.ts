@@ -25,6 +25,7 @@ import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/
 import { DEFAULT_WORD_STATUSES, TWordStatus, WORD_STATUSES_SETTING, setStatus } from "@src/shared/wordStatus";
 import { ANKI_RICH_CARDS_SETTING, DEFAULT_ANKI_RICH_CARDS } from "@src/shared/ankiSettings";
 import { PLAYBACK_RATE_DEFAULT, PLAYBACK_RATE_SETTING, PLAYBACK_RATE_STEP, clampRate, stepRate } from "@src/shared/playbackRate";
+import { DEFAULT_LISTENING_MODE, LISTENING_MODE_SETTING } from "@src/shared/listeningMode";
 
 // Every persisted store carries an explicit name: it is the chrome.storage key (`persist:<name>`)
 // and is shared with the options page. See src/utils/withPersist.ts.
@@ -224,6 +225,16 @@ $playbackRate
   .on(playbackRateChanged, (_, value) => clampRate(value))
   .on(playbackRateSpeedUp, (rate) => stepRate(rate, PLAYBACK_RATE_STEP))
   .on(playbackRateSpeedDown, (rate) => stepRate(rate, -PLAYBACK_RATE_STEP));
+
+/** Listening mode: blur subtitle text; reveal on hover or the H peek toggle (see src/shared/listeningMode.ts). */
+export const $listeningMode = withPersist(createStore<boolean>(DEFAULT_LISTENING_MODE, { name: LISTENING_MODE_SETTING }));
+export const listeningModeChanged = createEvent<boolean>();
+$listeningMode.on(listeningModeChanged, (_, value) => value);
+
+/** Transient "peek" toggle (H): reveal the blurred text until toggled off. Reset when mode changes. */
+export const $listeningPeek = createStore<boolean>(false);
+export const listeningPeekToggled = createEvent();
+$listeningPeek.on(listeningPeekToggled, (peek) => !peek).reset(listeningModeChanged);
 
 export const esRenderSetings = createEvent();
 

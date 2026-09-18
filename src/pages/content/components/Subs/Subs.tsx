@@ -17,6 +17,8 @@ import {
   $uiScale,
   $furigana,
   $readingLine,
+  $listeningMode,
+  $listeningPeek,
   $dimKnownWords,
   $knownWords,
   $wordStatuses,
@@ -90,7 +92,7 @@ export const Subs: FC<TSubsProps> = () => {
   // Without the offline dictionary, "always" would look up every kanji token over the HTTP API;
   // fall back to "hover" (one lookup at a time) until it is installed.
   const effectiveFurigana: TFuriganaMode = furigana === "always" && !dictReady ? "hover" : furigana;
-  const [subsBackground, subsBackgroundOpacity, meaningSize] = useUnit([$subsBackground, $subsBackgroundOpacity, $meaningSize]);
+  const [subsBackground, subsBackgroundOpacity, meaningSize, listeningMode, listeningPeek] = useUnit([$subsBackground, $subsBackgroundOpacity, $meaningSize, $listeningMode, $listeningPeek]);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -155,6 +157,7 @@ export const Subs: FC<TSubsProps> = () => {
     <Draggable>
       <div
         id="es-subs"
+        className={`${listeningMode ? "es-subs--listening" : ""} ${listeningPeek ? "es-subs--peek" : ""}`}
         ref={rootRef}
         onMouseLeave={handleOnMouseLeave}
         onMouseEnter={handleOnMouseEnter}

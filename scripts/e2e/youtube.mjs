@@ -226,6 +226,26 @@ await page.waitForTimeout(500);
 log("furigana=never (expect ruby=0):", JSON.stringify(await furiState()));
 await setPersist({ "persist:furigana": JSON.stringify("always") });
 
+// Listening mode (unit E): blur the text, then peek with H to reveal.
+await page.mouse.move(10, 10);
+await setPersist({ "persist:listeningMode": JSON.stringify(true) });
+await page.waitForTimeout(500);
+log("listening blur applied:", await page.evaluate(() => {
+  const el = document.querySelector("#es-subs .es-sub-item");
+  return el ? getComputedStyle(el).filter : null;
+}));
+await page.screenshot({ path: "/tmp/himotoki-unitE-blurred.png" });
+await page.keyboard.press("h");
+await page.waitForTimeout(400);
+log("after H peek (expect filter none):", await page.evaluate(() => {
+  const el = document.querySelector("#es-subs .es-sub-item");
+  return el ? getComputedStyle(el).filter : null;
+}));
+await page.screenshot({ path: "/tmp/himotoki-unitE-revealed.png" });
+await page.keyboard.press("h");
+await setPersist({ "persist:listeningMode": JSON.stringify(false) });
+await page.waitForTimeout(300);
+
 let matched = 0;
 let total = 0;
 for (const [text, rendered] of [...seen.entries()].slice(0, 6)) {

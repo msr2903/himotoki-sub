@@ -18,6 +18,7 @@ import { ClickActionSelect, HoverActionSelect, OpenOptionsPage } from "./TokenAc
 import { OpenTranscript } from "./OpenTranscript";
 import { UiScale } from "./UiScale";
 import { PlaybackSpeed } from "./PlaybackSpeed";
+import { ListeningModeToggle } from "./ListeningModeToggle";
 import { SecondarySubsSelect } from "./SecondarySubsSelect";
 import { FuriganaSelect, FuriganaLevelSelect, ReadingLineSelect } from "./FuriganaSelect";
 import { DimKnownToggle } from "./DimKnownToggle";
@@ -178,6 +179,9 @@ export const SettingsContent: FC<{ onClose: () => void }> = ({ onClose }) => {
               </div>
               <div className="es-settings-content__item">
                 <PlaybackSpeed />
+              </div>
+              <div className="es-settings-content__item">
+                <ListeningModeToggle />
               </div>
               <div className="es-settings-content__item">
                 <SubsDelay />
