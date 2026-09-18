@@ -22,8 +22,10 @@ export type AnkiNoteInput = {
   word: string;
   /** Reading (kana) shown under the headword. */
   reading?: string;
-  /** Primary gloss / meaning. */
+  /** Primary gloss / meaning (used when `meanings` is not provided). */
   gloss: string;
+  /** All senses/meanings, rendered as a numbered list on the card. Falls back to `gloss`. */
+  meanings?: string[];
   /** Sentence the word appeared in; the keyword is bolded inside it. */
   contextSentence?: string;
   /** Surface to bold inside the context sentence (usually the headword). */
@@ -77,12 +79,19 @@ export const boldKeyword = (sentence: string, keyword?: string): string => {
 export const themeClass = (theme: TAnkiCardTheme = "auto"): string =>
   theme === "light" ? "himotoki--light" : theme === "dark" ? "himotoki--dark" : "";
 
+/** Render the meanings: a numbered list when there is more than one sense, else a single line. Pure. */
+export const renderMeaning = (gloss: string, meanings?: string[]): string => {
+  const list = (meanings && meanings.length ? meanings : [gloss]).map((m) => m.trim()).filter(Boolean);
+  if (list.length <= 1) return htmlEscape(list[0] || "");
+  return `<ol class="hm-senses">${list.map((m) => `<li>${htmlEscape(m)}</li>`).join("")}</ol>`;
+};
+
 /** Build the fields for a Himotoki note. Pure. */
 export const buildHimotokiFields = (input: AnkiNoteInput): HimotokiFields => ({
   Word: htmlEscape(input.word),
   Reading: input.reading ? htmlEscape(input.reading) : "",
   Sentence: input.contextSentence ? boldKeyword(input.contextSentence, input.keyword) : "",
-  Meaning: htmlEscape(input.gloss),
+  Meaning: renderMeaning(input.gloss, input.meanings),
   Level: input.jlpt && input.jlpt.length ? input.jlpt.map((j) => htmlEscape(j.toUpperCase())).join(" · ") : "",
   Image: input.imageFilename ? `<img src="${htmlEscape(input.imageFilename)}">` : "",
   Audio: input.audioFilename ? `[sound:${input.audioFilename}]` : "",
@@ -170,6 +179,18 @@ export const HIMOTOKI_CARD_CSS = `
 .hm-sentence b { color: var(--c-accent); font-weight: 600; }
 
 .hm-meaning { font-size: 17px; margin: 8px 0; }
+
+.hm-senses {
+  display: inline-block;
+  text-align: left;
+  margin: 4px auto 0;
+  padding: 0 0 0 1.5em;
+  max-width: 90%;
+  font-size: 16px;
+  line-height: 1.6;
+}
+.hm-senses li { margin: 3px 0; }
+.hm-senses li::marker { color: var(--c-accent); font-weight: 700; }
 
 .hm-level {
   display: inline-block;
