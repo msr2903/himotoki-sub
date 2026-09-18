@@ -2,7 +2,7 @@ import { FC, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useUnit } from "effector-react";
 import toast from "react-hot-toast";
 
-import { $ankiRichCards, $knownWords, $learningService, $wordStatuses, wordStatusSet } from "@src/models/settings";
+import { $ankiCardTheme, $ankiRichCards, $knownWords, $learningService, $wordStatuses, wordStatusSet } from "@src/models/settings";
 import { captureCueAudio, captureVideoFrame } from "@src/utils/mediaCapture";
 import { tokenUnpinned } from "@src/models/translations";
 import { knownKeyOf } from "@src/shared/knownWords";
@@ -49,7 +49,7 @@ export const SubItemTranslation: FC<{
 }> = ({ subItem, contextSentence, cueStart, cueEnd, pinned }) => {
   const text = subItem.cleanedText || subItem.text;
   const { translation, pending } = useLookup(subItem);
-  const [learningService, video, unpin, knownWords, wordStatuses, setWordStatus, ankiRichCards] = useUnit([
+  const [learningService, video, unpin, knownWords, wordStatuses, setWordStatus, ankiRichCards, ankiCardTheme] = useUnit([
     $learningService,
     $video,
     tokenUnpinned,
@@ -57,6 +57,7 @@ export const SubItemTranslation: FC<{
     $wordStatuses,
     wordStatusSet,
     $ankiRichCards,
+    $ankiCardTheme,
   ]);
 
   const [service, setService] = useState<ILearningService>(null);
@@ -180,6 +181,7 @@ export const SubItemTranslation: FC<{
         reading: current.reading,
         jlpt: current.jlpt,
         richCards: ankiRichCards,
+        cardTheme: ankiCardTheme,
         image,
         audio,
         himotokiSave: current.himotokiSave

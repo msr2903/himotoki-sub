@@ -39,7 +39,8 @@ import {
 } from "@src/shared/furiganaDifficulty";
 import { COLOR_BY_DIFFICULTY_SETTING, DEFAULT_COLOR_BY_DIFFICULTY } from "@src/shared/tokenColor";
 import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
-import { ANKI_RICH_CARDS_SETTING, DEFAULT_ANKI_RICH_CARDS } from "@src/shared/ankiSettings";
+import { ANKI_CARD_THEME_OPTIONS, ANKI_CARD_THEME_SETTING, ANKI_RICH_CARDS_SETTING, DEFAULT_ANKI_CARD_THEME, DEFAULT_ANKI_RICH_CARDS, isAnkiCardTheme } from "@src/shared/ankiSettings";
+import type { TAnkiCardTheme } from "@src/utils/ankiNote";
 import { DEFAULT_LISTENING_MODE, LISTENING_MODE_SETTING } from "@src/shared/listeningMode";
 import { buildRows, toCsv, toJson } from "@src/shared/exportWords";
 import { AccountPanel } from "@src/pages/shared/AccountPanel";
@@ -208,6 +209,11 @@ const Options: FC = () => {
     DEFAULT_ANKI_RICH_CARDS,
     (v): v is boolean => typeof v === "boolean",
   );
+  const [ankiCardTheme, setAnkiCardTheme] = usePersistedSetting<TAnkiCardTheme>(
+    ANKI_CARD_THEME_SETTING,
+    DEFAULT_ANKI_CARD_THEME,
+    isAnkiCardTheme,
+  );
   // Persist key from src/models/history; kept as a literal so the options bundle avoids the content model.
   const [lookupHistory, setLookupHistory] = usePersistedSetting<unknown[]>(
     "lookupHistory",
@@ -369,6 +375,20 @@ const Options: FC = () => {
                   type="checkbox"
                   checked={ankiRichCards}
                   onChange={(e) => setAnkiRichCards(e.target.checked)}
+                />
+              }
+            />
+            <Row
+              title="Anki card theme"
+              desc={optionDesc(ANKI_CARD_THEME_OPTIONS, ankiCardTheme)}
+              htmlFor="anki-card-theme"
+              control={
+                <SettingSelect
+                  id="anki-card-theme"
+                  value={ankiCardTheme}
+                  options={ANKI_CARD_THEME_OPTIONS}
+                  onChange={setAnkiCardTheme}
+                  guard={isAnkiCardTheme}
                 />
               }
             />

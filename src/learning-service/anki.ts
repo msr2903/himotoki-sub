@@ -1,5 +1,13 @@
 import ILearningService, { TAditionalData, TAnkiMedia } from "./learningService";
-import { buildAnkiNote } from "@src/utils/ankiNote";
+import {
+  HIMOTOKI_CARD_CSS,
+  HIMOTOKI_CARD_TEMPLATE_NAME,
+  HIMOTOKI_FIELDS,
+  HIMOTOKI_FRONT_TEMPLATE,
+  HIMOTOKI_BACK_TEMPLATE,
+  HIMOTOKI_MODEL_NAME,
+  buildAnkiNote,
+} from "@src/utils/ankiNote";
 
 const ANKI_API_VERSION = 6;
 const ANKI_DESK = "Himotoki";
@@ -32,6 +40,38 @@ export class Anki implements ILearningService {
     }
   }
 
+  /**
+   * Ensure the custom "Himotoki" note type exists and its template/CSS are current. Creating is
+   * required (cards can't be added to a missing note type); updating an existing one is best-effort so
+   * a partial/locked model never blocks saving.
+   */
+  private async ensureModel(): Promise<void> {
+    const names = await this.invoke("modelNames", {});
+    const existing: string[] = Array.isArray(names?.result) ? names.result : [];
+    if (!existing.includes(HIMOTOKI_MODEL_NAME)) {
+      const created = await this.invoke("createModel", {
+        modelName: HIMOTOKI_MODEL_NAME,
+        inOrderFields: [...HIMOTOKI_FIELDS],
+        css: HIMOTOKI_CARD_CSS,
+        isCloze: false,
+        cardTemplates: [{ Name: HIMOTOKI_CARD_TEMPLATE_NAME, Front: HIMOTOKI_FRONT_TEMPLATE, Back: HIMOTOKI_BACK_TEMPLATE }],
+      });
+      if (created?.error) throw new Error(created.error);
+      return;
+    }
+    try {
+      await this.invoke("updateModelTemplates", {
+        model: {
+          name: HIMOTOKI_MODEL_NAME,
+          templates: { [HIMOTOKI_CARD_TEMPLATE_NAME]: { Front: HIMOTOKI_FRONT_TEMPLATE, Back: HIMOTOKI_BACK_TEMPLATE } },
+        },
+      });
+      await this.invoke("updateModelStyling", { model: { name: HIMOTOKI_MODEL_NAME, css: HIMOTOKI_CARD_CSS } });
+    } catch {
+      // Non-fatal: adding the note still works with the existing template.
+    }
+  }
+
   public async addWord(word: string, translation: string, aditionalData: TAditionalData): Promise<string> {
     const createDeskResult = await this.invoke("createDeck", { deck: ANKI_DESK });
 
@@ -41,6 +81,12 @@ export class Anki implements ILearningService {
 
     if (createDeskResult.error) {
       return Promise.reject("Anki Error: " + createDeskResult.error);
+    }
+
+    try {
+      await this.ensureModel();
+    } catch (error) {
+      return Promise.reject("Anki Error: could not set up the Himotoki note type — " + (error instanceof Error ? error.message : String(error)));
     }
 
     const rich = aditionalData.richCards !== false;
@@ -65,6 +111,7 @@ export class Anki implements ILearningService {
       jlpt: rich ? aditionalData.jlpt : undefined,
       imageFilename,
       audioFilename,
+      theme: aditionalData.cardTheme || "auto",
     });
 
     const addWordResult = await this.invoke("addNote", { note });

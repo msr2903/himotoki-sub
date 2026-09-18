@@ -23,7 +23,8 @@ import { DEFAULT_FURIGANA_LEVEL, FURIGANA_LEVEL_SETTING } from "@src/shared/furi
 import { COLOR_BY_DIFFICULTY_SETTING, DEFAULT_COLOR_BY_DIFFICULTY } from "@src/shared/tokenColor";
 import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
 import { DEFAULT_WORD_STATUSES, TWordStatus, WORD_STATUSES_SETTING, setStatus } from "@src/shared/wordStatus";
-import { ANKI_RICH_CARDS_SETTING, DEFAULT_ANKI_RICH_CARDS } from "@src/shared/ankiSettings";
+import { ANKI_CARD_THEME_SETTING, ANKI_RICH_CARDS_SETTING, DEFAULT_ANKI_CARD_THEME, DEFAULT_ANKI_RICH_CARDS } from "@src/shared/ankiSettings";
+import type { TAnkiCardTheme } from "@src/utils/ankiNote";
 import { PLAYBACK_RATE_DEFAULT, PLAYBACK_RATE_SETTING, PLAYBACK_RATE_STEP, clampRate, stepRate } from "@src/shared/playbackRate";
 import { DEFAULT_LISTENING_MODE, LISTENING_MODE_SETTING } from "@src/shared/listeningMode";
 
@@ -215,6 +216,13 @@ export const $ankiRichCards = withPersist(
 );
 export const ankiRichCardsChanged = createEvent<boolean>();
 $ankiRichCards.on(ankiRichCardsChanged, (_, value) => value);
+
+/** Theme for generated Anki cards: auto (match Anki) / light / dark (see src/shared/ankiSettings.ts). */
+export const $ankiCardTheme = withPersist(
+  createStore<TAnkiCardTheme>(DEFAULT_ANKI_CARD_THEME, { name: ANKI_CARD_THEME_SETTING }),
+);
+export const ankiCardThemeChanged = createEvent<TAnkiCardTheme>();
+$ankiCardTheme.on(ankiCardThemeChanged, (_, value) => value);
 
 /** Video playback speed (see src/shared/playbackRate.ts). Applied to the video in videos/init.ts. */
 export const $playbackRate = withPersist(createStore<number>(PLAYBACK_RATE_DEFAULT, { name: PLAYBACK_RATE_SETTING }));
