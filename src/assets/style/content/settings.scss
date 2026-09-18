@@ -316,3 +316,123 @@
 .es-video-stats-empty {
   color: var(--hm-ink-muted);
 }
+
+/* ---------- lookup history ---------- */
+
+.es-lookup-history {
+  font-size: 13px;
+  color: var(--hm-ink);
+}
+
+.es-lookup-history__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.es-lookup-history__title {
+  font-weight: 600;
+}
+
+.es-lookup-history__clear {
+  border: 0;
+  background: transparent;
+  color: var(--hm-ink-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--hm-accent);
+    text-decoration: underline;
+  }
+}
+
+.es-lookup-history__empty {
+  margin: 0;
+  color: var(--hm-ink-muted);
+}
+
+.es-lookup-history__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.es-lookup-history__item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.es-lookup-history__word {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--hm-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--hm-accent-muted);
+  }
+
+  &:disabled {
+    cursor: default;
+  }
+}
+
+.es-lookup-history__headword {
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.es-lookup-history__reading {
+  color: var(--hm-ink-muted);
+  font-size: 11.5px;
+  flex-shrink: 0;
+}
+
+.es-lookup-history__gloss {
+  color: var(--hm-ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.es-lookup-history__time {
+  margin-left: auto;
+  color: var(--hm-ink-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.es-lookup-history__remove {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--hm-ink-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--hm-accent);
+    background: var(--hm-accent-muted);
+  }
+}

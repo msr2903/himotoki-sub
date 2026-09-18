@@ -502,7 +502,23 @@ log("video stats:", JSON.stringify(await page.evaluate(() => document.querySelec
 log("settings panel overflow (scrollHeight > clientHeight means it scrolls):", JSON.stringify(await page.evaluate(() => { const m = document.querySelector(".es-settings-content__main"); const c = document.querySelector(".es-settings-content"); return m && c ? { mainScroll: m.scrollHeight, mainClient: m.clientHeight, panel: c.getBoundingClientRect().height, playerH: document.querySelector(".html5-video-player")?.clientHeight } : null; })));
 log("select values fully visible:", JSON.stringify(await page.evaluate(() => [...document.querySelectorAll(".es-settings-content [class*=singleValue]")].map((e) => [e.textContent, e.scrollWidth <= e.clientWidth + 1]))));
 await page.screenshot({ path: "/tmp/himotoki-e2e-settings.png" });
-await page.screenshot({ path: "/tmp/himotoki-e2e-settings.png" });
+
+// Lookup history (unit C): seed a few items and screenshot the panel's history section.
+await popup.evaluate(() => chrome.storage.local.set({ "persist:lookupHistory": JSON.stringify([
+  { key: "hw:顔", headword: "顔", reading: "かお", gloss: "face; visage", source: "顔", videoTimeMs: 12000, ts: Date.now() },
+  { key: "hw:食べる", headword: "食べる", reading: "たべる", gloss: "to eat", source: "食べる", videoTimeMs: 8000, ts: Date.now() },
+  { key: "hw:朝", headword: "朝", reading: "あさ", gloss: "morning", source: "朝", videoTimeMs: 3000, ts: Date.now() },
+]) }));
+await page.waitForTimeout(700);
+log("lookup history items rendered:", await page.evaluate(() => document.querySelectorAll(".es-lookup-history__item").length));
+{
+  const historyEl = await page.$(".es-lookup-history");
+  if (historyEl) {
+    await historyEl.scrollIntoViewIfNeeded().catch(() => {});
+    await page.waitForTimeout(200);
+    await historyEl.screenshot({ path: "/tmp/himotoki-unitC-panel.png" }).catch(() => page.screenshot({ path: "/tmp/himotoki-unitC-panel.png" }));
+  }
+}
 
 // Keyboard nav
 await page.mouse.move(10, 10);
