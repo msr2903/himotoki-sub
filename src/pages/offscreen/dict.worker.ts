@@ -24,6 +24,9 @@ export type DictStatus = {
 };
 
 const DB_FILE = "/jitendex-lite.sqlite";
+// A new dictionary is downloaded here first, then swapped into DB_FILE only once verified, so a
+// failed/aborted update never destroys the dictionary the user already had installed.
+const DB_TMP = "/jitendex-lite.tmp.sqlite";
 const VFS_NAME = "himotoki-dict";
 const VFS_DIR = ".himotoki-dict";
 
@@ -35,6 +38,7 @@ type Sqlite3Db = {
 type PoolUtil = {
   OpfsSAHPoolDb: new (filename: string) => Sqlite3Db;
   importDb: (name: string, data: () => Promise<Uint8Array | undefined>) => Promise<number>;
+  exportFile: (name: string) => Uint8Array;
   getFileNames: () => string[];
   unlink: (name: string) => boolean;
   getCapacity: () => number;
@@ -44,6 +48,7 @@ type PoolUtil = {
 let poolUtil: PoolUtil | null = null;
 let db: Sqlite3Db | null = null;
 let dict: Dictionary | null = null;
+let vfsPromise: Promise<void> | null = null;
 let bootPromise: Promise<void> | null = null;
 let installing: Promise<void> | null = null;
 
@@ -66,9 +71,11 @@ function query(sql: string, params: unknown[] = []): Array<Record<string, unknow
   >;
 }
 
-async function boot(): Promise<void> {
-  if (!bootPromise) {
-    bootPromise = (async () => {
+// Bring up the OPFS VFS. This is the part that install/remove genuinely require; it is kept separate
+// from opening an existing DB so a corrupt DB (below) cannot prevent re-downloading or deleting it.
+async function ensureVfs(): Promise<void> {
+  if (!vfsPromise) {
+    vfsPromise = (async () => {
       // The bundler build resolves sqlite3.wasm relative to the worker script itself (Vite emits it as
       // an asset); passing a custom Emscripten config here breaks the one-shot API bootstrap.
       // The API bootstrap merges globalThis.sqlite3ApiConfig over its defaults; in the bundled
@@ -83,8 +90,30 @@ async function boot(): Promise<void> {
       const install = (sqlite3 as { installOpfsSAHPoolVfs: (o: Record<string, unknown>) => Promise<PoolUtil> })
         .installOpfsSAHPoolVfs;
       poolUtil = await install.call(sqlite3, { name: VFS_NAME, directory: VFS_DIR, initialCapacity: 4 });
-      if (poolUtil.getFileNames().includes(DB_FILE)) {
-        openDb();
+    })().catch((error) => {
+      vfsPromise = null;
+      status.state = "error";
+      status.error = error instanceof Error ? error.message : String(error);
+      throw error;
+    });
+  }
+  await vfsPromise;
+}
+
+async function boot(): Promise<void> {
+  if (!bootPromise) {
+    bootPromise = (async () => {
+      await ensureVfs();
+      if (poolUtil!.getFileNames().includes(DB_FILE)) {
+        try {
+          openDb();
+        } catch (error) {
+          // A corrupt or schema-incompatible DB file must NOT brick the worker: surface the error but
+          // leave the VFS ready so install (re-download) and remove (delete) can still recover it.
+          closeDb();
+          status.state = "error";
+          status.error = error instanceof Error ? error.message : String(error);
+        }
       } else {
         status.state = "missing";
       }
@@ -130,11 +159,30 @@ function closeDb(): void {
   }
 }
 
-async function install(url: string, expectedSha256?: string): Promise<void> {
+/** Feed an already-in-memory buffer to importDb via its streaming callback (one chunk, then done). */
+function bufferSource(bytes: Uint8Array): () => Promise<Uint8Array | undefined> {
+  let sent = false;
+  return async () => {
+    if (sent) return undefined;
+    sent = true;
+    return bytes;
+  };
+}
+
+async function install(url: string, expectedSha256?: string, expectedRevision?: string): Promise<void> {
   if (installing) return installing;
+  // Tracked outside the IIFE so the .catch below knows whether a prior dictionary existed.
+  let hadExisting = false;
   installing = (async () => {
     if (!poolUtil) throw new Error("VFS not ready");
-    closeDb();
+    const pool = poolUtil;
+    // If a dictionary is already installed, download the new one into a temp file and swap only after
+    // it verifies — the old DB stays intact and usable if anything fails. A fresh install has nothing
+    // to lose, so it imports straight to DB_FILE (unchanged behaviour).
+    hadExisting = pool.getFileNames().includes(DB_FILE);
+    const target = hadExisting ? DB_TMP : DB_FILE;
+    if (!hadExisting) closeDb();
+    if (pool.getFileNames().includes(DB_TMP)) pool.unlink(DB_TMP); // clear any stale temp
     status.state = "downloading";
     status.received = 0;
     status.total = 0;
@@ -174,11 +222,12 @@ async function install(url: string, expectedSha256?: string): Promise<void> {
     });
     const stream = isGzip ? source.pipeThrough(new DecompressionStream("gzip")) : source;
     const reader = stream.getReader();
-    if (poolUtil.getFileNames().includes(DB_FILE)) poolUtil.unlink(DB_FILE);
-    if (poolUtil.getCapacity() < 2) await poolUtil.addCapacity(2);
+    // Extra capacity for the temp file during an update (temp alongside the still-present old DB).
+    const wantCapacity = hadExisting ? 4 : 2;
+    if (pool.getCapacity() < wantCapacity) await pool.addCapacity(wantCapacity);
     let sawData = false;
     const hasher = new Sha256();
-    await poolUtil.importDb(DB_FILE, async () => {
+    await pool.importDb(target, async () => {
       const { done, value } = await reader.read();
       if (done) {
         status.state = "importing";
@@ -198,15 +247,55 @@ async function install(url: string, expectedSha256?: string): Promise<void> {
     } else {
       status.verified = "skipped";
     }
-    openDb();
+    if (hadExisting) {
+      // Verified: replace the old DB with the temp copy. The SAH pool has no rename, so copy the
+      // bytes across and drop the temp only after DB_FILE is rebuilt and opens cleanly.
+      closeDb();
+      const bytes = pool.exportFile(DB_TMP);
+      if (pool.getFileNames().includes(DB_FILE)) pool.unlink(DB_FILE);
+      await pool.importDb(DB_FILE, bufferSource(bytes));
+      openDb();
+      pool.unlink(DB_TMP);
+    } else {
+      openDb();
+    }
+    if (expectedRevision && status.revision && status.revision !== expectedRevision) {
+      console.warn(
+        "[himotoki-dict] installed dictionary revision",
+        status.revision,
+        "does not match expected revision",
+        expectedRevision,
+      );
+    }
   })()
-    .catch((error) => {
+    .catch(async (error) => {
       status.state = "error";
       status.error = error instanceof Error ? error.message : String(error);
+      // Never leave the user without a dictionary because an install failed.
+      const pool = poolUtil;
       try {
-        poolUtil?.unlink(DB_FILE);
+        const files = pool?.getFileNames() ?? [];
+        if (!hadExisting) {
+          // A failed first install may leave a partial DB_FILE — clean it up (no prior data to lose).
+          closeDb();
+          if (pool && files.includes(DB_FILE)) pool.unlink(DB_FILE);
+        } else if (pool && !files.includes(DB_FILE) && files.includes(DB_TMP)) {
+          // The swap was interrupted after DB_FILE was removed but the verified temp survived —
+          // promote it so a working dictionary remains.
+          const bytes = pool.exportFile(DB_TMP);
+          await pool.importDb(DB_FILE, bufferSource(bytes));
+        }
+        if (pool?.getFileNames().includes(DB_TMP)) pool.unlink(DB_TMP);
+        // Reopen whatever valid DB remains so lookups keep working after a failed update.
+        if (!db && pool?.getFileNames().includes(DB_FILE)) openDb();
+        // A working dictionary survived; reflect that (the failed-update error is still delivered to
+        // the caller via the rejected promise / toast).
+        if (db) {
+          status.state = "ready";
+          status.error = "";
+        }
       } catch {
-        /* ignore */
+        /* best-effort recovery */
       }
       throw error;
     })
@@ -219,14 +308,16 @@ async function install(url: string, expectedSha256?: string): Promise<void> {
 function remove(): void {
   closeDb();
   if (poolUtil?.getFileNames().includes(DB_FILE)) poolUtil.unlink(DB_FILE);
+  if (poolUtil?.getFileNames().includes(DB_TMP)) poolUtil.unlink(DB_TMP);
   status.state = "missing";
   status.revision = "";
   status.terms = 0;
   status.bytes = 0;
   status.verified = "";
+  status.error = "";
 }
 
-type Request = { id: number; op: string; url?: string; expectedSha256?: string; surface?: string; surfaces?: string[]; cues?: string[][]; seq?: number };
+type Request = { id: number; op: string; url?: string; expectedSha256?: string; expectedRevision?: string; surface?: string; surfaces?: string[]; cues?: string[][]; seq?: number };
 
 self.onmessage = async (event: MessageEvent<Request>) => {
   const msg = event.data;
@@ -241,7 +332,7 @@ self.onmessage = async (event: MessageEvent<Request>) => {
         return;
       case "install":
         if (!msg.url) throw new Error("missing dictionary url");
-        await install(msg.url, msg.expectedSha256);
+        await install(msg.url, msg.expectedSha256, msg.expectedRevision);
         reply(true, { ...status });
         return;
       case "remove":
