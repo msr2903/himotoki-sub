@@ -2,6 +2,7 @@ import { esRenderSetings } from "@src/models/settings";
 import Service from "./service";
 import { parse, subTitleType } from "subtitle";
 import { esSubsChanged, subsReloadRequested } from "@src/models/subs";
+import { adBreakDurationMs, primaryTrackKey } from "./netflixHelpers";
 
 const WEBVTT = "webvtt-lssdh-ios8";
 
@@ -92,7 +93,24 @@ class Netflix implements Service {
     if (title === "") return parse("");
 
     const moveId = this.getMoveId();
-    const subCacheItem = this.subCache.find((item) => item.videoId == moveId && item.title === title);
+    let subCacheItem = this.subCache.find((item) => item.videoId == moveId && item.title === title);
+
+    // The cache is keyed off track.language (e.g. "ja") in handleNetflixData, but getSubs is
+    // called with track.bcp47 (e.g. "ja-JP"). When they differ, fall back to matching the primary
+    // language subtag plus any [cc]/-forced postfix so the two title formats resolve to one track.
+    if (!subCacheItem) {
+      const want = primaryTrackKey(title);
+      subCacheItem = this.subCache.find((item) => {
+        if (item.videoId != moveId) return false;
+        const key = primaryTrackKey(item.title);
+        return key.lang === want.lang && key.postfix === want.postfix;
+      });
+    }
+
+    if (!subCacheItem) {
+      console.warn("[himotoki] no cached Netflix subtitle track for", title, moveId);
+      return parse("");
+    }
 
     const isSubCacheAdBreaksSame = JSON.stringify(subCacheItem.adBreaks) == JSON.stringify(this.adBreaks);
 
@@ -126,10 +144,10 @@ class Netflix implements Service {
   }
 
   public getSettingsButtonContainer() {
-    const selector = (
+    const button =
       document.querySelector('[data-uia="control-fullscreen-enter"]') ||
-      document.querySelector('[data-uia="control-fullscreen-exit"]')
-    ).parentElement;
+      document.querySelector('[data-uia="control-fullscreen-exit"]');
+    const selector = button?.parentElement ?? null;
     if (selector === null) throw new Error("Settings button container not found");
     return selector as HTMLElement;
   }
@@ -200,7 +218,7 @@ class Netflix implements Service {
     const existedBreak = this.adBreaks.find((adBreak) => currentBreak.ads[0] && adBreak.id === currentBreak.ads[0].id);
 
     if (!existedBreak && currentBreak.ads[0]) {
-      const addDurationMs = currentBreak.ads.map((ad) => ad.endTimeMs).reduce((a, b) => a + b, 0);
+      const addDurationMs = adBreakDurationMs(currentBreak.ads);
       this.adBreaks.push({
         id: currentBreak.ads[0] && currentBreak.ads[0].id,
         locationMs: currentBreak.locationMs,
