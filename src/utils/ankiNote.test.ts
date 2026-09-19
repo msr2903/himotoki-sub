@@ -86,4 +86,12 @@ describe("buildAnkiNote", () => {
     expect(note.options.allowDuplicate).toBe(false);
     expect(note.fields.Word).toBe("顔");
   });
+
+  it("uses custom tags when provided, else defaults to himotoki", () => {
+    expect(buildAnkiNote({ deckName: "D", word: "顔", gloss: "face", tags: ["mining", "jp"] }).tags).toEqual([
+      "mining",
+      "jp",
+    ]);
+    expect(buildAnkiNote({ deckName: "D", word: "顔", gloss: "face", tags: [] }).tags).toEqual(["himotoki"]);
+  });
 });

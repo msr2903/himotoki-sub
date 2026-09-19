@@ -39,7 +39,18 @@ import {
 } from "@src/shared/furiganaDifficulty";
 import { COLOR_BY_DIFFICULTY_SETTING, DEFAULT_COLOR_BY_DIFFICULTY } from "@src/shared/tokenColor";
 import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
-import { ANKI_CARD_THEME_OPTIONS, ANKI_CARD_THEME_SETTING, ANKI_RICH_CARDS_SETTING, DEFAULT_ANKI_CARD_THEME, DEFAULT_ANKI_RICH_CARDS, isAnkiCardTheme } from "@src/shared/ankiSettings";
+import {
+  ANKI_CARD_THEME_OPTIONS,
+  ANKI_CARD_THEME_SETTING,
+  ANKI_RICH_CARDS_SETTING,
+  ANKI_DECK_SETTING,
+  ANKI_TAGS_SETTING,
+  DEFAULT_ANKI_CARD_THEME,
+  DEFAULT_ANKI_RICH_CARDS,
+  DEFAULT_ANKI_DECK,
+  DEFAULT_ANKI_TAGS,
+  isAnkiCardTheme,
+} from "@src/shared/ankiSettings";
 import type { TAnkiCardTheme } from "@src/utils/ankiNote";
 import { DEFAULT_LISTENING_MODE, LISTENING_MODE_SETTING } from "@src/shared/listeningMode";
 import { buildRows, toCsv, toJson } from "@src/shared/exportWords";
@@ -213,6 +224,16 @@ const Options: FC = () => {
     ANKI_CARD_THEME_SETTING,
     DEFAULT_ANKI_CARD_THEME,
     isAnkiCardTheme,
+  );
+  const [ankiDeck, setAnkiDeck] = usePersistedSetting<string>(
+    ANKI_DECK_SETTING,
+    DEFAULT_ANKI_DECK,
+    (v): v is string => typeof v === "string",
+  );
+  const [ankiTags, setAnkiTags] = usePersistedSetting<string>(
+    ANKI_TAGS_SETTING,
+    DEFAULT_ANKI_TAGS,
+    (v): v is string => typeof v === "string",
   );
   // Persist key from src/models/history; kept as a literal so the options bundle avoids the content model.
   const [lookupHistory, setLookupHistory] = usePersistedSetting<unknown[]>(
@@ -389,6 +410,36 @@ const Options: FC = () => {
                   options={ANKI_CARD_THEME_OPTIONS}
                   onChange={setAnkiCardTheme}
                   guard={isAnkiCardTheme}
+                />
+              }
+            />
+            <Row
+              title="Anki deck"
+              desc="Deck new cards are added to. Created automatically in Anki if it does not exist."
+              htmlFor="anki-deck"
+              control={
+                <input
+                  id="anki-deck"
+                  type="text"
+                  className="es-options-text"
+                  value={ankiDeck}
+                  placeholder={DEFAULT_ANKI_DECK}
+                  onChange={(e) => setAnkiDeck(e.target.value)}
+                />
+              }
+            />
+            <Row
+              title="Anki tags"
+              desc="Tags added to each saved card. Separate multiple tags with spaces or commas."
+              htmlFor="anki-tags"
+              control={
+                <input
+                  id="anki-tags"
+                  type="text"
+                  className="es-options-text"
+                  value={ankiTags}
+                  placeholder={DEFAULT_ANKI_TAGS}
+                  onChange={(e) => setAnkiTags(e.target.value)}
                 />
               }
             />

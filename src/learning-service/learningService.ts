@@ -17,6 +17,10 @@ export type TAditionalData = {
   richCards?: boolean;
   /** Anki card theme: "auto" follows Anki night mode; "light"/"dark" force it. */
   cardTheme?: "auto" | "light" | "dark";
+  /** Anki deck new cards go into (created if missing). Defaults to "Himotoki". */
+  deckName?: string;
+  /** Tags attached to the new Anki card. */
+  tags?: string[];
   /** Video-frame screenshot captured for a rich Anki card (see src/utils/mediaCapture.ts). */
   image?: TAnkiMedia | null;
   /** Cue audio clip captured for a rich Anki card. */

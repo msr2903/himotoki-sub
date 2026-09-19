@@ -73,7 +73,8 @@ export class Anki implements ILearningService {
   }
 
   public async addWord(word: string, translation: string, aditionalData: TAditionalData): Promise<string> {
-    const createDeskResult = await this.invoke("createDeck", { deck: ANKI_DESK });
+    const deck = aditionalData.deckName?.trim() || ANKI_DESK;
+    const createDeskResult = await this.invoke("createDeck", { deck });
 
     if (createDeskResult.error === "connection error") {
       return Promise.reject("Error connecting to Anki. Please make sure Anki is running and AnkiConnect is installed.");
@@ -102,7 +103,7 @@ export class Anki implements ILearningService {
 
     const headword = aditionalData.himotokiSave?.headword || word;
     const note = buildAnkiNote({
-      deckName: ANKI_DESK,
+      deckName: deck,
       word: headword,
       reading: rich ? aditionalData.reading || aditionalData.himotokiSave?.reading : undefined,
       gloss: translation,
@@ -113,6 +114,7 @@ export class Anki implements ILearningService {
       imageFilename,
       audioFilename,
       theme: aditionalData.cardTheme || "auto",
+      tags: aditionalData.tags,
     });
 
     const addWordResult = await this.invoke("addNote", { note });
