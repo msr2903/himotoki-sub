@@ -126,11 +126,31 @@ chrome.runtime.onInstalled.addListener(function (object) {
   }
 });
 
+// Message types this listener answers asynchronously; only for these do we keep the response channel
+// open (return true). Returning true for an unhandled type would leave the sender's promise hanging.
+const HANDLED_MESSAGE_TYPES = new Set([
+  "translateFullText",
+  "himotokiSplit",
+  "himotokiSplitBatch",
+  "himotokiDictManifest",
+  "openOptionsPage",
+  "himotokiSearch",
+  "himotokiEntry",
+  "himotokiSignIn",
+  "himotokiSignOut",
+  "himotokiGetSession",
+  "himotokiAddFavorite",
+  "post",
+]);
+
 chrome.runtime.onMessage.addListener(function (message, _sender, sendResponse) {
   if (message?.target === "offscreen-split") {
     // Offscreen document owns these messages; do not keep this SW channel open.
     return false;
   }
+
+  const type: unknown = message?.type;
+  if (typeof type !== "string") return false;
 
   if (message.type === "translateFullText") {
     const translationService = message.translationService || "google";
@@ -277,7 +297,9 @@ chrome.runtime.onMessage.addListener(function (message, _sender, sendResponse) {
       });
   }
 
-  return true;
+  // Keep the channel open only for a type we actually handle; otherwise let it close immediately so
+  // the sender's sendMessage promise resolves (undefined) instead of hanging until the port dies.
+  return HANDLED_MESSAGE_TYPES.has(type) || type in DICT_OPS;
 });
 
 /**
