@@ -31,6 +31,7 @@ import {
   $coverageStatus,
   computeCoverageFx,
 } from ".";
+import { appendRawSubs } from "./appendRawSubs";
 import { $streaming } from "../streamings";
 import {
   $video,
@@ -128,22 +129,18 @@ sample({
   );
 });
 
+// Full-track sources replace the whole caption list. rawSubsAdded is deliberately
+// NOT in this list: it carries a single incremental cue and is handled by the
+// append reducer below. (It used to be here too, and — running first — clobbered
+// $rawSubs with the lone cue, so the append handler never accumulated anything.)
 $rawSubs.on(
-  [fetchSubsFx.doneData, subsResyncFx.doneData, updateCustomSubsFx.doneData, rawSubsAdded],
+  [fetchSubsFx.doneData, subsResyncFx.doneData, updateCustomSubsFx.doneData],
   (oldSubs, subs) => (sameCaptions(oldSubs, subs) ? oldSubs : subs)
 );
 
-$rawSubs.on(rawSubsAdded, (oldSubs, newSubs) => {
-  const lastSub = oldSubs[oldSubs.length - 1];
-  if (!lastSub) {
-    return [...oldSubs, ...newSubs];
-  }
-  if (lastSub.text != newSubs[0].text && lastSub.start != newSubs[0].start) {
-    const subs = oldSubs.slice(0, -1);
-    lastSub.end = lastSub.start;
-    return [...subs, ...[lastSub], ...newSubs];
-  }
-});
+// Services that surface captions one cue at a time (MutationObserver-driven:
+// Amazon/Plex/Kinopoisk/Udemy/in-flight Netflix) emit rawSubsAdded per cue; append them.
+$rawSubs.on(rawSubsAdded, appendRawSubs);
 
 $rawSubs.reset(resetSubs);
 $sentenceOpen.reset(resetSubs);
