@@ -170,6 +170,19 @@ body {
   cursor: pointer;
 }
 
+.es-options-text {
+  flex-shrink: 0;
+  width: 13rem;
+  max-width: 13rem;
+  border: 1px solid var(--hm-border);
+  border-radius: var(--hm-radius-sm);
+  background: var(--hm-surface);
+  color: var(--hm-ink);
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 9px;
+}
+
 .range-control {
   display: flex;
   align-items: center;

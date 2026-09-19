@@ -2,7 +2,19 @@ import { FC, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useUnit } from "effector-react";
 import toast from "react-hot-toast";
 
-import { $ankiCardTheme, $ankiRichCards, $knownWords, $learningService, $wordStatuses, wordStatusSet } from "@src/models/settings";
+import {
+  $ankiCardTheme,
+  $ankiDeck,
+  $ankiRichCards,
+  $ankiSavedWords,
+  $ankiTags,
+  $knownWords,
+  $learningService,
+  $wordStatuses,
+  ankiWordSaved,
+  wordStatusSet,
+} from "@src/models/settings";
+import { parseAnkiTags } from "@src/shared/ankiSettings";
 import { captureCueAudio, captureVideoFrame } from "@src/utils/mediaCapture";
 import { tokenUnpinned } from "@src/models/translations";
 import { knownKeyOf } from "@src/shared/knownWords";
@@ -51,7 +63,20 @@ export const SubItemTranslation: FC<{
 }> = ({ subItem, contextSentence, cueStart, cueEnd, pinned }) => {
   const text = subItem.cleanedText || subItem.text;
   const { translation, pending } = useLookup(subItem);
-  const [learningService, video, unpin, knownWords, wordStatuses, setWordStatus, ankiRichCards, ankiCardTheme] = useUnit([
+  const [
+    learningService,
+    video,
+    unpin,
+    knownWords,
+    wordStatuses,
+    setWordStatus,
+    ankiRichCards,
+    ankiCardTheme,
+    ankiDeck,
+    ankiTags,
+    ankiSavedWords,
+    markAnkiSaved,
+  ] = useUnit([
     $learningService,
     $video,
     tokenUnpinned,
@@ -60,6 +85,10 @@ export const SubItemTranslation: FC<{
     wordStatusSet,
     $ankiRichCards,
     $ankiCardTheme,
+    $ankiDeck,
+    $ankiTags,
+    $ankiSavedWords,
+    ankiWordSaved,
   ]);
 
   const [service, setService] = useState<ILearningService>(null);
@@ -187,6 +216,8 @@ export const SubItemTranslation: FC<{
         meanings: current.translations?.length ? current.translations.map((s) => s.word) : [sense.word],
         richCards: ankiRichCards,
         cardTheme: ankiCardTheme,
+        deckName: ankiDeck,
+        tags: parseAnkiTags(ankiTags),
         image,
         audio,
         himotokiSave: current.himotokiSave
@@ -195,7 +226,12 @@ export const SubItemTranslation: FC<{
       })
       .then((value) => {
         const key = knownKeyOf(current);
-        if (key) setWordStatus({ key, status: "known" });
+        if (key) {
+          // Saving to Himotoki bookmarks the word (marks it known); saving to Anki only records
+          // that it was mined, so the Anki icon shows a check without touching known-word status.
+          if (target === "anki") markAnkiSaved(key);
+          else setWordStatus({ key, status: "known" });
+        }
         toast.success(value);
       })
       .catch((error) => toast.error(typeof error === "string" ? error : error?.message || String(error)));
@@ -226,6 +262,7 @@ export const SubItemTranslation: FC<{
   const saveLabel = SERVICE_LABEL[learningService] ?? "Save";
   const knownKey = knownKeyOf(current);
   const wordStatus = statusOf(wordStatuses, knownKey, knownWords);
+  const ankiSaved = knownKey ? ankiSavedWords.includes(knownKey) : false;
   const chain = translation.conjugation;
   const conjugable = senses.some(
     (sense) => sense.partOfSpeech === "verb" || sense.partOfSpeech === "adjective",
@@ -276,12 +313,12 @@ export const SubItemTranslation: FC<{
               <SaveIcon filled={wordStatus === "known"} />
             </button>
             <button
-              className="es-popup-save es-popup-save--anki"
-              title="Save to Anki"
+              className={`es-popup-save es-popup-save--anki ${ankiSaved ? "es-popup-save--saved" : ""}`}
+              title={ankiSaved ? "Save to Anki (saved)" : "Save to Anki"}
               aria-label="Save to Anki"
               onClick={() => handleAddWord(senses[0]!, "anki")}
             >
-              <AnkiIcon />
+              <AnkiIcon saved={ankiSaved} />
             </button>
           </span>
         </div>

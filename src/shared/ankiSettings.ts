@@ -23,3 +23,23 @@ export const ANKI_CARD_THEME_OPTIONS: ReadonlyArray<{ value: TAnkiCardTheme; lab
 ];
 
 export const isAnkiCardTheme = (v: unknown): v is TAnkiCardTheme => v === "auto" || v === "light" || v === "dark";
+
+/**
+ * Anki save customizations (Yomitan-style): the deck new cards go into and the tags attached to them.
+ * The deck is created via AnkiConnect `createDeck` if it does not exist. Tags are separated by spaces
+ * or commas (Anki tags cannot contain spaces themselves).
+ */
+export const ANKI_DECK_SETTING = "ankiDeck";
+export const DEFAULT_ANKI_DECK = "Himotoki";
+export const ANKI_TAGS_SETTING = "ankiTags";
+export const DEFAULT_ANKI_TAGS = "himotoki";
+
+/** Persisted set of words saved to Anki (stable keys from knownKeyOf), kept separate from known words. */
+export const ANKI_SAVED_SETTING = "ankiSavedWords";
+
+/** Parse a user tags string ("himotoki mining, jp") into clean Anki tags (no spaces, no empties). */
+export const parseAnkiTags = (raw: string): string[] =>
+  raw
+    .split(/[\s,]+/)
+    .map((t) => t.trim())
+    .filter(Boolean);

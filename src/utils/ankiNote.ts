@@ -38,6 +38,8 @@ export type AnkiNoteInput = {
   audioFilename?: string;
   /** Card theme: auto follows Anki night mode; light/dark force it. */
   theme?: TAnkiCardTheme;
+  /** Tags attached to the note. Defaults to ["himotoki"]. */
+  tags?: string[];
 };
 
 export type HimotokiFields = {
@@ -102,7 +104,7 @@ export const buildAnkiNote = (input: AnkiNoteInput): AnkiNote => ({
   deckName: input.deckName,
   modelName: HIMOTOKI_MODEL_NAME,
   fields: buildHimotokiFields(input),
-  tags: ["himotoki"],
+  tags: input.tags && input.tags.length ? input.tags : ["himotoki"],
   options: { allowDuplicate: false },
 });
 

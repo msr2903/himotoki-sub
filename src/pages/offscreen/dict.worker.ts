@@ -150,8 +150,29 @@ async function install(url: string, expectedSha256?: string): Promise<void> {
         },
       }),
     );
-    const isGzip = /\.gz($|\?)/.test(url) || (resp.headers.get("content-type") || "").includes("gzip");
-    const stream = isGzip ? counted.pipeThrough(new DecompressionStream("gzip")) : counted;
+    // Decide whether to inflate by inspecting the bytes, not the URL/headers: some servers send the
+    // .gz file with `Content-Encoding: gzip`, so fetch already inflated the body — piping that through
+    // DecompressionStream again throws "The compressed data was not valid: incorrect header check".
+    // Peek the first chunk for the gzip magic (0x1f 0x8b) and only decompress a still-compressed body.
+    const raw = counted.getReader();
+    const firstChunk = await raw.read();
+    const head = firstChunk.value;
+    const isGzip = !!head && head.length >= 2 && head[0] === 0x1f && head[1] === 0x8b;
+    const source = new ReadableStream<Uint8Array>({
+      start(controller) {
+        if (head && head.length) controller.enqueue(head);
+        if (firstChunk.done) controller.close();
+      },
+      async pull(controller) {
+        const { done, value } = await raw.read();
+        if (done) controller.close();
+        else if (value) controller.enqueue(value);
+      },
+      cancel(reason) {
+        void raw.cancel(reason);
+      },
+    });
+    const stream = isGzip ? source.pipeThrough(new DecompressionStream("gzip")) : source;
     const reader = stream.getReader();
     if (poolUtil.getFileNames().includes(DB_FILE)) poolUtil.unlink(DB_FILE);
     if (poolUtil.getCapacity() < 2) await poolUtil.addCapacity(2);
