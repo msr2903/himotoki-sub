@@ -1,6 +1,6 @@
 import { $streaming } from "@src/models/streamings";
 import { moveKeyPressed } from "@src/models/videos";
-import { secondarySubsCycled, playbackRateSpeedUp, playbackRateSpeedDown, listeningPeekToggled } from "@src/models/settings";
+import { $moveBySubsEnabled, secondarySubsCycled, playbackRateSpeedUp, playbackRateSpeedDown, listeningPeekToggled } from "@src/models/settings";
 import { replayLinePressed, loopLineToggled, slowReplayRequested } from "@src/models/videos";
 import { sentenceToggled, transcriptToggled } from "@src/models/subs";
 
@@ -69,6 +69,9 @@ export const keyboardHandler = (event: KeyboardEvent) => {
     if (event.type === "keydown") listeningPeekToggled();
     return;
   }
+  // Arrow-key navigation is the only part gated by the "move by subtitles" setting; the other
+  // shortcuts above are always available. Checked live so toggling the setting takes effect at once.
+  if (!$moveBySubsEnabled.getState()) return;
   if (event.code === "ArrowLeft") {
     event.stopPropagation();
     if (event.type === "keydown") {
