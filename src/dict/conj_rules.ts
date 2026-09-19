@@ -607,7 +607,11 @@ function _auxiliary_steps(rule: PeelRule, step: ConjStep): Array<ConjStep> {
   let steps = [step];
   let past_markers = ["た", "だ", "いた", "した", "った", "かった", "なかった", "りました", "ました", "れた", "られた"];
   if (!step.conj_type.includes("Past")) {
-    if ((rule.ends_with.endsWith(past_markers) || rule.suffix.endsWith(past_markers))) {
+    // Python's str.endswith(tuple) means "ends with ANY of these markers".
+    // Passing the array straight to String.prototype.endsWith coerces it to a
+    // comma-joined string that never matches, so the past step was dead code.
+    const ends_with_past = (s: string | undefined) => !!s && past_markers.some((m) => s.endsWith(m));
+    if ((ends_with_past(rule.ends_with) || ends_with_past(rule.suffix))) {
       steps.push(conjStep({ conj_type: "Past (~ta)", suffix: "た", gloss: "past" }));
     }
   }
