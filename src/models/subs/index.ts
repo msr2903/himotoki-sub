@@ -20,7 +20,6 @@ export const $subs = createStore<TSub[]>([]);
 export const $subsLanguage = createStore<string>("ja");
 export const $subsTitle = createStore<string>(null);
 export const $currentSubs = createStore<TSub[]>([]);
-export const $prevCurrentSubs = createStore<TSub[]>([]);
 export const esSubsChanged = createEvent<string>();
 export const autoPauseFx = createEffect<
   {
@@ -53,7 +52,6 @@ export const updateCurrentSubsFx = createEffect<{ subs: TSub[]; video: UnitValue
     return getCurrentSubs(subs, video.currentTime * 1000);
   }
 );
-export const updatePrevCurrentSubsFx = createEffect<TSub[], TSub[]>((subs) => subs);
 export const rawSubsAdded = createEvent<Captions>();
 export const updateCustomSubsFx = createEffect<Captions, Captions>((subs) => subs);
 
