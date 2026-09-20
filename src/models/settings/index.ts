@@ -2,10 +2,6 @@ import { createStore, createEvent, sample, createEffect } from "effector";
 import { debug } from "patronum";
 
 import { withPersist } from "@src/utils/withPersist";
-import {
-  addKeyboardEventsListeners,
-  removeKeyboardEventsListeners,
-} from "@src/utils/keyboardHandler";
 import { TFuriganaLevel, TFuriganaMode, TLearningService, TReadingLineMode, TSecondarySubs, TTokenAction, TTranslationService } from "../types";
 import { fetchCurrentStreamingFx } from "../streamings";
 import {
@@ -57,16 +53,9 @@ export const netflixOnFlightEnabledChangedFx = createEffect<boolean, void>(() =>
 
 export const $moveBySubsEnabled = withPersist(createStore<boolean>(true, { name: "moveBySubsEnabled" }));
 export const moveBySubsEnabledChanged = createEvent<boolean>();
-export const moveBySubsEnabledChangeFx = createEffect<boolean, boolean>(
-  (isEnabled) => {
-    if (isEnabled) {
-      addKeyboardEventsListeners();
-    } else {
-      removeKeyboardEventsListeners();
-    }
-    return isEnabled;
-  },
-);
+// The keyboard listener is attached unconditionally (see Subs.tsx / keyboardHandler); this setting
+// only gates the arrow keys, checked live inside keyboardHandler — so no add/remove wiring here.
+$moveBySubsEnabled.on(moveBySubsEnabledChanged, (_, isEnabled) => isEnabled);
 
 export const $translateLanguage = withPersist(
   createStore<string>(window.navigator.language.split("-")[0], { name: "translateLanguage" }),
@@ -257,11 +246,6 @@ sample({
 });
 
 sample({
-  clock: moveBySubsEnabledChanged,
-  target: moveBySubsEnabledChangeFx,
-});
-
-sample({
   clock: translateLanguageChanged,
   target: translateLanguageChangeFx,
 });
@@ -311,10 +295,6 @@ $progressBarEnabled.on(
 $autoStopEnabled.on(autoStopEnabledChanged, (_, isEnabled) => isEnabled);
 $netflixOnFlightEnabled.on(
   netflixOnFlightEnabledChanged,
-  (_, isEnabled) => isEnabled,
-);
-$moveBySubsEnabled.on(
-  moveBySubsEnabledChangeFx.doneData,
   (_, isEnabled) => isEnabled,
 );
 $translateLanguage.on(

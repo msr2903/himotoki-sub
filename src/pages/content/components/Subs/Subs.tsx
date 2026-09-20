@@ -10,7 +10,6 @@ import {
   $autoStopEnabled,
   $clickAction,
   $hoverAction,
-  $moveBySubsEnabled,
   $subsBackground,
   $subsBackgroundOpacity,
   $secondarySubs,
@@ -61,7 +60,6 @@ export const Subs: FC<TSubsProps> = () => {
     video,
     currentSubs,
     subsFontSize,
-    moveBySubsEnabled,
     wasPaused,
     handleWasPausedChanged,
     autoStopEnabled,
@@ -79,7 +77,6 @@ export const Subs: FC<TSubsProps> = () => {
     $video,
     $currentSubs,
     $subsFontSize,
-    $moveBySubsEnabled,
     $wasPaused,
     wasPausedChanged,
     $autoStopEnabled,
@@ -100,10 +97,10 @@ export const Subs: FC<TSubsProps> = () => {
   const [subsBackground, subsBackgroundOpacity, meaningSize, listeningMode, listeningPeek] = useUnit([$subsBackground, $subsBackgroundOpacity, $meaningSize, $listeningMode, $listeningPeek]);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
+  // Attach the keyboard shortcuts unconditionally: D/B/T/R/L/H/,/./\ must work regardless of the
+  // "move by subtitles" setting, which now only gates the arrow keys (inside keyboardHandler itself).
   useEffect(() => {
-    if (moveBySubsEnabled) {
-      addKeyboardEventsListeners();
-    }
+    addKeyboardEventsListeners();
     return () => {
       removeKeyboardEventsListeners();
     };
@@ -136,7 +133,7 @@ export const Subs: FC<TSubsProps> = () => {
     if (rootRef.current?.matches(":hover")) return;
     video.play();
     handleWasPausedChanged(false);
-  }, [pinnedWord]);
+  }, [pinnedWord, wasPaused, video, handleWasPausedChanged]);
 
   const handleOnMouseLeave = () => {
     if (pinnedWord) return;
@@ -357,6 +354,10 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
       leaveTimer.current = null;
     }
   };
+
+  // Clear a pending leave timer if the token unmounts mid-hover (e.g. ONNX re-segmentation remount),
+  // so it doesn't fire subItemMouseLeft against a gone component.
+  useEffect(() => clearLeaveTimer, []);
 
   const handleOnMouseLeave = () => {
     clearLeaveTimer();
