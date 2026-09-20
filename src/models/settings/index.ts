@@ -19,7 +19,17 @@ import { DEFAULT_FURIGANA_LEVEL, FURIGANA_LEVEL_SETTING } from "@src/shared/furi
 import { COLOR_BY_DIFFICULTY_SETTING, DEFAULT_COLOR_BY_DIFFICULTY } from "@src/shared/tokenColor";
 import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
 import { DEFAULT_WORD_STATUSES, TWordStatus, WORD_STATUSES_SETTING, setStatus } from "@src/shared/wordStatus";
-import { ANKI_CARD_THEME_SETTING, ANKI_RICH_CARDS_SETTING, DEFAULT_ANKI_CARD_THEME, DEFAULT_ANKI_RICH_CARDS } from "@src/shared/ankiSettings";
+import {
+  ANKI_CARD_THEME_SETTING,
+  ANKI_RICH_CARDS_SETTING,
+  ANKI_DECK_SETTING,
+  ANKI_TAGS_SETTING,
+  ANKI_SAVED_SETTING,
+  DEFAULT_ANKI_CARD_THEME,
+  DEFAULT_ANKI_RICH_CARDS,
+  DEFAULT_ANKI_DECK,
+  DEFAULT_ANKI_TAGS,
+} from "@src/shared/ankiSettings";
 import type { TAnkiCardTheme } from "@src/utils/ankiNote";
 import { PLAYBACK_RATE_DEFAULT, PLAYBACK_RATE_SETTING, PLAYBACK_RATE_STEP, clampRate, stepRate } from "@src/shared/playbackRate";
 import { DEFAULT_LISTENING_MODE, LISTENING_MODE_SETTING } from "@src/shared/listeningMode";
@@ -212,6 +222,25 @@ export const $ankiCardTheme = withPersist(
 );
 export const ankiCardThemeChanged = createEvent<TAnkiCardTheme>();
 $ankiCardTheme.on(ankiCardThemeChanged, (_, value) => value);
+
+/** Deck new Anki cards go into (created if missing). */
+export const $ankiDeck = withPersist(createStore<string>(DEFAULT_ANKI_DECK, { name: ANKI_DECK_SETTING }));
+export const ankiDeckChanged = createEvent<string>();
+$ankiDeck.on(ankiDeckChanged, (_, value) => value);
+
+/** Tags attached to new Anki cards (space/comma separated; see parseAnkiTags). */
+export const $ankiTags = withPersist(createStore<string>(DEFAULT_ANKI_TAGS, { name: ANKI_TAGS_SETTING }));
+export const ankiTagsChanged = createEvent<string>();
+$ankiTags.on(ankiTagsChanged, (_, value) => value);
+
+/**
+ * Words saved to Anki (stable keys from knownKeyOf). Tracked separately from $knownWords so that
+ * saving to Anki does not mark a word "known" (that is reserved for saving to Himotoki); it only
+ * flips the popup's Anki save icon to a check.
+ */
+export const $ankiSavedWords = withPersist(createStore<string[]>([], { name: ANKI_SAVED_SETTING }));
+export const ankiWordSaved = createEvent<string>();
+$ankiSavedWords.on(ankiWordSaved, (list, key) => (list.includes(key) ? list : [...list, key]));
 
 /** Video playback speed (see src/shared/playbackRate.ts). Applied to the video in videos/init.ts. */
 export const $playbackRate = withPersist(createStore<number>(PLAYBACK_RATE_DEFAULT, { name: PLAYBACK_RATE_SETTING }));
