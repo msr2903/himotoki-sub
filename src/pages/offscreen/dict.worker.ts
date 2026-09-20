@@ -206,6 +206,22 @@ async function install(url: string, expectedSha256?: string, expectedRevision?: 
     const firstChunk = await raw.read();
     const head = firstChunk.value;
     const isGzip = !!head && head.length >= 2 && head[0] === 0x1f && head[1] === 0x8b;
+    // If it's not gzip, it must already be a raw SQLite database. Detect the common misconfiguration
+    // where the URL serves something else (usually an SPA index.html because the file isn't deployed)
+    // and fail with an actionable message instead of the cryptic "not an SQLite3 database header".
+    if (!isGzip && head && head.length) {
+      const looksSqlite =
+        head.length >= 16 && new TextDecoder().decode(head.subarray(0, 15)) === "SQLite format 3";
+      if (!looksSqlite) {
+        const contentType = resp.headers.get("content-type") || "unknown";
+        const looksHtml = head[0] === 0x3c; // '<'
+        throw new Error(
+          looksHtml
+            ? `The dictionary URL returned an HTML page (content-type: ${contentType}), not the dictionary file — it is probably not deployed at ${url}.`
+            : `The dictionary URL returned data that is neither gzip nor a SQLite database (content-type: ${contentType}) at ${url}.`,
+        );
+      }
+    }
     const source = new ReadableStream<Uint8Array>({
       start(controller) {
         if (head && head.length) controller.enqueue(head);
