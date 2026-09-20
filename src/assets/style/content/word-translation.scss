@@ -15,6 +15,10 @@
   transform: translate3d(-50%, -100%, 0);
   padding: 12px 14px 12px;
   overflow-y: auto;
+  // Always reserve the scrollbar gutter so the box is the same width whether or not the entry is
+  // tall enough to scroll — otherwise the scrollbar is added outside `max-content`, making a
+  // scrollable popup visibly wider than a non-scrollable one for the same word.
+  scrollbar-gutter: stable;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--hm-border) transparent;
