@@ -131,6 +131,6 @@ Deferred / follow-ups:
 
 ## Deployment checklist
 
-1. Rebuild `jitendex-lite` with `--pitch/--freq/--jlpt` and host `.sqlite.gz` + `.json` at `HIMOTOKI_DICT_URL` (long `Cache-Control`).
+1. Rebuild `jitendex-lite` with `--pitch/--freq/--jlpt` and publish `.sqlite.gz` + `.json` as a GitHub release asset (`gh release create dict-<revision> … --latest`); `HIMOTOKI_DICT_URL` points at `releases/latest/download`, so this is self-hosted and independent of himotoki.my.id.
 2. `pnpm build`, zip `dist/`, upload to the Chrome Web Store (listing text and screenshots in `store/`).
 3. Add the store and unpacked extension IDs to the Google OAuth client's authorized origins.

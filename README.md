@@ -55,12 +55,16 @@ Settings live in the in-player panel, the full settings page (toolbar popup → 
 
 ### Offline dictionary file
 
-The extension downloads `jitendex-lite.sqlite.gz` from the URL in `src/shared/himotokiConfig.ts` (`HIMOTOKI_DICT_URL`, default `https://himotoki.my.id/dicts/jitendex-lite.sqlite.gz`). Build that file from a Jitendex SQLite produced by himotoki-web-ts and upload it there:
+The extension downloads `jitendex-lite.sqlite.gz` from the URL in `src/shared/himotokiConfig.ts` (`HIMOTOKI_DICT_URL`, default the repo's own GitHub release: `https://github.com/msr2903/himotoki-sub/releases/latest/download/jitendex-lite.sqlite.gz`). It is self-hosted so the offline dictionary does not depend on himotoki.my.id. Build the file from a Jitendex SQLite and publish it as a release asset:
 
 ```bash
-python3 scripts/build-dict.py /path/to/himotoki-web-ts/data/dicts/jitendex.sqlite dist-dict
+python3 scripts/build-dict.py /path/to/jitendex.sqlite dist-dict \
+  --pitch pitch-kanjium.sqlite --freq freq-jpdb-v2.sqlite --jlpt jlpt.sqlite
 # → dist-dict/jitendex-lite.sqlite.gz (+ .json manifest with revision and sha256)
+gh release create dict-<revision> dist-dict/jitendex-lite.sqlite.gz dist-dict/jitendex-lite.json --latest
 ```
+
+`latest/download` always resolves to the newest release, and a new release with a higher manifest `revision` triggers the in-app "update available" prompt.
 
 For local testing you can point the extension at any URL by setting `himotokiDictUrl` in `chrome.storage.local` (the end-to-end scripts do this).
 
