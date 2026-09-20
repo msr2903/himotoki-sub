@@ -38,6 +38,7 @@ export const moveFx = createEffect<TMoveFX, void>(({ video, subs, streaming, dir
     if (currentSubs.length < 2) {
       // use regular move if we don't have subs
       moveVideoToTime(video, streaming, currentTime + TIME_SEEK_TIME);
+      return;
     }
 
     const nextSub = subs.find((sub) => sub.start > currentTime);
@@ -55,11 +56,12 @@ export const moveFx = createEffect<TMoveFX, void>(({ video, subs, streaming, dir
     if (currentSubs.length < 2) {
       // use regular move if we don't have subs
       moveVideoToTime(video, streaming, currentTime - TIME_SEEK_TIME);
+      return;
     }
 
     let prevSub = subs[currentSubs[0].id - 1];
 
-    if (prevSub.end - prevSub.start < 20) {
+    if (prevSub && prevSub.end - prevSub.start < 20) {
       // if the previous subtitle is too short, we need move to the previous one
       // to avoid the situation when the previous subtitle is the same as the current one.
       // It's happening with youtube auto-generated subtitles
