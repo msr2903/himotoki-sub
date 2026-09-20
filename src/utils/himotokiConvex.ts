@@ -1,5 +1,3 @@
-import { HIMOTOKI_CONVEX_URL } from "@src/shared/himotokiConfig";
-
 export type HimotokiSessionUser = {
   id: string;
   email: string | null;
@@ -27,6 +25,7 @@ export type HimotokiFavoriteArgs = {
 };
 
 async function convexCall<T>(
+  convexUrl: string,
   path: string,
   args: Record<string, unknown>,
   accessToken?: string,
@@ -37,7 +36,7 @@ async function convexCall<T>(
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
   }
-  const res = await fetch(`${HIMOTOKI_CONVEX_URL}/api/mutation`, {
+  const res = await fetch(`${convexUrl.replace(/\/$/, "")}/api/mutation`, {
     method: "POST",
     headers,
     body: JSON.stringify({
@@ -58,6 +57,7 @@ async function convexCall<T>(
 }
 
 async function convexAction<T>(
+  convexUrl: string,
   path: string,
   args: Record<string, unknown>,
   accessToken?: string,
@@ -68,7 +68,7 @@ async function convexAction<T>(
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
   }
-  const res = await fetch(`${HIMOTOKI_CONVEX_URL}/api/action`, {
+  const res = await fetch(`${convexUrl.replace(/\/$/, "")}/api/action`, {
     method: "POST",
     headers,
     body: JSON.stringify({
@@ -89,18 +89,21 @@ async function convexAction<T>(
 }
 
 export async function signInWithGoogleIdToken(
+  convexUrl: string,
   idToken: string,
 ): Promise<HimotokiSignInResult> {
-  return convexAction<HimotokiSignInResult>("authActions:signInWithGoogle", {
+  return convexAction<HimotokiSignInResult>(convexUrl, "authActions:signInWithGoogle", {
     idToken,
   });
 }
 
 export async function addHimotokiFavorite(
+  convexUrl: string,
   accessToken: string,
   favorite: HimotokiFavoriteArgs,
 ): Promise<{ added: boolean }> {
   return convexCall<{ added: boolean }>(
+    convexUrl,
     "saved:addFavorite",
     favorite as unknown as Record<string, unknown>,
     accessToken,

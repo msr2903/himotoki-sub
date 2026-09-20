@@ -2,6 +2,7 @@ import { FC, ReactNode, useEffect, useRef, useState } from "react";
 
 import type { TFuriganaLevel, TFuriganaMode, TReadingLineMode, TSecondarySubs, TTokenAction } from "@src/models/types";
 import { onPersistedChange, readPersisted, writePersisted } from "@src/shared/persistedSettings";
+import { ENDPOINT_DEFAULTS, type EndpointKey, originMatchPattern } from "@src/shared/runtimeConfig";
 import {
   CLICK_ACTION_SETTING,
   DEFAULT_CLICK_ACTION,
@@ -72,6 +73,31 @@ function usePersistedSetting<T>(name: string, fallback: T, validate: (v: unknown
   return [value, update] as const;
 }
 
+/**
+ * A plain (non-`persist:`) chrome.storage.local string key, used for runtime endpoint overrides.
+ * An empty value removes the key so the compiled-in default applies.
+ */
+function useRawStringSetting(key: string): readonly [string, (next: string) => void] {
+  const [value, setValue] = useState("");
+  useEffect(() => {
+    void chrome.storage.local.get([key]).then((r) => setValue(typeof r[key] === "string" ? r[key] : ""));
+    const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+      if (area === "local" && key in changes) {
+        const next = changes[key]?.newValue;
+        setValue(typeof next === "string" ? next : "");
+      }
+    };
+    chrome.storage.onChanged.addListener(listener);
+    return () => chrome.storage.onChanged.removeListener(listener);
+  }, [key]);
+  const update = (next: string) => {
+    setValue(next);
+    const trimmed = next.trim();
+    void (trimmed ? chrome.storage.local.set({ [key]: trimmed }) : chrome.storage.local.remove([key]));
+  };
+  return [value, update] as const;
+}
+
 /** Sidebar sections, matching the himotoki.my.id settings layout. */
 const SETTINGS_NAV = [
   { id: "words", label: "Words" },
@@ -79,6 +105,7 @@ const SETTINGS_NAV = [
   { id: "appearance", label: "Appearance" },
   { id: "dictionary", label: "Dictionary" },
   { id: "account", label: "Account" },
+  { id: "advanced", label: "Advanced" },
   { id: "about", label: "About" },
 ] as const;
 
@@ -252,6 +279,20 @@ const Options: FC = () => {
     (v): v is Record<string, string> => typeof v === "object" && v !== null && !Array.isArray(v),
   );
   const version = chrome.runtime.getManifest().version;
+
+  // Runtime endpoint overrides (plain storage keys) so a domain/backend move needs no rebuild.
+  const [dictUrl, setDictUrl] = useRawStringSetting("himotokiDictUrl");
+  const [convexUrl, setConvexUrl] = useRawStringSetting("himotokiConvexUrl");
+  const [googleClientId, setGoogleClientId] = useRawStringSetting("himotokiGoogleClientId");
+  // For a custom URL endpoint on a new origin, request host permission (needs a user gesture — a
+  // Blur after typing qualifies) so the extension can actually fetch it.
+  const applyEndpointUrl = (key: EndpointKey, value: string, set: (v: string) => void) => {
+    set(value);
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const pattern = originMatchPattern(trimmed);
+    if (pattern) void chrome.permissions.request({ origins: [pattern] }).catch(() => undefined);
+  };
 
   const exportCount = new Set([...knownWords, ...Object.keys(wordStatuses)]).size;
   const exportWords = (format: "json" | "csv") => {
@@ -587,6 +628,76 @@ const Options: FC = () => {
                 </button>
               </span>
             </div>
+          </Group>
+
+          <Group
+            id="advanced"
+            title="Advanced"
+            lede="Endpoints the extension talks to. Leave a field blank to use the built-in default; set one to point at a different host if the domain ever changes — no reinstall needed."
+          >
+            <Row
+              title="Dictionary URL"
+              desc="Where the offline dictionary (.sqlite.gz) is downloaded from. The .json manifest is fetched from the same path. Saving a custom URL asks for permission to access that site."
+              htmlFor="endpoint-dict"
+              control={
+                <input
+                  id="endpoint-dict"
+                  type="text"
+                  className="es-options-text"
+                  value={dictUrl}
+                  placeholder={ENDPOINT_DEFAULTS.himotokiDictUrl}
+                  onChange={(e) => setDictUrl(e.target.value)}
+                  onBlur={(e) => applyEndpointUrl("himotokiDictUrl", e.target.value, setDictUrl)}
+                />
+              }
+            />
+            <Row
+              title="Convex URL"
+              desc="Backend for Save to Himotoki (account favorites). Only used when you sign in."
+              htmlFor="endpoint-convex"
+              control={
+                <input
+                  id="endpoint-convex"
+                  type="text"
+                  className="es-options-text"
+                  value={convexUrl}
+                  placeholder={ENDPOINT_DEFAULTS.himotokiConvexUrl}
+                  onChange={(e) => setConvexUrl(e.target.value)}
+                  onBlur={(e) => applyEndpointUrl("himotokiConvexUrl", e.target.value, setConvexUrl)}
+                />
+              }
+            />
+            <Row
+              title="Google client ID"
+              desc="OAuth client ID used for Himotoki account sign-in."
+              htmlFor="endpoint-google"
+              control={
+                <input
+                  id="endpoint-google"
+                  type="text"
+                  className="es-options-text"
+                  value={googleClientId}
+                  placeholder={ENDPOINT_DEFAULTS.himotokiGoogleClientId}
+                  onChange={(e) => setGoogleClientId(e.target.value)}
+                />
+              }
+            />
+            {(dictUrl || convexUrl || googleClientId) && (
+              <div className="row">
+                <span className="row-desc">Custom endpoints are set.</span>
+                <button
+                  type="button"
+                  className="es-options-link"
+                  onClick={() => {
+                    setDictUrl("");
+                    setConvexUrl("");
+                    setGoogleClientId("");
+                  }}
+                >
+                  Reset to defaults
+                </button>
+              </div>
+            )}
           </Group>
 
           <Group id="about" title="About">
