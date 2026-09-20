@@ -13,6 +13,17 @@ const ANKI_API_VERSION = 6;
 const ANKI_DESK = "Himotoki";
 const ANKI_URL = "http://localhost:8765";
 
+/**
+ * True when an AnkiConnect call looks like it failed because Anki/AnkiConnect isn't reachable.
+ * The background POST rejects with a network error ("Failed to fetch", etc.) — not the literal
+ * "connection error" the old code checked for — and may return no result at all.
+ */
+export const isAnkiConnectionError = (result: { error?: unknown } | null | undefined): boolean => {
+  if (!result) return true;
+  const errText = result.error ? String(result.error) : "";
+  return /failed to fetch|networkerror|load failed|connection|econnrefused/i.test(errText);
+};
+
 export class Anki implements ILearningService {
   public color: string;
 
@@ -76,7 +87,10 @@ export class Anki implements ILearningService {
     const deck = aditionalData.deckName?.trim() || ANKI_DESK;
     const createDeskResult = await this.invoke("createDeck", { deck });
 
-    if (createDeskResult.error === "connection error") {
+    // When Anki (AnkiConnect) is not running the background POST rejects with a network error such
+    // as "Failed to fetch" (never the literal "connection error"), and may yield no result at all.
+    // Detect those and show actionable guidance instead of a raw, confusing error.
+    if (isAnkiConnectionError(createDeskResult)) {
       return Promise.reject("Error connecting to Anki. Please make sure Anki is running and AnkiConnect is installed.");
     }
 
