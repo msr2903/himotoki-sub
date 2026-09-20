@@ -66,7 +66,7 @@ gh release create dict-<revision> dist-dict/jitendex-lite.sqlite.gz dist-dict/ji
 
 `latest/download` always resolves to the newest release, and a new release with a higher manifest `revision` triggers the in-app "update available" prompt.
 
-For local testing you can point the extension at any URL by setting `himotokiDictUrl` in `chrome.storage.local` (the end-to-end scripts do this).
+All deployment-tied endpoints are runtime-configurable so a domain/backend move needs no rebuild: the **Advanced** section of the options page overrides the dictionary URL, the Convex URL (Save to Himotoki), and the Google OAuth client ID. Each falls back to the compiled default when left blank, and setting a custom dictionary/Convex URL requests host permission for that origin. The same values can be set directly as plain `chrome.storage.local` keys (`himotokiDictUrl`, `himotokiConvexUrl`, `himotokiGoogleClientId`) — the end-to-end scripts set `himotokiDictUrl` this way.
 
 ## Testing
 
