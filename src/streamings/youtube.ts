@@ -299,11 +299,17 @@ class Youtube implements Service {
           };
         }
 
+        // Prefer the cue's declared duration for its end. The last segment's tOffsetMs is when the
+        // last *word* appears (its start), not when the cue ends, so using it made auto-generated
+        // captions disappear while their final word was still on screen. Fall back to tOffsetMs only
+        // when dDurationMs is absent.
         const lastSeg = sub.segs[sub.segs.length - 1];
         const end =
-          typeof lastSeg?.tOffsetMs === "number"
-            ? lastSeg.tOffsetMs + sub.tStartMs
-            : sub.tStartMs + (sub.dDurationMs || 0);
+          typeof sub.dDurationMs === "number" && sub.dDurationMs > 0
+            ? sub.tStartMs + sub.dDurationMs
+            : typeof lastSeg?.tOffsetMs === "number"
+              ? sub.tStartMs + lastSeg.tOffsetMs
+              : sub.tStartMs;
 
         return {
           start: sub.tStartMs,

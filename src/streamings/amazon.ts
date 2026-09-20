@@ -15,29 +15,31 @@ class Amazon implements Service {
 
   public init(): void {
     $video.watch((video) => {
-      if (video) {
-        waitForElement("#dv-web-player video, .tst-video-overlay-player-html5", () => {
-          esSubsChanged("en");
-          const subtitleSource = document.querySelector(".atvwebplayersdk-captions-overlay");
-          const videoElement = document.querySelector("video");
-          const subtitleObserver = new MutationObserver(() => {
-            const subtitleParts = subtitleSource.querySelectorAll(".atvwebplayersdk-captions-text");
-
-            const subtitleContent = [...subtitleParts].map((el) => getText(el)).join("\n");
-            console.log("subtitleContent", subtitleContent);
-            const startTime = videoElement.currentTime;
-            const captions = [
-              {
-                start: startTime * 1000,
-                end: (startTime + 100) * 1000,
-                text: subtitleContent,
-              },
-            ];
-            rawSubsAdded(captions);
-          });
-          subtitleObserver.observe(subtitleSource, { childList: true, subtree: true });
+      if (!video) return;
+      waitForElement("#dv-web-player video, .tst-video-overlay-player-html5", () => {
+        esSubsChanged("en");
+        const subtitleSource = document.querySelector(".atvwebplayersdk-captions-overlay");
+        const videoElement = document.querySelector("video");
+        if (!subtitleSource || !videoElement) return;
+        // The observer fires on every DOM mutation; only emit when the caption text actually changes,
+        // otherwise every mutation appended another overlapping cue for the same line.
+        let lastContent = "";
+        const subtitleObserver = new MutationObserver(() => {
+          const subtitleParts = subtitleSource.querySelectorAll(".atvwebplayersdk-captions-text");
+          const subtitleContent = [...subtitleParts].map((el) => getText(el)).join("\n").trim();
+          if (!subtitleContent || subtitleContent === lastContent) return;
+          lastContent = subtitleContent;
+          const startTime = videoElement.currentTime;
+          rawSubsAdded([
+            {
+              start: startTime * 1000,
+              end: (startTime + 100) * 1000,
+              text: subtitleContent,
+            },
+          ]);
         });
-      }
+        subtitleObserver.observe(subtitleSource, { childList: true, subtree: true });
+      });
     });
   }
 
