@@ -2,7 +2,6 @@ import reloadOnUpdate from "virtual:reload-on-update-in-background-script";
 
 import { googleTranslateSingleFetcher } from "@src/utils/googleTranslateSingleFetcher";
 import { deeplTranslateFetcher } from "@src/utils/deeplTranslateFetcher";
-import { himotokiEntry, himotokiSearch } from "@src/utils/himotokiApi";
 import {
   HIMOTOKI_CONVEX_URL,
   HIMOTOKI_GOOGLE_CLIENT_ID,
@@ -134,8 +133,6 @@ const HANDLED_MESSAGE_TYPES = new Set([
   "himotokiSplitBatch",
   "himotokiDictManifest",
   "openOptionsPage",
-  "himotokiSearch",
-  "himotokiEntry",
   "himotokiSignIn",
   "himotokiSignOut",
   "himotokiGetSession",
@@ -206,18 +203,6 @@ chrome.runtime.onMessage.addListener(function (message, _sender, sendResponse) {
         sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
       }
     })();
-  }
-
-  if (message.type === "himotokiSearch") {
-    himotokiSearch(message.q, message.lang, message.limit)
-      .then((data) => sendResponse({ ok: true, data }))
-      .catch((error: Error) => sendResponse({ ok: false, error: error.message }));
-  }
-
-  if (message.type === "himotokiEntry") {
-    himotokiEntry(message.source, message.seq, message.lang)
-      .then((data) => sendResponse({ ok: true, data }))
-      .catch((error: Error) => sendResponse({ ok: false, error: error.message }));
   }
 
   if (message.type === "himotokiSignIn") {

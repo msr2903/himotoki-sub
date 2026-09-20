@@ -10,7 +10,6 @@ import {
   TOKEN_ACTIONS,
   isTokenAction,
 } from "@src/shared/tokenActions";
-import { HIMOTOKI_API_BASE } from "@src/shared/himotokiConfig";
 import { DEFAULT_SECONDARY_SUBS, SECONDARY_SUBS_OPTIONS, SECONDARY_SUBS_SETTING, isSecondarySubs } from "@src/shared/secondarySubs";
 import {
   DEFAULT_FURIGANA,
@@ -592,17 +591,14 @@ const Options: FC = () => {
 
           <Group id="about" title="About">
             <p className="row-desc">
-              Japanese subtitles are split into words with a local model and looked up in Jitendex. Whole-line
-              translation uses Google Translate or DeepL.{" "}
-              <a className="inline-link" href={HIMOTOKI_API_BASE} target="_blank" rel="noreferrer">
-                himotoki.my.id
-              </a>
+              Japanese subtitles are split into words with a local model and looked up in Jitendex on your
+              device. Whole-line translation uses Google Translate or DeepL.
             </p>
             <p className="row-desc">
               Dictionary data: <a className="inline-link" href="https://jitendex.org/" target="_blank" rel="noreferrer">Jitendex</a> © Stephen Kraus,{" "}
               <a className="inline-link" href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer">CC BY-SA 4.0</a>, built from{" "}
               <a className="inline-link" href="https://www.edrdg.org/jmdict/j_jmdict.html" target="_blank" rel="noreferrer">JMdict</a> (EDRDG) and{" "}
-              <a className="inline-link" href="https://tatoeba.org/" target="_blank" rel="noreferrer">Tatoeba</a> examples (CC BY 2.0 FR). Word lookups stay on your device when the offline dictionary is installed; otherwise they are sent to Himotoki. Whole-line translation and saving to your account also use online services (see the{" "}
+              <a className="inline-link" href="https://tatoeba.org/" target="_blank" rel="noreferrer">Tatoeba</a> examples (CC BY 2.0 FR). Word lookups run on your device using the offline dictionary. Whole-line translation and saving to your account use online services (see the{" "}
               <a className="inline-link" href="https://github.com/msr2903/himotoki-sub/blob/master/PRIVACY.md" target="_blank" rel="noreferrer">privacy policy</a>).
             </p>
           </Group>

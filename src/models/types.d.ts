@@ -72,12 +72,12 @@ export type TWordTranslation = {
   targetLanguage: string;
   translations: TWordTranslationItem[];
   transcription: string;
-  /** Stashed from GET /api/search for Convex saved.addFavorite. */
+  /** Populated from the offline dictionary lookup, for Convex saved.addFavorite (Save to Himotoki). */
   himotokiSave?: THimotokiSaveMeta;
   /** Set when the dictionary request itself failed (network, server), as opposed to "no entry". */
   error?: string;
-  /** Where the answer came from: the offline SQLite dictionary or the Himotoki HTTP API. */
-  lookupSource?: "local" | "api";
+  /** Where the answer came from: the offline SQLite dictionary, or "none" when it isn't installed. */
+  lookupSource?: "local" | "none";
   /** Dictionary headword (kanji form if any) and its kana reading, for furigana. */
   headword?: string;
   reading?: string;

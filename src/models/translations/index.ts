@@ -3,12 +3,10 @@ import { createEffect, createEvent, createStore, sample } from "effector";
 import { TSubItem, TWordTranslation } from "../types";
 import { $translateLanguage, $translationService, $deeplApiKey } from "../settings";
 import { $currentSubs, $subs } from "../subs";
-import { HIMOTOKI_GLOSS_LANG } from "@src/shared/himotokiConfig";
 import {
   entryLemma,
   himotokiEntryToWordTranslation,
   himotokiTokenToWordTranslation,
-  type HimotokiEntry,
   type HimotokiToken,
 } from "@src/utils/himotokiTypes";
 
@@ -101,34 +99,13 @@ const lookupLocal = async (source: string): Promise<TWordTranslation | null> => 
   return translation;
 };
 
-/** Himotoki HTTP API, used only while the offline dictionary is not installed. */
-const lookupApi = async (source: string): Promise<TWordTranslation> => {
-  const resp = await chrome.runtime.sendMessage({
-    type: "himotokiSearch",
-    q: source,
-    lang: HIMOTOKI_GLOSS_LANG,
-    limit: 5,
-  });
-  if (!resp?.ok) throw new Error(resp?.error || "Himotoki search failed");
-  const results = (resp.data || []) as HimotokiEntry[];
-  const best = results[0];
-  const translation = best ? himotokiEntryToWordTranslation(best, source, "en") : emptyTranslation(source);
-  const alternatives = results.slice(1).map((entry) => himotokiEntryToWordTranslation(entry, source, "en"));
-  if (alternatives.length) translation.alternatives = alternatives;
-  translation.lookupSource = "api";
-  return translation;
-};
-
 export const fetchWordTranslationFx = createEffect<{ source: string }, TWordTranslation>(async ({ source }) => {
   try {
-    let local: TWordTranslation | null = null;
-    try {
-      local = await lookupLocal(source);
-    } catch (error) {
-      console.warn("[himotoki] local dictionary failed, falling back to API", error);
-    }
+    const local = await lookupLocal(source);
     if (local) return { ...local, source };
-    return { ...(await lookupApi(source)), source };
+    // The offline dictionary is not installed. There is no online fallback (the extension is
+    // self-contained); the popup prompts the user to install it.
+    return { ...emptyTranslation(source), source, lookupSource: "none" };
   } catch (error) {
     console.error("[himotoki] word lookup failed", error);
     return emptyTranslation(source, error instanceof Error ? error.message : String(error));
@@ -151,7 +128,7 @@ sample({
 $lookups.on(fetchWordTranslationFx.doneData, (all, translation) => ({ ...all, [translation.source]: translation }));
 // Any resolved lookup tells us for free whether the local dictionary is currently serving.
 $dictReady.on(fetchWordTranslationFx.doneData, (ready, translation) =>
-  translation.lookupSource === "local" ? true : translation.lookupSource === "api" ? false : ready,
+  translation.lookupSource === "local" ? true : translation.lookupSource === "none" ? false : ready,
 );
 $lookupPendings.on(fetchWordTranslationFx, (pendings, { source }) => ({ ...pendings, [source]: true }));
 $lookupPendings.on(fetchWordTranslationFx.finally, (pendings, { params: { source } }) => {

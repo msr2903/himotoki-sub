@@ -24,7 +24,6 @@ import { useLookup } from "@src/pages/content/hooks/useLookup";
 import { TLearningService, TSubItem, TWordTranslation, TWordTranslationItem } from "@src/models/types";
 import ILearningService from "@src/learning-service/learningService";
 import { getLearningService } from "@src/utils/getLearningService";
-import { HIMOTOKI_API_BASE } from "@src/shared/himotokiConfig";
 import { SoundIcon } from "./assets/SoundIcon";
 import { SaveIcon } from "./assets/SaveIcon";
 import { AnkiIcon } from "./assets/AnkiIcon";
@@ -258,7 +257,6 @@ export const SubItemTranslation: FC<{
     : [{ word: current.mainTranslation, partOfSpeech: "unknown" as const, synonyms: [], popularity: 0 }];
   const visibleSenses = showAll ? senses : senses.slice(0, SENSE_LIMIT);
   const hiddenCount = senses.length - visibleSenses.length;
-  const himotokiQuery = encodeURIComponent(current.himotokiSave?.headword || headword);
   const saveLabel = SERVICE_LABEL[learningService] ?? "Save";
   const knownKey = knownKeyOf(current);
   const wordStatus = statusOf(wordStatuses, knownKey, knownWords);
@@ -420,18 +418,15 @@ export const SubItemTranslation: FC<{
         </div>
       )}
 
-      <footer className="es-popup-actions">
-        <a className="es-popup-btn" href={`${HIMOTOKI_API_BASE}/?q=${himotokiQuery}`} target="_blank" rel="noreferrer">
-          Open entry
-        </a>
-        {pinned && (
+      {pinned && (
+        <footer className="es-popup-actions">
           <button className="es-popup-btn es-popup-btn--ghost" onClick={() => unpin()}>
             Close
           </button>
-        )}
-      </footer>
-      {translation.lookupSource === "api" && (
-        <div className="es-word-hint">Online lookup. Download the offline dictionary in the extension settings for instant results.</div>
+        </footer>
+      )}
+      {translation.lookupSource === "none" && (
+        <div className="es-word-hint">Install the offline dictionary in the extension settings to look up words.</div>
       )}
     </div>
   );

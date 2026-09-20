@@ -1,4 +1,3 @@
-import { HIMOTOKI_API_BASE } from "@src/shared/himotokiConfig";
 import { AccountPanel } from "@src/pages/shared/AccountPanel";
 import { DictionaryPanel } from "@src/pages/shared/DictionaryPanel";
 
@@ -40,11 +39,6 @@ const Popup = () => {
       <menu>
         <li onClick={() => void chrome.runtime.openOptionsPage()}>
           <a className="es-popup-settings">Settings (hover, click, dictionary)</a>
-        </li>
-        <li>
-          <a target="_blank" href={HIMOTOKI_API_BASE} rel="noreferrer">
-            Open Himotoki
-          </a>
         </li>
         <li onClick={handleRequestPermissions}>
           <a className="es-popup-kinopub">Enable on Kinopub</a>

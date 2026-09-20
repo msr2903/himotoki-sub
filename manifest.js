@@ -56,11 +56,11 @@ const manifest = {
   optional_host_permissions: ["*://*/*"],
   optional_permissions: [],
   host_permissions: [
-    "https://himotoki.my.id/*",
     // Offline dictionary is a self-hosted GitHub release asset; the download 302-redirects from
     // github.com to *.githubusercontent.com, so both origins are needed.
     "https://github.com/*",
     "https://*.githubusercontent.com/*",
+    // Convex backs the optional "Save to Himotoki" account feature.
     "https://*.convex.cloud/*",
     "https://accounts.google.com/*",
     "https://translate.google.com/*",
