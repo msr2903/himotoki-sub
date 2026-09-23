@@ -35,7 +35,11 @@ try {
     const requests = [];
     s.computeCoverageFx.use((captions) => new Promise((resolve) => requests.push({ captions, resolve })));
     s.processRawSubsFx.use(async (captions) => captions);
-    const load = (captions) => s.processRawSubsFx(captions);
+    // Drive captions through $rawSubs (like the real fetch path) so the stale-result guard on
+    // $subs accepts them — calling processRawSubsFx directly is rejected as out-of-date.
+    const load = async (captions) => { s.fetchSubsFx.use(async () => captions); s.subsRequested("ja"); await tick(); };
+    // The real ONNX upgrade effect would rewrite $subs mid-check; keep it pending like a slow batch.
+    s.processJapaneseSubsFx.use(() => new Promise(() => {}));
     const first = [cue("猫 犬")], second = [cue("鳥")];
     await load(first); await load(second);
     requests[1].resolve({ 鳥: "bird" }); await tick();
@@ -91,7 +95,7 @@ try {
   assert.equal(await page.locator(".es-entry-count").textContent(), "1 / 2");
   await page.getByTitle("Next entry").click();
   assert.equal(await page.locator(".es-entry-count").textContent(), "2 / 2");
-  await page.getByRole("button", { name: "Mark known", exact: true }).click();
+  await page.getByRole("button", { name: "Known", exact: true }).click();
   assert.equal(await page.locator(".es-sub-item-pinned").count(), 1);
   assert.ok(await page.evaluate(() => window.audit.settings.$knownWords.getState().includes("seq:jitendex:2")));
   console.log("PASS Entry switching and mark-known keep the popup pinned and select the correct entry");
@@ -129,7 +133,11 @@ try {
   await options.keyboard.press("End");
   const maxScale = await options.locator("#ui-scale").getAttribute("max");
   await options.waitForFunction(async (v) => (await chrome.storage.local.get("persist:uiScale"))["persist:uiScale"] === v, maxScale);
-  await options.evaluate(() => chrome.storage.local.set({ "persist:knownWords": JSON.stringify(["seq:jitendex:10", "seq:jitendex:11"]) }));
+  await options.evaluate(() => chrome.storage.local.set({
+    "persist:knownWords": JSON.stringify(["seq:jitendex:10", "seq:jitendex:11"]),
+    // The popup test above persisted a "known" word status; clear it so the count is just the array.
+    "persist:wordStatuses": "{}",
+  }));
   await options.getByText("2 words marked known.", { exact: true }).waitFor();
   await options.locator("#dim-known").check();
   const options2 = await ctx.newPage();

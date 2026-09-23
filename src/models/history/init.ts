@@ -13,6 +13,7 @@ const lookupHistoryCandidate = sample({
       translation,
       video ? Math.floor(video.currentTime * 1000) : undefined,
       typeof document !== "undefined" ? document.title : undefined,
+      typeof location !== "undefined" ? location.href : undefined,
     ),
 });
 

@@ -14,10 +14,20 @@ export const appendRawSubs = (oldSubs: Captions, newSubs: Captions): Captions =>
   if (!lastSub) {
     return [...oldSubs, ...newSubs];
   }
-  if (lastSub.text != newSubs[0].text && lastSub.start != newSubs[0].start) {
-    // Clamp the previous cue's end so it doesn't overlap the new one.
-    const clampedLast = { ...lastSub, end: lastSub.start };
-    return [...oldSubs.slice(0, -1), clampedLast, ...newSubs];
+  const next = newSubs[0];
+  if (!next) return oldSubs;
+  const nextStart = Number(next.start);
+  const lastStart = Number(lastSub.start);
+  if (lastSub.text === next.text && lastStart === nextStart) return oldSubs; // true duplicate
+  if (nextStart <= lastStart) {
+    // Same moment or out-of-order: the observer emitted a revised cue — replace the last one.
+    return [...oldSubs.slice(0, -1), ...newSubs];
   }
-  return oldSubs;
+  // Clamp the previous cue's end to the new cue's start so they don't overlap — but keep
+  // its real duration (end = own start produced zero-length cues that could never replay).
+  return [
+    ...oldSubs.slice(0, -1),
+    { ...lastSub, end: Math.min(Number(lastSub.end), nextStart) },
+    ...newSubs,
+  ];
 };

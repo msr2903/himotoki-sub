@@ -14,7 +14,42 @@ export type TLookupHistoryItem = {
   /** Video position (ms) when the word was looked up, for jump-to-cue. */
   videoTimeMs?: number;
   videoTitle?: string;
+  /** Page URL at lookup time — used to open the original video for entries from other videos. */
+  videoUrl?: string;
+  /** Stable video identity derived from the URL, for "is this the same video" checks. */
+  videoKey?: string;
   ts: number;
+};
+
+/**
+ * Video identity for jump-to-cue: YouTube's video id (watch?v=, /shorts/, /live/, /embed/, /v/),
+ * otherwise origin + pathname (covers Netflix /watch/<id> and similar per-video routes).
+ */
+export const videoKeyFromUrl = (rawUrl: string | undefined): string | undefined => {
+  if (!rawUrl) return undefined;
+  try {
+    const url = new URL(rawUrl);
+    const v = url.searchParams.get("v");
+    if (v) return `yt:${v}`;
+    const m = url.pathname.match(/^\/(shorts|live|embed|v)\/([^\/?#]+)/);
+    if (m) return `yt:${m[2]}`;
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return rawUrl;
+  }
+};
+
+/** Original video URL with a timestamp hint for players that understand `t` (YouTube). */
+export const urlWithTimestamp = (rawUrl: string, ms: number): string => {
+  try {
+    const url = new URL(rawUrl);
+    if (url.hostname.includes("youtube.com") || url.hostname === "youtu.be") {
+      url.searchParams.set("t", `${Math.floor(ms / 1000)}s`);
+    }
+    return url.toString();
+  } catch {
+    return rawUrl;
+  }
 };
 
 export const LOOKUP_HISTORY_SETTING = "lookupHistory";
@@ -35,6 +70,7 @@ export const historyItemFromTranslation = (
   tx: TWordTranslation | null | undefined,
   videoTimeMs?: number,
   videoTitle?: string,
+  videoUrl?: string,
 ): TLookupHistoryItem | null => {
   if (!tx || tx.error) return null;
   const headword = tx.headword || tx.source;
@@ -48,6 +84,8 @@ export const historyItemFromTranslation = (
     source: tx.source,
     videoTimeMs,
     videoTitle,
+    videoUrl,
+    videoKey: videoKeyFromUrl(videoUrl),
     ts: Date.now(),
   };
 };

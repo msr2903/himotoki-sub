@@ -5,8 +5,18 @@ import { split, resetModelCache } from "@src/split";
 
 let ready: Promise<void> | null = null;
 // onnxruntime-web rejects overlapping run() calls on one session ("Session already started"),
-// so batches must be sequential. Inference is ~2 ms per cue, so this is not a bottleneck.
+// so inference must be sequential — not just within one batch message but across all messages
+// (cue-at-a-time services, delay resyncs and multiple tabs all overlap). Serialize every split
+// and the model warmup through one module-level promise chain. Inference is ~2 ms per cue, so
+// this is not a bottleneck.
 const BATCH_CONCURRENCY = 1;
+
+let inferenceChain: Promise<unknown> = Promise.resolve();
+const runExclusive = <T>(fn: () => Promise<T>): Promise<T> => {
+  const run = inferenceChain.then(fn, fn);
+  inferenceChain = run;
+  return run;
+};
 
 async function ensureReady(): Promise<void> {
   if (!ready) {
@@ -87,8 +97,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "himotokiSplit") {
     void (async () => {
       try {
-        await ensureReady();
-        const result = await split(String(message.text ?? ""));
+        const result = await runExclusive(async () => {
+          await ensureReady();
+          return split(String(message.text ?? ""));
+        });
         sendResponse({ ok: true, data: result });
       } catch (error) {
         sendResponse({
@@ -103,10 +115,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "himotokiSplitBatch") {
     void (async () => {
       try {
-        await ensureReady();
         const texts: string[] = Array.isArray(message.texts) ? message.texts : [];
+        // Warmup goes through the chain too, so a concurrent message's warmup split can't overlap
+        // another batch's items.
+        await runExclusive(() => ensureReady());
         const results = await mapPool(texts, BATCH_CONCURRENCY, (text) =>
-          split(String(text ?? "")),
+          runExclusive(() => split(String(text ?? ""))),
         );
         sendResponse({ ok: true, data: results });
       } catch (error) {

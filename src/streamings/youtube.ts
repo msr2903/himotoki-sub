@@ -3,6 +3,7 @@ import { parse, subTitleType } from "subtitle";
 import { esSubsChanged } from "@src/models/subs";
 import { esRenderSetings } from "@src/models/settings";
 import Service from "./service";
+import { videoIdFromUrl } from "./youtubeHelpers";
 
 type YoutubeSubtitle = {
   dDurationMs: number;
@@ -341,12 +342,7 @@ class Youtube implements Service {
   }
 
   private getVideoId(): string {
-    const regExpression = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = window.location.href.match(regExpression);
-    if (match && match[2].length === 11) {
-      return match[2];
-    }
-    return "";
+    return videoIdFromUrl(window.location.href);
   }
 
   private hasJapaneseTrack(): boolean {

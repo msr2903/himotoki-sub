@@ -28,6 +28,7 @@ import { MeaningSize } from "./MeaningSize";
 import { VideoStats } from "./VideoStats";
 import { LookupHistory } from "./LookupHistory";
 import { useClickOutside } from "@src/hooks/useClickOutside";
+import { useOverlayPortalTarget } from "@src/hooks/useOverlayPortalTarget";
 import { useUnit } from "effector-react";
 import {
   $activeSettingsTab,
@@ -66,6 +67,7 @@ export const SettingsContent: FC<{ onClose: () => void }> = ({ onClose }) => {
     $uiScale,
   ]);
   const contentRef = useRef();
+  const modalTarget = useOverlayPortalTarget();
 
   useClickOutside(contentRef, onClose);
 
@@ -197,7 +199,7 @@ export const SettingsContent: FC<{ onClose: () => void }> = ({ onClose }) => {
         </div>
         <div className="es-settings-content__close" onClick={() => onClose()} />
       </div>
-      {createPortal(<DeepLApiKeyModal />, document.querySelector("body"))}
+      {createPortal(<DeepLApiKeyModal />, modalTarget)}
     </>
   );
 };

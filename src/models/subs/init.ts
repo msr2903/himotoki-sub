@@ -170,8 +170,24 @@ sample({
   target: processRawSubsFx,
 });
 
-$subs.on(processRawSubsFx.doneData, (_, subs) => subs);
-$subs.on(processJapaneseSubsFx.doneData, (_, subs) => subs);
+// Apply split results only when they belong to the current raw captions: both effects are
+// async, so a batch finishing after a reset/track switch/delay change must not write stale
+// cues back into $subs (same params-identity guard as computeCoverageFx above). `done` fires on
+// failure too, so only successful results are written.
+sample({
+  clock: processRawSubsFx.done,
+  source: $rawSubs,
+  filter: (rawSubs, done) => !("error" in done) && rawSubs === done.params,
+  fn: (_, done) => ("result" in done ? done.result : []),
+  target: $subs,
+});
+sample({
+  clock: processJapaneseSubsFx.done,
+  source: $rawSubs,
+  filter: (rawSubs, done) => !("error" in done) && rawSubs === done.params,
+  fn: (_, done) => ("result" in done ? done.result : []),
+  target: $subs,
+});
 $subs.reset(resetSubs);
 
 // After the Segmenter paint, upgrade all cues via the local ONNX split.

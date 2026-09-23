@@ -54,14 +54,21 @@ export type HimotokiSearchResponse = {
 
 const mapPos = (pos?: string[]): TPartOfSpeach => {
   if (!pos?.length) return "unknown";
-  const joined = pos.join(" ").toLowerCase();
-  if (joined.includes("v") || joined.includes("verb")) return "verb";
-  if (joined.includes("adj")) return "adjective";
-  if (joined.includes("adv")) return "adverb";
-  if (joined.includes("n") || joined.includes("noun")) return "noun";
-  if (joined.includes("prt") || joined.includes("particle")) return "particle";
-  if (joined.includes("conj")) return "conjunction";
-  if (joined.includes("int")) return "interjection";
+  // Whole-tag matching on JMDict/Jitendex POS codes. Substring tests mislabeled "adv" as verb and
+  // "int"/"conj" as noun; every "v*" tag (v1, v5*, vi, vt, vs, vz, vk, v-unspec, ...) is a verb.
+  const tags = pos.map((t) => t.toLowerCase());
+  const has = (pred: (t: string) => boolean) => tags.some(pred);
+  if (has((t) => t.startsWith("v") || t === "aux-v" || t === "cop" || t === "cop-da" || t === "verb")) return "verb";
+  if (has((t) => t.startsWith("adj") || t === "aux-adj" || t === "adjective")) return "adjective";
+  if (has((t) => t === "adv" || t === "adv-to" || t === "adverb")) return "adverb";
+  if (has((t) => t === "prt" || t === "particle")) return "particle";
+  if (has((t) => t === "conj" || t === "conjunction")) return "conjunction";
+  if (has((t) => t === "int" || t === "interjection")) return "interjection";
+  if (has((t) => t === "pn" || t === "pronoun")) return "pronoun";
+  if (has((t) => t === "num" || t === "numeral")) return "numeral";
+  if (has((t) => t === "pref" || t === "prefix")) return "prefix";
+  if (has((t) => t === "abbr" || t === "abbreviation")) return "abbreviation";
+  if (has((t) => t.startsWith("n") || t === "noun" || t === "exp")) return "noun";
   return "unknown";
 };
 

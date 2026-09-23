@@ -77,6 +77,9 @@ export const captureCueAudio = async (
   const durationMs = Math.min(MAX_AUDIO_MS, Math.max(MIN_AUDIO_MS, (endSec - startSec) * 1000));
   const prevTime = video.currentTime;
   const wasPaused = video.paused;
+  // The wait below is wall-clock, so the clip must play at 1x: at 0.5x it would cover only half
+  // the cue, at 2x it would overrun into the next line. Restored in finally.
+  const prevRate = video.playbackRate;
 
   try {
     const stream = capture.call(v);
@@ -90,6 +93,11 @@ export const captureCueAudio = async (
     };
 
     video.currentTime = startSec;
+    try {
+      video.playbackRate = 1;
+    } catch {
+      // ignore — recording still works, just at the user's speed
+    }
     await video.play().catch(() => {});
     recorder.start();
     await new Promise((r) => setTimeout(r, durationMs));
@@ -107,9 +115,10 @@ export const captureCueAudio = async (
   } catch {
     return null;
   } finally {
-    // Restore playback position and paused state.
+    // Restore playback position, speed and paused state.
     try {
       video.currentTime = prevTime;
+      video.playbackRate = prevRate;
       if (wasPaused) video.pause();
     } catch {
       // ignore

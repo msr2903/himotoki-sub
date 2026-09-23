@@ -225,7 +225,9 @@ function groupTermsToEntry(rows: TermRow[], entryKeyNum: number): DictEntry | nu
     const expr = String(row.expression);
     const reading = String(row.reading || expr);
     if (KANJI_RE.test(expr)) {
-      if (!expressions.includes(expr)) expressions.push(expr);
+      // Negative-score rows are rarely-used or stub spellings (為る under する, 言った
+      // redirects); keep their reading but don't offer them as display headwords.
+      if (Number(row.score || 0) >= 0 && !expressions.includes(expr)) expressions.push(expr);
       if (reading && !readings.includes(reading)) readings.push(reading);
     } else {
       if (!readings.includes(expr)) readings.push(expr);
@@ -410,7 +412,10 @@ function scoreCandidate(lemma: string, steps: ConjStep[], entries: DictEntry[], 
     }
   }
   if (
-    ["したら", "すれば", "しない", "して", "した", "します", "しました"].includes(surface) ||
+    [
+      "したら", "すれば", "しない", "して", "した", "します", "しました",
+      "しなかった", "しなくて", "しないで", "しなければ", "しよう",
+    ].includes(surface) ||
     surface.startsWith("しちゃ") ||
     surface.startsWith("され")
   ) {
@@ -453,6 +458,9 @@ function scoreCandidate(lemma: string, steps: ConjStep[], entries: DictEntry[], 
     if (["godan", "ichidan", "suru", "kuru"].includes(cls ?? "")) score += 3;
   }
   score -= steps.length * 0.05;
+  // Extra steps beyond the first are speculative derivations (e.g. reading 見合わせた as
+  // past-of-potential of 見合わす); the direct parse should win unless bonuses justify it.
+  if (steps.length > 1) score -= (steps.length - 1) * 1.5;
   if (lemma === surface && steps.length) score -= 10;
   return score;
 }
@@ -493,25 +501,30 @@ function kanjiPrefix(surface: string): string | null {
   return null;
 }
 
+/** Frequency rank for ordering; missing data sorts last. Lower freq = more frequent word. */
+function freqKey(entry: DictEntry): number {
+  const f = Number(entry.freq);
+  return Number.isFinite(f) && f > 0 ? f : Number.MAX_SAFE_INTEGER;
+}
+
 function entrySortKey(entry: DictEntry, surface: string): number[] {
   const seq = Number(entry.seq) || 0;
   const kanjiList = entry.kanji ?? [];
   const readings = entry.readings ?? [];
   if (KANJI_RE.test(surface)) {
-    return [kanjiList.length && kanjiList[0] === surface ? 0 : 1, entry.common ? 0 : 1, seq];
+    return [kanjiList.length && kanjiList[0] === surface ? 0 : 1, entry.common ? 0 : 1, freqKey(entry), seq];
   }
   const posTags = entryPosTags(entry);
   const isParticle = posTags.some((tag) => tag === "prt" || tag.includes("prt"));
-  const kanaOnlyPrimary = !kanjiList.length && readings.length > 0 && readings[0] === surface;
   const primaryExact =
     (readings.length > 0 && readings[0] === surface) || (kanjiList.length > 0 && kanjiList[0] === surface);
   const isFunctionPos = posTags.some((tag) => FUNCTION_POS.has(tag));
   return [
     isParticle ? 0 : 1,
-    kanaOnlyPrimary ? 0 : 1,
+    entry.common ? 0 : 1,
     primaryExact ? 0 : 1,
     isFunctionPos && surface.length <= 2 ? 0 : 1,
-    entry.common ? 0 : 1,
+    freqKey(entry),
     seq,
   ];
 }
@@ -623,6 +636,24 @@ export class Dictionary {
     return rowsToUniqueEntries(rows, limit);
   }
 
+  /**
+   * Strict surface lookup: exact expression/reading equality on kana-script variants only.
+   * Subtitle text is exact, so spelling-tolerant fuzzy variants are left to the last-resort
+   * path in lookupSegment — otherwise inflected kana forms resolve to look-alike nouns.
+   */
+  private lookupSurfaceStrict(text: string, limit = 20): DictEntry[] {
+    if (!text) return [];
+    const variants = [...new Set(JAPANESE_RE.test(text) ? kanaSearchVariants(text) : [text])];
+    const placeholders = variants.map(() => "?").join(",");
+    const rows = this.termRows(
+      `SELECT ${this.termColumns} FROM term
+       WHERE expression IN (${placeholders}) OR reading IN (${placeholders})
+       ORDER BY score DESC, id LIMIT ?`,
+      [...variants, ...variants, limit * 8],
+    );
+    return rowsToUniqueEntries(rows, limit);
+  }
+
   /** Strict equality on expression/reading (kana variants only), used by segment repair. */
   isExactHeadword(surface: string): boolean {
     if (!surface || surface.length < 2) return false;
@@ -665,10 +696,10 @@ export class Dictionary {
   }
 
   private lookupForConj(text: string): DictEntry[] {
-    let entries = this.lookupSurface(text, 20);
+    let entries = this.lookupSurfaceStrict(text, 20);
     if (text === "する") entries = rankSuruEntries(entries);
     if (!entries.length && text.endsWith("する") && text.length > 2) {
-      entries = withVsCompounds(text, entries, this.lookupSurface(text.slice(0, -2), 20));
+      entries = withVsCompounds(text, entries, this.lookupSurfaceStrict(text.slice(0, -2), 20));
     }
     return entries;
   }
@@ -706,16 +737,36 @@ export class Dictionary {
     for (const [lemma, steps] of raw) {
       if (!lemma || !steps.length || !validLemma(lemma)) continue;
       if ((lemma.endsWith("て") || lemma.endsWith("で") || lemma.endsWith("して")) && lemma.length <= 3) continue;
+      // A te-auxiliary peel that produced a non-te stem (待てる → 待て) can chain into an
+      // imperative peel (待て → 待つ); "imperative of a progressive" is not a real derivation.
+      if (
+        steps.some(
+          (s, i) =>
+            i > 0 &&
+            (s.conj_type === "Imperative" || s.conj_type === "Negative imperative") &&
+            (steps[i - 1]!.conj_type.startsWith("Conjunctive") ||
+              steps[i - 1]!.conj_type === "Progressive (ている)"),
+        )
+      )
+        continue;
       const key = `${lemma}|${steps.map((s) => s.conj_type).join(",")}`;
       if (seen.has(key)) continue;
       seen.add(key);
       const entries = this.lookupForConj(lemma);
       if (!entries.length) continue;
-      const compatible = entries.filter((e) => stepsCompatibleWithPos(steps, entryPosTags(e)));
+      const compatible = rankEntries(
+        entries.filter((e) => stepsCompatibleWithPos(steps, entryPosTags(e))),
+        lemma,
+      );
       if (!compatible.length) continue;
       const entry = compatible[0]!;
       const score = scoreCandidate(lemma, steps, [entry], surface);
-      if (score > bestScore) {
+      // On a score tie or near-tie a much more frequent lemma wins
+      // (分かる over 分かつ, ある over 合う for あって).
+      const nearTie =
+        best !== null && score <= bestScore && score >= bestScore - 2 &&
+        freqKey(entry) * 3 < freqKey(best[2]);
+      if (score > bestScore || nearTie) {
         bestScore = score;
         best = [lemma, steps, entry];
       }
@@ -777,45 +828,86 @@ export class Dictionary {
     for (const label of PARADIGM_KEYS) {
       const form = forms[label];
       if (!form) continue;
+      // Paradigm cells the rules engine cannot derive are filled with the lemma itself
+      // (e.g. i-adjective Potential/Passive/Imperative); don't show those as real forms.
+      if (label !== "Dictionary" && form === lemma) continue;
       const formReading = readingForms?.[label] ?? (reading && form === lemma ? reading : "");
       out.push({ label, form, reading: formReading || "" });
     }
     return out.length ? out : null;
   }
 
-  /** Per-token resolution: exact → kanji prefix → deconjugation. Mirrors analyze.ts lookupSegment. */
+  /**
+   * Per-token resolution: strict exact → deconjugation → kanji prefix → fuzzy kana.
+   * Deinflection beats exact hits that are only stubs/non-common rows, and beats
+   * reading-only matches for kana surfaces (kana verb forms like した, いない).
+   */
   lookupSegment(surface: string): LookupResult {
     const result: LookupResult = { surface, entries: [], best: null };
     if (!surface) return result;
 
-    let entries = this.lookupSurface(surface, 20);
-    if (entries.length) {
-      result.entries = rankEntries(entries, surface);
-      result.best = result.entries[0] ?? null;
+    const variants = new Set(kanaSearchVariants(surface));
+    const exact = rankEntries(
+      this.lookupSurfaceStrict(surface, 20).filter((e) => !isRedirectEntry(e) && e.score >= 0),
+      surface,
+    );
+
+    const tree = this.getConjugationTree(surface);
+    const treeEntry = tree?.root_seq ? this.getEntry(Number(tree.root_seq)) : null;
+
+    const kanaSurface = !KANJI_RE.test(surface);
+    const isKanaPrimary = (e: DictEntry) =>
+      !(e.kanji ?? []).length && (e.readings ?? []).some((r) => variants.has(r));
+    const exactCommon = exact.some((e) => e.common);
+    const commonKanaPrimary = exact.some((e) => e.common && isKanaPrimary(e));
+
+    const treeFirst =
+      !!tree &&
+      !!treeEntry &&
+      (!exact.length ||
+        (treeEntry.common && !exactCommon) ||
+        (kanaSurface && treeEntry.common && !commonKanaPrimary));
+
+    if (treeFirst && tree && treeEntry) {
+      const steps = tree.steps ?? [];
+      result.entries = [treeEntry, ...exact.filter((e) => e.seq !== treeEntry.seq)];
+      result.best = treeEntry;
+      result.source_text = tree.root_text;
+      result.conj_type = steps.length ? String(steps[steps.length - 1]!.conjType ?? "") || null : null;
+      result.conjugation = tree;
       return result;
     }
 
+    if (exact.length) {
+      result.entries = exact;
+      result.best = exact[0] ?? null;
+      return result;
+    }
+
+    // Kanji-prefix fallback: only when deinflection found nothing (思い出した must reach
+    // 思い出す via the tree before the stem 思い出 wins as a noun).
     const prefix = kanjiPrefix(surface);
     if (prefix) {
-      entries = this.lookupSurface(prefix, 20);
+      const entries = rankEntries(
+        this.lookupSurfaceStrict(prefix, 20).filter((e) => !isRedirectEntry(e) && e.score >= 0),
+        prefix,
+      );
       if (entries.length) {
-        result.entries = rankEntries(entries, prefix);
-        result.best = result.entries[0] ?? null;
+        result.entries = entries;
+        result.best = entries[0] ?? null;
         return result;
       }
     }
 
-    const tree = this.getConjugationTree(surface);
-    if (tree && tree.root_seq) {
-      const entry = this.getEntry(Number(tree.root_seq));
-      if (entry) {
-        const steps = tree.steps ?? [];
-        result.entries = [entry];
-        result.best = entry;
-        result.source_text = tree.root_text;
-        result.conj_type = steps.length ? String(steps[steps.length - 1]!.conjType ?? "") || null : null;
-        result.conjugation = tree;
-        return result;
+    // Last resort: spelling-tolerant kana matching (variant forms the strict pass missed).
+    if (JAPANESE_RE.test(surface)) {
+      const fuzzy = rankEntries(
+        rowsToUniqueEntries(this.fuzzyKanaTermRows(surface, 100), 20).filter((e) => !isRedirectEntry(e)),
+        surface,
+      );
+      if (fuzzy.length) {
+        result.entries = fuzzy;
+        result.best = fuzzy[0] ?? null;
       }
     }
     return result;

@@ -1,6 +1,7 @@
 import { FC } from "react";
 
 import { default as ReactSelect, Props } from "react-select";
+import { useOverlayPortalTarget } from "@src/hooks/useOverlayPortalTarget";
 
 const customStyles = {
   control: (baseStyles, _state) => ({
@@ -57,13 +58,16 @@ const theme = (theme) => ({
 });
 
 export const Select: FC<Props> = (props) => {
+  // Full-screen renders only the fullscreen element's subtree — the menu must portal there,
+  // not into document.body, or it opens invisibly.
+  const portalTarget = useOverlayPortalTarget();
   return (
     <div style={{ width: "100%", minWidth: "160px" }}>
       <ReactSelect
         {...props}
         styles={customStyles}
         theme={theme}
-        menuPortalTarget={document.body}
+        menuPortalTarget={portalTarget}
         menuPosition="fixed"
       />
     </div>

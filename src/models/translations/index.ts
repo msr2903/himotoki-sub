@@ -119,13 +119,18 @@ sample({
     const key = lookupKeyOf(payload);
     if (!key || pendings[key]) return false;
     const cached = lookups[key];
-    return !cached || Boolean(cached.error);
+    // A "none" result means the dictionary was not installed at lookup time — retry on the
+    // next request instead of caching the install hint forever.
+    return !cached || Boolean(cached.error) || cached.lookupSource === "none";
   },
   fn: (_, payload) => ({ source: lookupKeyOf(payload) }),
   target: fetchWordTranslationFx,
 });
 
 $lookups.on(fetchWordTranslationFx.doneData, (all, translation) => ({ ...all, [translation.source]: translation }));
+// Dictionary installs/updates/removals flip $dictReady; cached entries resolved under the
+// old availability (install hints, or entries from a removed dictionary) are invalidated.
+$lookups.reset($dictReady.updates);
 // Any resolved lookup tells us for free whether the local dictionary is currently serving.
 $dictReady.on(fetchWordTranslationFx.doneData, (ready, translation) =>
   translation.lookupSource === "local" ? true : translation.lookupSource === "none" ? false : ready,
@@ -190,12 +195,34 @@ sample({
   target: fetchSubTranslationFx,
 });
 
+const lineTranslationDone = createEvent<{ source: string; text: string }>();
+const lineTranslationFailed = createEvent<{ source: string; error: string }>();
+
+// Results only land while the request's language/service still matches the current
+// settings — a response that lands after a switch must not be cached under the new one.
+sample({
+  clock: fetchSubTranslationFx.done,
+  source: { language: $translateLanguage, service: $translationService },
+  filter: ({ language, service }, { params }) =>
+    params.language === language && params.translationService === service,
+  fn: (_, { params, result }) => ({ source: params.source, text: result }),
+  target: lineTranslationDone,
+});
+sample({
+  clock: fetchSubTranslationFx.fail,
+  source: { language: $translateLanguage, service: $translationService },
+  filter: ({ language, service }, { params }) =>
+    params.language === language && params.translationService === service,
+  fn: (_, { params, error }) => ({
+    source: params.source,
+    error: error instanceof Error ? error.message : String(error),
+  }),
+  target: lineTranslationFailed,
+});
+
 $lineTranslations
-  .on(fetchSubTranslationFx.done, (all, { params, result }) => ({ ...all, [params.source]: { text: result } }))
-  .on(fetchSubTranslationFx.fail, (all, { params, error }) => ({
-    ...all,
-    [params.source]: { text: "", error: error instanceof Error ? error.message : String(error) },
-  }))
+  .on(lineTranslationDone, (all, { source, text }) => ({ ...all, [source]: { text } }))
+  .on(lineTranslationFailed, (all, { source, error }) => ({ ...all, [source]: { text: "", error } }))
   // A different target language or service invalidates everything.
   .reset($translateLanguage.updates, $translationService.updates);
 $lineTranslationPendings

@@ -54,17 +54,21 @@ class DeepLTranslateFetcher {
   }
 
   async getFullTextTranslation({ text, lang }: TRequest): Promise<string> {
+    // Settings use Google-style codes (zh-CN, zh-TW, en, ...); DeepL expects its own codes.
+    const targetLang = this.getDeepLLanguageCode(lang);
     if (!this.#apiKey || !this.#apiKey.length) {
       const response = await query({
         text,
         source_lang: "auto",
-        target_lang: lang,
+        // deeplx types only accept its own small union, but passes the code through to DeepL.
+        target_lang: targetLang as TRequest["lang"],
       });
 
       if (response.code === 200) {
         return response.data;
       } else {
-        throw new Error(`DeepL API error: ${response}`);
+        const detail = response.message ?? (response.code !== undefined ? `code ${response.code}` : JSON.stringify(response));
+        throw new Error(`DeepL API error: ${detail}`);
       }
     }
 
@@ -77,7 +81,7 @@ class DeepLTranslateFetcher {
         },
         body: JSON.stringify({
           text: [text],
-          target_lang: lang,
+          target_lang: targetLang,
         }),
       });
 
@@ -104,7 +108,7 @@ class DeepLTranslateFetcher {
   private getDeepLLanguageCode(googleLangCode: string): string {
     const langMap: Record<string, string> = {
       zh: "ZH",
-      "zh-cn": "ZH",
+      "zh-cn": "ZH-HANS",
       "zh-tw": "ZH-HANT",
       en: "EN-US",
       de: "DE",

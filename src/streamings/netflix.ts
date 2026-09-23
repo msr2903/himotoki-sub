@@ -2,7 +2,7 @@ import { esRenderSetings } from "@src/models/settings";
 import Service from "./service";
 import { parse, subTitleType } from "subtitle";
 import { esSubsChanged, subsReloadRequested } from "@src/models/subs";
-import { adBreakDurationMs, primaryTrackKey } from "./netflixHelpers";
+import { adBreakDurationMs, primaryTrackKey, resyncSubsWithAdBreaks } from "./netflixHelpers";
 
 const WEBVTT = "webvtt-lssdh-ios8";
 
@@ -129,8 +129,11 @@ class Netflix implements Service {
       console.log("getSubs from server", this.adBreaks);
       const resp = await fetch(subCacheItem.url);
       const data = await resp.text();
-      const subs = parse(data);
-      subCacheItem.originalData = subs;
+      const parsed = parse(data);
+      subCacheItem.originalData = parsed;
+      // Breaks can already be known on the first fetch (ad state arrives while the request
+      // is in flight) — apply them now instead of recording them as already applied.
+      const subs = this.resyncSubsWithAds(parsed);
       subCacheItem.data = subs;
       subCacheItem.adBreaks = JSON.parse(JSON.stringify(this.adBreaks));
       return subs;
@@ -272,23 +275,7 @@ class Netflix implements Service {
   }
 
   private resyncSubsWithAds(subs: subTitleType[]) {
-    const adBreak = this.adBreaks[this.adBreaks.length - 1];
-    console.log("resynced with time: ", adBreak.durationMs);
-
-    subs = subs.map((sub) => {
-      if (Number(sub.start) >= adBreak.locationMs) {
-        const start = Number(sub.start) + adBreak.durationMs;
-        const end = Number(sub.end) + adBreak.durationMs;
-
-        return Object.assign({}, sub, {
-          start,
-          end,
-        });
-      } else {
-        return sub;
-      }
-    });
-    return subs;
+    return resyncSubsWithAdBreaks(subs ?? [], this.adBreaks);
   }
 }
 

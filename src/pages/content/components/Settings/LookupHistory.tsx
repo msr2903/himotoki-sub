@@ -3,6 +3,7 @@ import { useUnit } from "effector-react";
 
 import { $lookupHistory, historyCleared, historyItemRemoved } from "@src/models/history";
 import { moveToTimeRequested } from "@src/models/videos";
+import { urlWithTimestamp, videoKeyFromUrl } from "@src/shared/lookupHistory";
 
 const formatTime = (ms: number): string => {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -20,6 +21,11 @@ export const LookupHistory: FC = () => {
     historyCleared,
   ]);
 
+  // A timestamp only means something in the video it was recorded in: same video → seek; a
+  // different video → open the original URL (with a t= hint where the player supports it) instead
+  // of seeking the current video to a meaningless position.
+  const currentVideoKey = videoKeyFromUrl(typeof location !== "undefined" ? location.href : undefined);
+
   return (
     <div className="es-lookup-history">
       <div className="es-lookup-history__head">
@@ -34,14 +40,27 @@ export const LookupHistory: FC = () => {
         <p className="es-lookup-history__empty">No lookups yet — hover or click words to build your history.</p>
       ) : (
         <ul className="es-lookup-history__list">
-          {history.slice(0, 50).map((item) => (
+          {history.slice(0, 50).map((item) => {
+            const sameVideo = item.videoTimeMs != null && item.videoKey != null && item.videoKey === currentVideoKey;
+            const otherVideoUrl =
+              !sameVideo && item.videoTimeMs != null && item.videoUrl ? urlWithTimestamp(item.videoUrl, item.videoTimeMs) : null;
+            return (
             <li key={item.key} className="es-lookup-history__item">
               <button
                 type="button"
                 className="es-lookup-history__word"
-                title={item.videoTimeMs != null ? "Jump to when you looked it up" : undefined}
-                disabled={item.videoTimeMs == null}
-                onClick={() => item.videoTimeMs != null && seek(item.videoTimeMs)}
+                title={
+                  sameVideo
+                    ? "Jump to when you looked it up"
+                    : otherVideoUrl
+                      ? `Looked up in ${item.videoTitle || "another video"} — open it there`
+                      : undefined
+                }
+                disabled={item.videoTimeMs == null || (!sameVideo && !otherVideoUrl)}
+                onClick={() => {
+                  if (sameVideo && item.videoTimeMs != null) seek(item.videoTimeMs);
+                  else if (otherVideoUrl) window.open(otherVideoUrl, "_blank", "noopener");
+                }}
               >
                 <span className="es-lookup-history__headword">{item.headword}</span>
                 {item.reading && <span className="es-lookup-history__reading">{item.reading}</span>}
@@ -57,7 +76,8 @@ export const LookupHistory: FC = () => {
                 ×
               </button>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

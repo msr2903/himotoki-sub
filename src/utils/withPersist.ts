@@ -20,7 +20,11 @@ export const withPersist = <State>(store: StoreWritable<State>, config: PersistC
   }
   const persistKey = persistKeyFor(name);
   const rehydrate = createEvent<State>(`@PERSIST/REHYDRATE/${name}`);
-  let lastSerialized: string | null = null;
+  // Seeding lastSerialized with the current state stops the watch below from writing the
+  // default over storage before the async get lands — that write's onChanged would then
+  // rehydrate the store back to the default and wipe every saved setting.
+  let lastSerialized = JSON.stringify(store.getState());
+  const initialSerialized = lastSerialized;
 
   store.on(rehydrate, (_, value) => value);
 
@@ -34,8 +38,11 @@ export const withPersist = <State>(store: StoreWritable<State>, config: PersistC
     }
   };
 
-  // Read before the first write below so the stored value wins over the default.
-  chrome.storage.local.get([persistKey], (result) => applyRaw(result[persistKey]));
+  chrome.storage.local.get([persistKey], (result) => {
+    // Hydrate only if nothing wrote to the store meanwhile: a local change already
+    // persisted itself and must not be clobbered by a late-arriving stored value.
+    if (JSON.stringify(store.getState()) === initialSerialized) applyRaw(result[persistKey]);
+  });
 
   store.watch((state) => {
     const serialized = JSON.stringify(state);

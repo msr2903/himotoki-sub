@@ -105,6 +105,34 @@ Serves the built dictionary locally, installs it through the extension, then che
 
 `←` / `→` previous / next line (with `alt` to force), `↓` repeat line, `D` cycle the second subtitle line, `R` replay the current line, `L` loop the current line, `B` open the local sentence breakdown, `T` open the searchable transcript. All are ignored while typing in an input.
 
+## Debugging the subtitle pipeline
+
+The pipeline is `rawSubs (per-service fetch/observer) → $rawSubs → processJapaneseSubsFx (Intl.Segmenter paint, then ONNX upgrade via the offscreen document) → $subs → $currentSubs → Subs.tsx`. Work stage by stage: first find where the data stops looking right, then debug that stage in isolation.
+
+### Reading the pipeline state
+
+- **Content script console** (`DevTools → Console`, frame = the video page): `console.log` in `src/models/subs/init.ts` / `appendRawSubs.ts`. The `TSub[]` store state is not reachable from the page console — log it, or poke it through the e2e hooks below.
+- **Offscreen document** (`chrome://extensions → Himotoki → "Inspect views: offscreen.html"`): ONNX split errors (`Session already started` = concurrent `session.run` — inference is serialized through `runExclusive` in `src/pages/offscreen/index.ts`), dictionary worker traffic.
+- **Background worker** (`chrome://extensions → service worker` link): `himotokiSplit`/`himotokiDict`/`himotokiLookup` message relay, dictionary download/import progress.
+- **Persisted settings**: `chrome.storage.local.get(null)` in any extension page console shows `persist:<name>` keys; `withPersist` writes them JSON-encoded.
+
+### Reproducing without a video site
+
+- **Unit tests** are the fastest repro for pure logic: `npx vitest run <file>` — cue merging (`appendRawSubs.test.ts`), deinflection (`lookup.test.ts` runs real SQL against an in-memory fixture via `node:sqlite`), furigana segmentation, history helpers.
+- **Dictionary harness** (`/tmp/dict-harness/`): bundle `src/dict/lookup.ts` with `npx esbuild --bundle --format=cjs`, then query a built `jitendex-lite.sqlite` with Node ≥22's `node:sqlite`. This answers "what should 見合わせた resolve to?" in seconds without a browser. `check.cjs` holds the regression surfaces (書いた→書く, した→する, 勝てる→勝つ, …).
+- **`pnpm test` regression checks** (`scripts/e2e/regressions.mjs`) run the real built `dist/` in Chromium with stubbed video/subs — use it for startup and model-wiring bugs.
+- **`pnpm test:e2e` (`scripts/e2e/youtube.mjs`)** on a captioned video for the full path; `HIMOTOKI_E2E_WORD`/`HIMOTOKI_E2E_TIME` aim at a specific token. Screenshots land in `/tmp/himotoki-e2e-*.png`.
+- **`node scripts/e2e/dict.mjs <dictDir>`** for the installed-dictionary path (lookup, repair, OPFS persistence).
+
+### Signatures worth recognizing
+
+- **Last caption lingers ~100 s** → the service's observer never emitted a clearing cue (see `amazon.ts` — emit an empty zero-length cue on text loss).
+- **Segmentation silently coarser** → a batch failed and everything fell back to `Intl.Segmenter`; check the offscreen console for `Session already started` (concurrency) or WASM load errors.
+- **Subtitles drift only after ads** → Netflix ad-break resync; `netflixHelpers.resyncSubsWithAdBreaks` is the pure function to unit-test.
+- **No captions after SPA navigation** → `ytInitialPlayerResponse` is stale; `youtube.js` must read `movie_player.getPlayerResponse()` and guard by `videoDetails.videoId` vs the URL.
+- **Lookups stuck at "not installed" after installing** → `$lookups` caches `lookupSource:"none"` results; they must be retried, and the cache reset on `$dictReady` changes.
+- **UI doubled or detached after remount** (`#es`, `.es-settings`) → a React root was orphaned; `main.tsx` keeps `Root` handles and unmounts before re-mounting.
+
 ## Showing UI changes to the user (required)
 
 For **any UI/UX refinement or visual bug fix**, the reply to the user must include **a screenshot of the result** and **a short list of what changed** — the user wants visual proof the change was actually applied, not just a description. Capture the screenshot before treating the task as done; show before/after when it clarifies the fix.

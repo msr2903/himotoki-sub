@@ -34,12 +34,16 @@ def _attach_extras(conn, opts):
 
     if opts["--pitch"]:
         conn.execute("ATTACH DATABASE ? AS pitchdb", (opts["--pitch"],))
-        # One pattern per (expression, reading); take the first.
+        # One pattern per (expression, reading); take the first. Kana-only headwords are
+        # stored with reading='' in the source table but reading=expression in term.
         conn.execute(
             """
             UPDATE term SET pitch = (
               SELECT patterns FROM pitchdb.pitch p
-              WHERE p.expression = term.expression AND p.reading = term.reading LIMIT 1
+              WHERE p.expression = term.expression
+                AND (p.reading = term.reading
+                     OR (p.reading = '' AND term.reading = term.expression))
+              LIMIT 1
             ) WHERE pitch IS NULL
             """
         )
@@ -48,12 +52,14 @@ def _attach_extras(conn, opts):
 
     if opts["--freq"]:
         conn.execute("ATTACH DATABASE ? AS freqdb", (opts["--freq"],))
-        # Smallest rank (most frequent) per (expression, reading).
+        # Smallest rank (most frequent) per (expression, reading); same kana-only join as pitch.
         conn.execute(
             """
             UPDATE term SET freq = (
               SELECT CAST(MIN(f.value) AS INTEGER) FROM freqdb.freq f
-              WHERE f.expression = term.expression AND f.reading = term.reading
+              WHERE f.expression = term.expression
+                AND (f.reading = term.reading
+                     OR (f.reading = '' AND term.reading = term.expression))
             ) WHERE freq IS NULL
             """
         )
@@ -62,20 +68,37 @@ def _attach_extras(conn, opts):
 
     if opts["--jlpt"]:
         conn.execute("ATTACH DATABASE ? AS jlptdb", (opts["--jlpt"],))
+        # A seq can be listed at several levels, one row per spelling/reading (来る is n5
+        # as 来る/くる but n1 as 来る/きたる). Prefer the row matching this term's
+        # expression+reading; otherwise take the easiest level (level DESC puts n5 first).
         conn.execute(
             """
-            UPDATE term SET jlpt = (
-              SELECT j.level FROM jlptdb.jlpt_word j WHERE j.seq = term.sequence LIMIT 1
+            UPDATE term SET jlpt = COALESCE(
+              (SELECT j.level FROM jlptdb.jlpt_word j
+                WHERE j.seq = term.sequence
+                  AND (j.reading = term.reading OR j.expression = term.expression)
+                ORDER BY (j.expression = term.expression AND j.reading = term.reading) DESC,
+                         (j.reading = term.reading) DESC,
+                         j.level DESC
+                LIMIT 1),
+              (SELECT j.level FROM jlptdb.jlpt_word j
+                WHERE j.seq = term.sequence
+                ORDER BY j.level DESC
+                LIMIT 1)
             ) WHERE jlpt IS NULL
             """
         )
         conn.commit()
         conn.execute("DETACH DATABASE jlptdb")
 
-    # Mark the build as extras-enhanced so clients on a plain build are offered the update once.
+    # Mark the build as extras-enhanced so clients on a plain build are offered the update.
+    # '+pf2' supersedes the older '+pf' marker (kana-only pitch/freq join + per-reading JLPT);
+    # stripping any existing '+pf*' suffix first keeps the marker idempotent across rebuilds.
     if any(opts.values()):
         conn.execute(
-            "UPDATE meta SET value = value || '+pf' WHERE key = 'revision' AND value NOT LIKE '%+pf'"
+            "UPDATE meta SET value = CASE WHEN value LIKE '%+pf%' "
+            "THEN substr(value, 1, instr(value, '+pf') - 1) ELSE value END || '+pf2' "
+            "WHERE key = 'revision'"
         )
 
 
@@ -100,6 +123,11 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         work = os.path.join(tmp, "work.sqlite")
         shutil.copyfile(src, work)
+        # WAL-mode sources keep recent pages in sidecar files; copy them along so the
+        # working copy isn't silently behind the live database.
+        for suffix in ("-wal", "-shm"):
+            if os.path.exists(src + suffix):
+                shutil.copyfile(src + suffix, work + suffix)
         conn = sqlite3.connect(work)
         conn.execute("PRAGMA journal_mode=DELETE")
         names = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")]
