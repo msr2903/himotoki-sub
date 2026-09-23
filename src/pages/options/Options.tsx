@@ -273,7 +273,7 @@ const Options: FC = () => {
     (v): v is boolean => typeof v === "boolean",
   );
   // Persist key from the word-status feature; read defensively so export works with or without it.
-  const [wordStatuses] = usePersistedSetting<Record<string, string>>(
+  const [wordStatuses, setWordStatuses] = usePersistedSetting<Record<string, string>>(
     "wordStatuses",
     {},
     (v): v is Record<string, string> => typeof v === "object" && v !== null && !Array.isArray(v),
@@ -295,6 +295,12 @@ const Options: FC = () => {
   };
 
   const exportCount = new Set([...knownWords, ...Object.keys(wordStatuses)]).size;
+  // Effective known set: explicit "known" statuses plus legacy-array keys with no status
+  // override (statusOf semantics — an explicit non-known status wins over the array).
+  const knownCount = new Set([
+    ...Object.keys(wordStatuses).filter((k) => wordStatuses[k] === "known"),
+    ...knownWords.filter((k) => !(k in wordStatuses)),
+  ]).size;
   const exportWords = (format: "json" | "csv") => {
     const rows = buildRows(knownWords, wordStatuses);
     const today = new Date().toISOString().slice(0, 10);
@@ -303,39 +309,57 @@ const Options: FC = () => {
   };
 
   const [activeNav, setActiveNav] = useState<string>(SETTINGS_NAV[0].id);
-  const suppressObserver = useRef(false);
+  const suppressScrollSpy = useRef(false);
+  const pickActiveRef = useRef<(() => void) | null>(null);
 
-  // Highlight the nav item for whichever section is in view (like himotoki.my.id).
+  // Highlight the nav item for whichever section is in view (like himotoki.my.id). A plain
+  // scroll listener picks the last section whose top has crossed the 30% line — an
+  // IntersectionObserver ratio contest can never select the final, short section.
   useEffect(() => {
     const nodes = SETTINGS_NAV.map((item) => document.getElementById(`settings-${item.id}`)).filter(
       (n): n is HTMLElement => Boolean(n),
     );
     if (!nodes.length) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (suppressObserver.current) return;
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-        const id = visible[0]?.target?.id?.replace(/^settings-/, "");
-        if (id) setActiveNav(id);
-      },
-      { rootMargin: "-20% 0px -60% 0px", threshold: [0.1, 0.35, 0.6] },
-    );
-    for (const node of nodes) observer.observe(node);
-    return () => observer.disconnect();
+    const pickActive = () => {
+      if (suppressScrollSpy.current) return;
+      const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+      if (atBottom) {
+        setActiveNav(SETTINGS_NAV[SETTINGS_NAV.length - 1]!.id);
+        return;
+      }
+      const line = window.innerHeight * 0.3;
+      let active: string = SETTINGS_NAV[0].id;
+      for (const node of nodes) {
+        if (node.getBoundingClientRect().top <= line) active = node.id.replace(/^settings-/, "");
+      }
+      setActiveNav(active);
+    };
+    pickActiveRef.current = pickActive;
+    window.addEventListener("scroll", pickActive, { passive: true });
+    window.addEventListener("resize", pickActive);
+    pickActive();
+    return () => {
+      pickActiveRef.current = null;
+      window.removeEventListener("scroll", pickActive);
+      window.removeEventListener("resize", pickActive);
+    };
   }, []);
 
   const scrollToSection = (id: string) => {
     const el = document.getElementById(`settings-${id}`);
     if (!el) return;
     setActiveNav(id);
-    // Don't let the observer fight the smooth scroll's intermediate sections.
-    suppressObserver.current = true;
+    // Don't let the scroll spy fight the smooth scroll's intermediate sections — release when
+    // the scroll settles (scrollend), with a timeout as fallback. Re-pick on release: nothing
+    // else refires if the page is already settled.
+    suppressScrollSpy.current = true;
     el.scrollIntoView({ behavior: "smooth", block: "start" });
-    window.setTimeout(() => {
-      suppressObserver.current = false;
-    }, 600);
+    const release = () => {
+      suppressScrollSpy.current = false;
+      pickActiveRef.current?.();
+    };
+    if ("onscrollend" in window) window.addEventListener("scrollend", release, { once: true });
+    window.setTimeout(release, 1200);
   };
 
   return (
@@ -423,8 +447,23 @@ const Options: FC = () => {
               control={<input id="dim-known" type="checkbox" checked={dimKnown} onChange={(e) => setDimKnown(e.target.checked)} />}
             />
             <div className="row">
-              <span className="row-desc">{knownWords.length} word{knownWords.length === 1 ? "" : "s"} marked known.</span>
-              {knownWords.length > 0 && <button type="button" className="es-options-link" onClick={() => setKnownWords([])}>Forget all</button>}
+              <span className="row-desc">{knownCount} word{knownCount === 1 ? "" : "s"} marked known.</span>
+              {knownCount > 0 && (
+                <button
+                  type="button"
+                  className="es-options-link"
+                  onClick={() => {
+                    setKnownWords([]);
+                    // "known" entries in the status map win over the legacy array, so they
+                    // must be cleared too — otherwise forgotten words stay Known.
+                    setWordStatuses(
+                      Object.fromEntries(Object.entries(wordStatuses).filter(([, s]) => s !== "known")),
+                    );
+                  }}
+                >
+                  Forget all
+                </button>
+              )}
             </div>
             <Row
               title="Rich Anki cards"

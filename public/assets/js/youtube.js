@@ -1,14 +1,39 @@
+function videoIdFromUrl() {
+  const m = location.href.match(/^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|live\/|shorts\/|watch\?v=|&v=)([^#&?]*).*/);
+  return m && m[2].length === 11 ? m[2] : "";
+}
+
+function captionTracksFromResponse(resp) {
+  if (!resp) return [];
+  // During SPA navigation a stale response still describes the previous video — only
+  // trust it when its videoId matches the URL (or the URL carries no id to compare).
+  const vid = resp.videoDetails && resp.videoDetails.videoId;
+  const urlVid = videoIdFromUrl();
+  if (vid && urlVid && vid !== urlVid) return [];
+  const tracks = resp.captions && resp.captions.playerCaptionsTracklistRenderer
+    ? resp.captions.playerCaptionsTracklistRenderer.captionTracks
+    : null;
+  return Array.isArray(tracks) && tracks.length ? tracks : [];
+}
+
 function getCaptionTracksFromPage() {
   try {
-    const fromInitial =
-      window.ytInitialPlayerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-    if (Array.isArray(fromInitial) && fromInitial.length) return fromInitial;
+    // movie_player.getPlayerResponse() is live and follows SPA navigation;
+    // ytInitialPlayerResponse is only written on the initial document load and goes stale.
+    const player = document.getElementById("movie_player");
+    const live =
+      player && typeof player.getPlayerResponse === "function" ? player.getPlayerResponse() : null;
+    const fromPlayer = captionTracksFromResponse(live);
+    if (fromPlayer.length) return fromPlayer;
+
+    const fromInitial = captionTracksFromResponse(window.ytInitialPlayerResponse);
+    if (fromInitial.length) return fromInitial;
 
     const raw = window.ytplayer?.config?.args?.player_response;
     if (raw) {
       const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-      const fromConfig = parsed?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-      if (Array.isArray(fromConfig) && fromConfig.length) return fromConfig;
+      const fromConfig = captionTracksFromResponse(parsed);
+      if (fromConfig.length) return fromConfig;
     }
   } catch {
     // player response not ready yet

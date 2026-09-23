@@ -50,6 +50,14 @@ import { statusOf } from "@src/shared/wordStatus";
 import { PhraseRange, clampRange, isIndexSelected, joinItems, rangeLength } from "@src/shared/phraseSelection";
 import { getLearningService } from "@src/utils/getLearningService";
 import { useLineTranslation } from "@src/pages/content/hooks/useLineTranslation";
+import { useRubySegments } from "@src/pages/content/hooks/useRubySegments";
+import { parseAnkiTags } from "@src/shared/ankiSettings";
+import {
+  $ankiCardTheme,
+  $ankiDeck,
+  $ankiRichCards,
+  $ankiTags,
+} from "@src/models/settings";
 
 type TSubsProps = {};
 
@@ -155,8 +163,31 @@ export const Subs: FC<TSubsProps> = () => {
 
   const fontSizePx = video ? ((video.clientWidth / 100) * subsFontSize) / 43 : subsFontSize * 0.5;
 
+  // Clicks after a real drag must not pin a word or fire a line translation; the cancel list keeps
+  // text selection and scrollbar drags inside the pop-ups/panels from moving the overlay.
+  const dragDistance = useRef(0);
+  const swallowClickAfterDrag = () => {
+    const swallow = (event: Event) => {
+      event.stopPropagation();
+      event.preventDefault();
+    };
+    document.addEventListener("click", swallow, { capture: true, once: true });
+    window.setTimeout(() => document.removeEventListener("click", swallow, { capture: true }), 0);
+  };
+
   return (
-    <Draggable>
+    <Draggable
+      cancel=".es-word-translation, .es-transcript, .es-breakdown, .es-phrase-bar, .es-full-translation, .es-sub-secondary, .es-sub-reading-line, .es-token-label, input, textarea, select, button, a"
+      onStart={() => {
+        dragDistance.current = 0;
+      }}
+      onDrag={(_e, data) => {
+        dragDistance.current += Math.abs(data.deltaX) + Math.abs(data.deltaY);
+      }}
+      onStop={() => {
+        if (dragDistance.current > 5) swallowClickAfterDrag();
+      }}
+    >
       <div
         id="es-subs"
         className={`${listeningMode ? "es-subs--listening" : ""} ${listeningPeek ? "es-subs--peek" : ""}`}
@@ -255,18 +286,57 @@ const Sub: FC<{ sub: TSub; secondary: boolean; furigana: TFuriganaMode; readingL
 
 /** Action bar for a selected multi-token phrase: translate it or save it, then clear. */
 const PhraseBar: FC<{ phrase: string; contextSentence?: string; onClose: () => void }> = ({ phrase, contextSentence, onClose }) => {
-  const [learningService] = useUnit([$learningService]);
+  const [learningService, ankiDeck, ankiTags, ankiCardTheme, ankiRichCards] = useUnit([
+    $learningService,
+    $ankiDeck,
+    $ankiTags,
+    $ankiCardTheme,
+    $ankiRichCards,
+  ]);
   const [showTranslation, setShowTranslation] = useState(false);
+  const [saveAfterTranslate, setSaveAfterTranslate] = useState(false);
   const { translation, pending } = useLineTranslation(showTranslation ? phrase : "");
 
-  const handleSave = () => {
+  const doSave = (meaning: string) => {
     const service = getLearningService(learningService);
     if (!service) return;
     service
-      .addWord(phrase, translation || phrase, { contextSentence: contextSentence || phrase, context: contextSentence || phrase })
+      .addWord(phrase, meaning, {
+        contextSentence: contextSentence || phrase,
+        context: contextSentence || phrase,
+        richCards: ankiRichCards,
+        cardTheme: ankiCardTheme,
+        deckName: ankiDeck,
+        tags: parseAnkiTags(ankiTags),
+      })
       .then((value) => toast.success(value))
       .catch((error) => toast.error(typeof error === "string" ? error : error?.message || String(error)));
   };
+
+  const handleSave = () => {
+    // Himotoki favorites need a dictionary entry (seq); a multi-word phrase has none, so saving
+    // there would always fail — say so instead of pretending the save went through.
+    if (learningService === "himotoki") {
+      toast.error("Phrase saving works with Anki — Himotoki favorites are for single dictionary words.");
+      return;
+    }
+    if (translation) {
+      doSave(translation);
+      return;
+    }
+    // Fetch the machine translation first so the card's meaning isn't the Japanese phrase itself.
+    setShowTranslation(true);
+    setSaveAfterTranslate(true);
+  };
+
+  useEffect(() => {
+    if (!saveAfterTranslate || pending) return;
+    if (translation) {
+      setSaveAfterTranslate(false);
+      doSave(translation);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveAfterTranslate, translation, pending]);
 
   return (
     <div className="es-phrase-bar" onClick={(e) => e.stopPropagation()}>
@@ -327,6 +397,11 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
   const action: TTokenAction = pinned ? clickAction : hovered ? hoverAction : "none";
   // Inline ruby over kanji tokens: always, or only while hovered.
   const showRuby = isWord && hasKanji(subItem.text) && (furigana === "always" || (furigana === "hover" && hovered));
+  // showRuby is only the intent — ruby can still fall back to plain text (difficulty gate, pending
+  // lookup, no reading). The label must show the reading in exactly those cases, not just when
+  // ruby is disabled.
+  const rubySegments = useRubySegments(subItem, showRuby);
+  const rubyVisible = rubySegments !== null;
   // Dimming, status colouring and difficulty colouring all resolve the token, so look up only when
   // one of them needs it. Statuses are only worth resolving once the user has marked some words.
   const hasStatuses = Object.keys(wordStatuses).length > 0;
@@ -400,7 +475,7 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
       className={`es-sub-item ${subItem.tag} ${action !== "none" ? "es-sub-item-active" : ""} ${pinned ? "es-sub-item-pinned" : ""} ${isKnown ? "es-sub-item--known" : ""} ${isLearning ? "es-sub-item--learning" : ""} ${isIgnored ? "es-sub-item--ignored" : ""} ${selected ? "es-sub-item--selected" : ""} ${jlptClass}`}
       onClick={handleClick}
     >
-      {showRuby ? <TokenRuby subItem={subItem} /> : subItem.text}
+      {rubyVisible ? <TokenRuby subItem={subItem} /> : subItem.text}
       {action === "popup" && (
         <SubItemTranslation
           subItem={subItem}
@@ -411,7 +486,7 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
         />
       )}
       {(action === "furigana" || action === "meaning" || action === "both") && (
-        <TokenLabel subItem={subItem} mode={action} showReading={!showRuby} offsetForRuby={showRuby} />
+        <TokenLabel subItem={subItem} mode={action} showReading={!rubyVisible} offsetForRuby={rubyVisible} />
       )}
     </pre>
   );

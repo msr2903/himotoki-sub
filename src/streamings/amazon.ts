@@ -22,18 +22,20 @@ class Amazon implements Service {
         const videoElement = document.querySelector("video");
         if (!subtitleSource || !videoElement) return;
         // The observer fires on every DOM mutation; only emit when the caption text actually changes,
-        // otherwise every mutation appended another overlapping cue for the same line.
+        // otherwise every mutation appended another overlapping cue for the same line. A cleared
+        // caption still emits (empty text, zero length) so the previous cue's end is clamped and a
+        // repeated line after a gap is not swallowed by the de-dup.
         let lastContent = "";
         const subtitleObserver = new MutationObserver(() => {
           const subtitleParts = subtitleSource.querySelectorAll(".atvwebplayersdk-captions-text");
           const subtitleContent = [...subtitleParts].map((el) => getText(el)).join("\n").trim();
-          if (!subtitleContent || subtitleContent === lastContent) return;
+          if (subtitleContent === lastContent) return;
           lastContent = subtitleContent;
           const startTime = videoElement.currentTime;
           rawSubsAdded([
             {
               start: startTime * 1000,
-              end: (startTime + 100) * 1000,
+              end: subtitleContent ? (startTime + 100) * 1000 : startTime * 1000,
               text: subtitleContent,
             },
           ]);

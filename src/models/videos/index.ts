@@ -35,12 +35,8 @@ export const moveFx = createEffect<TMoveFX, void>(({ video, subs, streaming, dir
 
   if (direction === "next") {
     const currentTime = video.currentTime * 1000;
-    if (currentSubs.length < 2) {
-      // use regular move if we don't have subs
-      moveVideoToTime(video, streaming, currentTime + TIME_SEEK_TIME);
-      return;
-    }
-
+    // Seek to the next cue's start whenever one exists — the single-current-cue case is the normal
+    // one, and in gaps between cues subs.find still locates the upcoming line.
     const nextSub = subs.find((sub) => sub.start > currentTime);
     const isNextSubClose = nextSub && nextSub.start - currentTime <= TIME_SEEK_TIME;
 
@@ -53,19 +49,18 @@ export const moveFx = createEffect<TMoveFX, void>(({ video, subs, streaming, dir
 
   if (direction === "prev") {
     const currentTime = video.currentTime * 1000;
-    if (currentSubs.length < 2) {
-      // use regular move if we don't have subs
-      moveVideoToTime(video, streaming, currentTime - TIME_SEEK_TIME);
-      return;
-    }
+    // Anchor on the cue before the current position: the cue before the one on screen, or — in a
+    // gap between cues — the last cue that already started.
+    const anchorIndex =
+      currentSubs.length > 0 ? currentSubs[0].id - 1 : subs.findLastIndex((sub) => sub.start < currentTime);
 
-    let prevSub = subs[currentSubs[0].id - 1];
+    let prevSub = anchorIndex >= 0 ? subs[anchorIndex] : undefined;
 
     if (prevSub && prevSub.end - prevSub.start < 20) {
       // if the previous subtitle is too short, we need move to the previous one
       // to avoid the situation when the previous subtitle is the same as the current one.
       // It's happening with youtube auto-generated subtitles
-      prevSub = subs[currentSubs[0].id - 2];
+      prevSub = subs[anchorIndex - 1];
     }
 
     const isPrevSubClose = prevSub && currentTime - prevSub.end <= TIME_SEEK_TIME;

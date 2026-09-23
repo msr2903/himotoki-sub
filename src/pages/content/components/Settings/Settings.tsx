@@ -7,6 +7,7 @@ import { useUnit } from "effector-react";
 import { SettingsContent } from "./SettingsContent";
 import { MonoLogo } from "./assets/MonoLogo";
 import { Toaster } from "react-hot-toast";
+import { useOverlayPortalTarget } from "@src/hooks/useOverlayPortalTarget";
 
 type TSettingsProps = {
   contentContainer: HTMLElement;
@@ -15,6 +16,7 @@ type TSettingsProps = {
 export const Settings: FC<TSettingsProps> = () => {
   const [showSettings, setShowSettings] = useState(false);
   const streaming = useUnit($streaming);
+  const toastTarget = useOverlayPortalTarget();
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     e.stopPropagation();
@@ -34,7 +36,7 @@ export const Settings: FC<TSettingsProps> = () => {
         <div className="es-toast">
           <Toaster />
         </div>,
-        document.querySelector("body"),
+        toastTarget,
       )}
     </>
   );

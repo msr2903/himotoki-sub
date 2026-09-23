@@ -14,12 +14,13 @@ export const surfaceReading = (surface: string, headword?: string, reading?: str
   // A kana-only headword gives no way to align kanji in the surface; better no furigana than wrong furigana.
   if (!hasKanji(headword)) return null;
 
-  // 来る is irregular: 来る/来れば/来よう → く/く/こ…, 来ない/来い → こ…, otherwise 来 → き.
+  // 来る is irregular: 来る/来れば → く…, 来ない/来い/来よう/来させる/来られる/来ず/来まい/来れる → こ…,
+  // otherwise 来 → き (来た, 来て, 来ます, 来たる…).
   if (headword === "来る" && surface.startsWith("来")) {
     const rest = surface.slice(1);
     if (hasKanji(rest)) return null;
-    if (/^(る|れ|よ)/.test(rest)) return `く${rest}`;
-    if (/^(な|い|ん)/.test(rest)) return `こ${rest}`;
+    if (rest.startsWith("る") || rest.startsWith("れば")) return `く${rest}`;
+    if (/^(れ|な|い|ん|よ|さ|ら|ず|まい)/.test(rest)) return `こ${rest}`;
     return `き${rest}`;
   }
 
@@ -86,9 +87,11 @@ export const furiganaSegments = (surface: string, headword?: string, reading?: s
       p = full.length;
       continue;
     }
-    // Kanji run reading is everything up to where the following kana run begins in the reading.
-    const idx = fullH.indexOf(toHiragana(next.text), p);
-    if (idx < p) return whole;
+    // Kanji run reading is everything up to where the following kana run begins in the
+    // reading. Search from p + 1: a kanji run always has at least one kana of reading,
+    // otherwise the kana anchoring at p itself leaves the kanji with no ruby (言い方).
+    const idx = fullH.indexOf(toHiragana(next.text), p + 1);
+    if (idx <= p) return whole;
     const rt = full.slice(p, idx);
     segments.push(rt ? { text: run.text, rt } : { text: run.text });
     p = idx;

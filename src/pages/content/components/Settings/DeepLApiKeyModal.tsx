@@ -35,6 +35,13 @@ export const DeepLApiKeyModal: FC = () => {
     handleModalClose();
   };
 
+  // "Use without key" must actually drop the stored key — otherwise translations keep going to
+  // the keyed endpoint with the old key and keep failing.
+  const handleUseWithoutKey = () => {
+    handleApiKeyChange("");
+    handleModalClose();
+  };
+
   if (!isModalOpen) {
     return null;
   }
@@ -93,7 +100,7 @@ export const DeepLApiKeyModal: FC = () => {
           </button>
           <button
             className="es-modal-button es-modal-button--primary"
-            onClick={handleCancel}
+            onClick={handleUseWithoutKey}
           >
             Use without key
           </button>

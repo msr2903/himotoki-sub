@@ -1,4 +1,4 @@
-import { createRoot } from "react-dom/client";
+import { createRoot, Root } from "react-dom/client";
 import refreshOnUpdate from "virtual:reload-on-update-in-view";
 
 import { $streaming, streamingDetected } from "@src/models/streamings";
@@ -21,12 +21,34 @@ let videoWatchAttached = false;
 let settingsWatchAttached = false;
 let initializedService: { name: string } | null = null;
 
+// Removing a root's container does not unmount the tree — detached roots keep their store
+// subscriptions, effects and portals alive (duplicated toasts, orphaned panels, stray unpin
+// handlers). Keep track of every root and unmount it before re-mounting.
+let settingsRoot: Root | null = null;
+let subsRoot: Root | null = null;
+let progressRoot: Root | null = null;
+
+const unmountSettings = () => {
+  settingsRoot?.unmount();
+  settingsRoot = null;
+  document.querySelectorAll(".es-settings").forEach((e) => e.remove());
+};
+
+const unmountSubsUi = () => {
+  subsRoot?.unmount();
+  subsRoot = null;
+  progressRoot?.unmount();
+  progressRoot = null;
+  document.querySelectorAll("#es").forEach((e) => e.remove());
+  document.querySelectorAll(".es-progress-bar").forEach((e) => e.remove());
+};
+
 const mountSettings = () => {
   try {
     const streaming = $streaming.getState();
     if (!streaming || streaming.name === "stub") return;
 
-    document.querySelectorAll(".es-settings").forEach((e) => e.remove());
+    unmountSettings();
     const buttonContainer = streaming.getSettingsButtonContainer();
     const contentContainer = streaming.getSettingsContentContainer();
     if (!buttonContainer || !contentContainer) {
@@ -52,7 +74,8 @@ const mountSettings = () => {
         video?.addEventListener("timeupdate", handleTimeUpdate as EventListener);
       });
     }
-    createRoot(settingNode).render(<Settings contentContainer={contentContainer} />);
+    settingsRoot = createRoot(settingNode);
+    settingsRoot.render(<Settings contentContainer={contentContainer} />);
   } catch (error) {
     console.warn("[himotoki] failed to render settings", error);
   }
@@ -62,8 +85,7 @@ const mountSubsUi = (language: string) => {
   try {
     console.log("Event:", "esSubsChanged", language);
     removeKeyboardEventsListeners();
-    document.querySelectorAll("#es").forEach((e) => e.remove());
-    document.querySelectorAll(".es-progress-bar").forEach((e) => e.remove());
+    unmountSubsUi();
 
     // Empty language = captions off / reset (EasySubs behavior).
     if (!language) return;
@@ -80,13 +102,15 @@ const mountSubsUi = (language: string) => {
     const subsNode = document.createElement("div");
     subsNode.id = "es";
     subsContainer.appendChild(subsNode);
-    createRoot(subsNode).render(<Subs />);
+    subsRoot = createRoot(subsNode);
+    subsRoot.render(<Subs />);
 
     if (!streaming.isOnFlight()) {
       const progressBarNode = document.createElement("div");
       progressBarNode.classList.add("es-progress-bar");
       subsContainer.appendChild(progressBarNode);
-      createRoot(progressBarNode).render(<ProgressBar />);
+      progressRoot = createRoot(progressBarNode);
+      progressRoot.render(<ProgressBar />);
     }
   } catch (error) {
     console.warn("[himotoki] failed to render subs UI", error);
