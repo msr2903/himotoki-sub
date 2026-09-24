@@ -12,6 +12,7 @@ import { SubsBackgroundOpacity } from "./SubsBackgroundOpacity";
 import { CustomSubs } from "./CustomSubs";
 import { EnableProgressBar } from "./EnableProgressBar";
 import { MoveBySubs } from "./MoveBySubs";
+import { MouseActionSelect } from "./MouseActionSelect";
 import { AutoPauseBySubs } from "./AutoPauseBySubs";
 import { EnableAutoStop } from "./EnableAutoStop";
 import { ClickActionSelect, HoverActionSelect, OpenOptionsPage } from "./TokenActionSelect";
@@ -107,6 +108,15 @@ export const SettingsContent: FC<{ onClose: () => void }> = ({ onClose }) => {
               </div>
               <div className="es-settings-content__item">
                 <MoveBySubs />
+              </div>
+              <div className="es-settings-content__item">
+                <MouseActionSelect button="middle" />
+              </div>
+              <div className="es-settings-content__item">
+                <MouseActionSelect button="back" />
+              </div>
+              <div className="es-settings-content__item">
+                <MouseActionSelect button="forward" />
               </div>
               <div className="es-settings-content__item">
                 <TranslateLanguage />

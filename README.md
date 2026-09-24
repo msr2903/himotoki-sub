@@ -42,6 +42,9 @@ YouTube, Netflix, KinoPub, Coursera, Plex, Udemy, Kinopoisk, Amazon Prime Video,
 | `T` | Toggle the searchable transcript |
 | `Esc` | Close a pinned pop-up |
 
+### Mouse controls
+The middle button and the two side buttons (back / forward) can each be set to previous line, next line, replay, loop, slow replay or play/pause, from the in-player panel or the settings page. They are off by default and only act while the pointer is over the video; elsewhere they keep their normal browser behaviour.
+
 Settings live in the in-player panel, the full settings page (toolbar popup → Settings), and a welcome page on first install.
 
 ## Build
