@@ -116,58 +116,71 @@ try {
   assert.deepEqual(await page.evaluate(() => window.auditMessages), ["himotokiLookupBatch"]);
   assert.equal(before.length, 0, "Sentence breakdown must not use HTTP fallback");
   console.log("PASS Editable hotkey guard and offline-only sentence breakdown");
-  // Exercise the shipped options page with real extension storage and two open pages.
+  // Exercise the shipped options page (hub + drill-in panels) with real extension storage and two open pages.
   const options = await ctx.newPage();
   options.on("pageerror", (e) => errors.push(String(e)));
-  await options.goto(`chrome-extension://${new URL(sw.url()).host}/src/pages/options/index.html`);
+  const optionsUrl = `chrome-extension://${new URL(sw.url()).host}/src/pages/options/index.html`;
+  const persisted = (page, key, value) =>
+    page.waitForFunction(async ([key, value]) => (await chrome.storage.local.get(`persist:${key}`))[`persist:${key}`] === JSON.stringify(value), [key, value]);
+  await options.goto(optionsUrl);
+  await options.locator("#furigana").getByRole("radio", { name: "On hover" }).click();
+  await persisted(options, "furigana", "hover");
+  await options.getByRole("button", { name: /^Words/ }).click();
   await options.waitForSelector("#hover-action");
-  for (const [id, key, value] of [
-    ["hover-action", "hoverAction", "meaning"], ["click-action", "clickAction", "none"],
-    ["furigana", "furigana", "hover"], ["reading-line", "readingLine", "text"],
-    ["secondary-subs", "secondarySubs", "translate"],
-  ]) {
+  assert.ok(options.url().endsWith("?panel=words"), "Menu row opens its panel");
+  for (const [id, key, value] of [["hover-action", "hoverAction", "meaning"], ["click-action", "clickAction", "none"]]) {
     await options.locator(`#${id}`).selectOption(value);
-    await options.waitForFunction(async ([key, value]) => (await chrome.storage.local.get(`persist:${key}`))[`persist:${key}`] === JSON.stringify(value), [key, value]);
+    await persisted(options, key, value);
   }
-  await options.locator("#ui-scale").focus();
-  await options.keyboard.press("End");
-  const maxScale = await options.locator("#ui-scale").getAttribute("max");
-  await options.waitForFunction(async (v) => (await chrome.storage.local.get("persist:uiScale"))["persist:uiScale"] === v, maxScale);
+  const increaseScale = options.locator("#ui-scale").getByRole("button", { name: /Increase/ });
+  while (await increaseScale.isEnabled()) await increaseScale.click();
+  await persisted(options, "uiScale", 150);
+  await options.locator("#dim-known").check();
+  await options.goBack();
+  await options.waitForSelector("#furigana");
+  await options.fill("input[type=search]", "second line");
+  await options.getByRole("button", { name: /^Second line/ }).click();
+  await options.locator("#secondary-subs").getByRole("radio", { name: "Translation" }).click();
+  await persisted(options, "secondarySubs", "translate");
+  await options.locator("#reading-line").getByRole("radio", { name: "Show as text" }).click();
+  await persisted(options, "readingLine", "text");
   await options.evaluate(() => chrome.storage.local.set({
     "persist:knownWords": JSON.stringify(["seq:jitendex:10", "seq:jitendex:11"]),
     // The popup test above persisted a "known" word status; clear it so the count is just the array.
     "persist:wordStatuses": "{}",
   }));
+  await options.goto(`${optionsUrl}?panel=data`);
   await options.getByText("2 words marked known.", { exact: true }).waitFor();
-  await options.locator("#dim-known").check();
   const options2 = await ctx.newPage();
-  await options2.goto(options.url());
+  await options2.goto(`${optionsUrl}?panel=data`);
+  await options2.getByText("2 words marked known.", { exact: true }).waitFor();
+  const forget = options.getByRole("button", { name: "Forget all", exact: true });
+  await forget.click();
+  await options.getByRole("button", { name: "Click to confirm", exact: true }).click();
+  await options2.locator("#known-words").getByText("Nothing here yet", { exact: true }).waitFor();
+  await options.goto(`${optionsUrl}?panel=words`);
+  await options2.goto(`${optionsUrl}?panel=words`);
   await options2.waitForFunction(() => document.querySelector("#hover-action")?.value === "meaning");
-  assert.equal(await options2.locator("#dim-known").isChecked(), true);
-  assert.equal(await options2.locator("#ui-scale").inputValue(), maxScale);
+  assert.equal(await options2.locator("#dim-known").isChecked(), true, "Forget all must not toggle dimming");
+  assert.equal(await options2.locator("#ui-scale .step-value").textContent(), "150%");
   await options2.locator("#hover-action").selectOption("both");
   await options.waitForFunction(() => document.querySelector("#hover-action")?.value === "both");
-  await options.getByRole("button", { name: "Forget all", exact: true }).click();
-  await options2.getByText("0 words marked known.", { exact: true }).waitFor();
-  assert.equal(await options.locator("#dim-known").isChecked(), true, "Forget all must not toggle dimming");
-  await options.reload();
-  await options.waitForFunction(() => document.querySelector("#hover-action")?.value === "both");
-  assert.equal(await options.locator("#secondary-subs").inputValue(), "translate");
+  await options.goto(`${optionsUrl}?panel=subtitles`);
+  assert.equal(await options.locator("#secondary-subs").getByRole("radio", { name: "Translation" }).getAttribute("aria-checked"), "true");
+  await options.getByRole("button", { name: "Settings", exact: true }).click();
+  await options.waitForSelector("#furigana");
   await options.setViewportSize({ width: 1280, height: 800 });
-  await options.getByRole("button", { name: "About", exact: true }).click();
-  await options.waitForTimeout(800);
-  assert.equal(await options.locator('.settings-nav-item[aria-current="location"]').textContent(), "About");
-  await options.evaluate(() => document.querySelector("#settings-readings").scrollIntoView({ behavior: "instant" }));
-  await options.waitForFunction(() => document.querySelector('.settings-nav-item[aria-current="location"]')?.textContent === "Furigana & readings");
-  await options.evaluate(() => window.scrollTo(0, 0));
-  await options.waitForFunction(() => document.querySelector('.settings-nav-item[aria-current="location"]')?.textContent === "Words");
   await options.screenshot({ path: "/tmp/himotoki-audit-options-desktop.png", fullPage: true });
-  for (const width of [720, 360, 320]) {
-    await options.setViewportSize({ width, height: 800 });
-    assert.ok(await options.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Options overflow at ${width}px`);
+  for (const url of [optionsUrl, `${optionsUrl}?panel=words`, `${optionsUrl}?panel=advanced`]) {
+    await options.goto(url);
+    for (const width of [720, 360, 320]) {
+      await options.setViewportSize({ width, height: 800 });
+      assert.ok(await options.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Options overflow at ${width}px (${url})`);
+    }
   }
+  await options.goto(optionsUrl);
   await options.screenshot({ path: "/tmp/himotoki-audit-options-mobile.png", fullPage: true });
-  console.log("PASS Options preserve controls, persist values, sync across pages, navigate sections, and fit narrow windows");
+  console.log("PASS Options preserve controls, persist values, sync across pages, navigate panels and search, and fit narrow windows");
   assert.deepEqual(errors, [], "Browser runtime errors");
   console.log(`PASS browser runtime errors: ${errors.length}`);
 } finally {
