@@ -1,6 +1,6 @@
 import { FC, ReactNode, useEffect, useRef, useState } from "react";
 
-import type { TFuriganaLevel, TFuriganaMode, TReadingLineMode, TSecondarySubs, TTokenAction } from "@src/models/types";
+import type { TFuriganaLevel, TFuriganaMode, TMouseAction, TMouseButton, TReadingLineMode, TSecondarySubs, TTokenAction } from "@src/models/types";
 import { onPersistedChange, readPersisted, writePersisted } from "@src/shared/persistedSettings";
 import { ENDPOINT_DEFAULTS, type EndpointKey, originMatchPattern } from "@src/shared/runtimeConfig";
 import {
@@ -53,6 +53,7 @@ import {
 } from "@src/shared/ankiSettings";
 import type { TAnkiCardTheme } from "@src/utils/ankiNote";
 import { DEFAULT_LISTENING_MODE, LISTENING_MODE_SETTING } from "@src/shared/listeningMode";
+import { DEFAULT_MOUSE_ACTION, MOUSE_ACTIONS, MOUSE_BUTTONS, isMouseAction } from "@src/shared/mouseActions";
 import { buildRows, toCsv, toJson } from "@src/shared/exportWords";
 import { AccountPanel } from "@src/pages/shared/AccountPanel";
 import { DictionaryPanel } from "@src/pages/shared/DictionaryPanel";
@@ -103,6 +104,7 @@ const SETTINGS_NAV = [
   { id: "words", label: "Words" },
   { id: "readings", label: "Furigana & readings" },
   { id: "appearance", label: "Appearance" },
+  { id: "mouse", label: "Mouse controls" },
   { id: "dictionary", label: "Dictionary" },
   { id: "account", label: "Account" },
   { id: "advanced", label: "Advanced" },
@@ -188,6 +190,28 @@ const downloadText = (filename: string, text: string, mime: string) => {
 const actionDesc = (value: TTokenAction) => TOKEN_ACTIONS.find((a) => a.value === value)?.description ?? "";
 const optionDesc = <T extends string>(options: ReadonlyArray<Option<T>>, value: T) =>
   options.find((o) => o.value === value)?.description ?? "";
+
+/** Middle / side mouse button binding; each button is its own persisted key. */
+const MouseActionRow: FC<{ button: TMouseButton }> = ({ button }) => {
+  const { label, setting } = MOUSE_BUTTONS.find((b) => b.id === button)!;
+  const [action, setAction] = usePersistedSetting<TMouseAction>(setting, DEFAULT_MOUSE_ACTION, isMouseAction);
+  return (
+    <Row
+      title={label}
+      desc={optionDesc(MOUSE_ACTIONS, action)}
+      htmlFor={`mouse-${button}`}
+      control={
+        <SettingSelect
+          id={`mouse-${button}`}
+          value={action}
+          options={MOUSE_ACTIONS}
+          onChange={setAction}
+          guard={isMouseAction}
+        />
+      }
+    />
+  );
+};
 
 const Options: FC = () => {
   const [hoverAction, setHoverAction] = usePersistedSetting<TTokenAction>(
@@ -641,6 +665,16 @@ const Options: FC = () => {
                 />
               }
             />
+          </Group>
+
+          <Group
+            id="mouse"
+            title="Mouse controls"
+            lede="Control playback without the keyboard. These work while the pointer is over the video; everywhere else the buttons keep their usual browser behaviour (back/forward, open link in new tab)."
+          >
+            {MOUSE_BUTTONS.map((b) => (
+              <MouseActionRow key={b.id} button={b.id} />
+            ))}
           </Group>
 
           <Group id="dictionary" title="Dictionary">

@@ -106,6 +106,10 @@ export type TLearningService = "himotoki" | "anki" | "disabled";
 /** What hovering or clicking a subtitle token does. */
 export type TTokenAction = "furigana" | "meaning" | "both" | "popup" | "none";
 
+/** What an extra mouse button does over the video (see src/shared/mouseActions.ts). */
+export type TMouseAction = "none" | "prev" | "next" | "replay" | "loop" | "slowReplay" | "playPause";
+export type TMouseButton = "middle" | "back" | "forward";
+
 /** Inline ruby furigana over kanji tokens. */
 export type TFuriganaMode = "always" | "hover" | "never";
 
