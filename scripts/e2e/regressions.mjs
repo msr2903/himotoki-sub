@@ -136,6 +136,19 @@ try {
   await page.evaluate(() => window.audit.settings.newWordsLevelChanged("n1"));
   await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-glossary__row").length === 1);
   assert.equal(await glossary(), "邂逅chance meeting", "N1 lists only rare words");
+  // The Show line chip is hidden while the pointer is still, and appears when it moves over the subtitles.
+  const chipShown = () => page.evaluate(() => getComputedStyle(document.querySelector("#es-subs .es-glossary__toggle")).opacity === "1");
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(2600);
+  assert.equal(await chipShown(), false, "Show line stays hidden while watching");
+  await page.locator("#es-subs .es-glossary__gloss").first().hover();
+  await page.waitForFunction(() => getComputedStyle(document.querySelector("#es-subs .es-glossary__toggle")).opacity === "1");
+  await page.locator("#es-subs").screenshot({ path: "/tmp/himotoki-glossary-chip.png" });
+  // Clicking the glossary background shows the line; the chip hides it again.
+  await page.locator("#es-subs .es-glossary__gloss").first().click();
+  await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-sub").length === 1);
+  await page.getByRole("button", { name: "Hide line" }).click();
+  await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-sub").length === 0);
   // A word the glossary missed: show the line, mark the word Learning, and it joins the glossary.
   await page.getByRole("button", { name: "Show line" }).click();
   await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-sub").length === 1);
@@ -155,6 +168,8 @@ try {
     s.updateCurrentSubsFx.use(async () => [line]); await s.updateCurrentSubsFx({ subs: [], video: null });
   });
   await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-sub").length === 0 && document.querySelector("#es-subs .es-glossary--empty"));
+  await page.hover("#es-subs");
+  await page.waitForFunction(() => getComputedStyle(document.querySelector("#es-subs .es-glossary__toggle")).opacity === "1");
   await page.locator("#es-subs").screenshot({ path: "/tmp/himotoki-glossary-empty-line.png" });
   await page.getByRole("button", { name: "Show line" }).click();
   await page.waitForFunction(() => document.querySelector("#es-subs .es-sub")?.textContent === "昨日映画");
@@ -162,7 +177,7 @@ try {
   await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-sub").length === 1 && document.querySelector("#es-subs .es-glossary"));
   await page.evaluate(() => window.audit.settings.newWordsLevelChanged("off"));
   await page.waitForFunction(() => !document.querySelector("#es-subs .es-glossary") && document.querySelectorAll("#es-subs .es-sub").length === 1);
-  console.log("PASS New words only swaps the line for a glossary; Show line reveals it and a word marked Learning joins the glossary");
+  console.log("PASS New words only: glossary replaces the line; Show line appears on pointer movement; background click and the chip reveal the line; a word marked Learning joins the glossary");
   await page.keyboard.press("Escape");
   assert.equal(await page.locator(".es-word-translation").count(), 0);
   await page.locator("#typing").focus(); await page.keyboard.press("b");
