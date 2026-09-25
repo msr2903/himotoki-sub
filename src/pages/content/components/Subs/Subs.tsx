@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 
 import { $currentSecondarySubs, $currentSubs, $sentenceOpen, $transcriptOpen } from "@src/models/subs";
 import { $video, $wasPaused, wasPausedChanged } from "@src/models/videos";
-import { TFuriganaMode, TSub, TSubItem, TTokenAction } from "@src/models/types";
+import { TFuriganaMode, TSub, TSubItem, TTokenAction, TWordTranslation } from "@src/models/types";
 import {
   $autoStopEnabled,
   $clickAction,
@@ -30,6 +30,9 @@ import {
 import {
   $activeHoverWord,
   $dictReady,
+  $lookups,
+  lookupKeyOf,
+  lookupRequested,
   $pinnedWord,
   subItemMouseEntered,
   subItemMouseLeft,
@@ -48,7 +51,7 @@ import { hasKanji } from "@src/utils/furigana";
 import { useLookup } from "@src/pages/content/hooks/useLookup";
 import { knownKeyOf } from "@src/shared/knownWords";
 import { jlptColorClass } from "@src/shared/tokenColor";
-import { isJapaneseToken, isNewWord } from "@src/shared/newWordsOnly";
+import { GLOSSARY_HOLD_MS, TNewWordsLevel, glossaryGloss, isJapaneseToken, isNewWord, pickGlossary } from "@src/shared/newWordsOnly";
 import { statusOf } from "@src/shared/wordStatus";
 import { PhraseRange, clampRange, isIndexSelected, joinItems, rangeLength } from "@src/shared/phraseSelection";
 import { getLearningService } from "@src/utils/getLearningService";
@@ -205,10 +208,12 @@ export const Subs: FC<TSubsProps> = () => {
         onMouseEnter={handleOnMouseEnter}
         style={{ fontSize: `${fontSizePx}px`, "--es-ui-scale": String(uiScale / 100), "--es-meaning-scale": String(meaningSize / 100) } as React.CSSProperties}
       >
-        {currentSubs.map((sub) => (
-          <Sub key={sub.id} sub={sub} secondary={secondaryMode === "translate"} furigana={effectiveFurigana} readingLine={readingLine} />
-        ))}
-        {secondaryMode === "track" && currentSubs.length > 0 && currentSecondary.length > 0 && (
+        {(!newWordsOnly || listeningPeek) &&
+          currentSubs.map((sub) => (
+            <Sub key={sub.id} sub={sub} secondary={secondaryMode === "translate"} furigana={effectiveFurigana} readingLine={readingLine} />
+          ))}
+        {newWordsOnly && <NewWordsGlossary subs={currentSubs} level={newWordsLevel} />}
+        {(!newWordsOnly || listeningPeek) && secondaryMode === "track" && currentSubs.length > 0 && currentSecondary.length > 0 && (
           <div className="es-sub es-sub--secondary" style={{ background: `rgba(0, 0, 0, ${subsBackgroundAlpha(subsBackground, subsBackgroundOpacity)})` }}>
             <div className="es-sub-secondary">{currentSecondary.map((cue) => cue.text).join(" ")}</div>
           </div>
@@ -289,6 +294,97 @@ const Sub: FC<{ sub: TSub; secondary: boolean; furigana: TFuriganaMode; readingL
       {range && rangeLength(range) >= 2 && phraseText && (
         <PhraseBar phrase={phraseText} contextSentence={sub.cleanedText} onClose={clearSelection} />
       )}
+    </div>
+  );
+};
+
+type GlossaryEntry = { sub: TSub; item: TSubItem; index: number; tx: TWordTranslation; gloss: string };
+
+/**
+ * New words only (beta): in place of the subtitle line, one row per word above the learner's level,
+ * with its short meaning. The word is a normal token (hover, click to pin the pop-up). A glossary stays
+ * up for GLOSSARY_HOLD_MS even if the line ends sooner, so quick lines can still be read.
+ */
+const NewWordsGlossary: FC<{ subs: TSub[]; level: Exclude<TNewWordsLevel, "off"> }> = ({ subs, level }) => {
+  const [lookups, request, knownWords, wordStatuses, subsBackground, subsBackgroundOpacity] = useUnit([
+    $lookups,
+    lookupRequested,
+    $knownWords,
+    $wordStatuses,
+    $subsBackground,
+    $subsBackgroundOpacity,
+  ]);
+  const tokens = subs.flatMap((sub) =>
+    sub.items.flatMap((item, index) => (item.type === "word" && isJapaneseToken(item.text) ? [{ sub, item, index }] : [])),
+  );
+  const tokensKey = tokens.map((t) => `${t.sub.id}:${t.index}:${t.item.text}`).join("|");
+  useEffect(() => {
+    tokens.forEach((t) => request(t.item));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tokensKey]);
+
+  // New words with a meaning, one row per dictionary entry. Known/ignored words never show; words
+  // being learned always do.
+  const seen = new Set<string>();
+  const words: GlossaryEntry[] = [];
+  for (const t of tokens) {
+    const tx = lookups[lookupKeyOf(t.item)];
+    const gloss = tx && !tx.error ? glossaryGloss(tx.mainTranslation) : "";
+    if (!tx || !gloss) continue;
+    const key = knownKeyOf(tx);
+    const status = statusOf(wordStatuses, key, knownWords);
+    if (status === "known" || status === "ignored") continue;
+    if (status !== "learning" && !isNewWord(tx, level)) continue;
+    const id = key ?? tx.headword ?? t.item.text;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    words.push({ ...t, tx, gloss });
+  }
+  const { shown, more } = pickGlossary(words.map((w) => ({ ...w, jlpt: w.tx.jlpt, frequency: w.tx.frequency })));
+  const signature = shown.map((w) => `${w.sub.id}:${w.index}`).join("|");
+
+  // Hold the last glossary when the line ends early; replace it as soon as a line has new words.
+  const [held, setHeld] = useState<{ shown: typeof shown; more: number; at: number } | null>(null);
+  useEffect(() => {
+    if (shown.length) {
+      setHeld({ shown, more, at: Date.now() });
+      return;
+    }
+    if (!held) return;
+    const left = held.at + GLOSSARY_HOLD_MS - Date.now();
+    if (left <= 0) {
+      setHeld(null);
+      return;
+    }
+    const timer = window.setTimeout(() => setHeld(null), left);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature]);
+
+  const rows = shown.length ? { shown, more } : held;
+  if (!rows?.shown.length) return null;
+  return (
+    <div className="es-glossary" style={{ background: `rgba(0, 0, 0, ${subsBackgroundAlpha(subsBackground, subsBackgroundOpacity)})` }}>
+      {rows.shown.map((w) => (
+        <div className="es-glossary__row" key={`${w.sub.id}:${w.index}`}>
+          <span className="es-glossary__word">
+            <SubItem
+              hoverKey={`${w.sub.id}:${w.index}`}
+              subItem={w.item}
+              contextSentence={w.sub.cleanedText}
+              furigana="always"
+              cueStart={w.sub.start}
+              cueEnd={w.sub.end}
+              itemIndex={w.index}
+              selected={false}
+              onShiftSelect={() => undefined}
+              noHoverLabel
+            />
+          </span>
+          <span className="es-glossary__gloss">{w.gloss}</span>
+        </div>
+      ))}
+      {rows.more > 0 && <div className="es-glossary__more">+{rows.more} more · press H for the line</div>}
     </div>
   );
 };
@@ -380,10 +476,12 @@ type TSubItemProps = {
   itemIndex: number;
   selected: boolean;
   onShiftSelect: (index: number) => void;
+  /** Skip the hover label (furigana/meaning); the glossary already shows both next to the word. */
+  noHoverLabel?: boolean;
 };
 
-const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furigana, cueStart, cueEnd, itemIndex, selected, onShiftSelect }) => {
-  const [activeHoverWord, pinnedWord, hoverAction, clickAction, handleSubItemMouseEntered, handleSubItemMouseLeft, pinToggle, dimKnownWords, knownWords, wordStatuses, colorByDifficulty, newWordsLevel, dictReady] =
+const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furigana, cueStart, cueEnd, itemIndex, selected, onShiftSelect, noHoverLabel }) => {
+  const [activeHoverWord, pinnedWord, hoverAction, clickAction, handleSubItemMouseEntered, handleSubItemMouseLeft, pinToggle, dimKnownWords, knownWords, wordStatuses, colorByDifficulty] =
     useUnit([
       $activeHoverWord,
       $pinnedWord,
@@ -396,8 +494,6 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
       $knownWords,
       $wordStatuses,
       $colorByDifficulty,
-      $newWordsLevel,
-      $dictReady,
     ]);
   const leaveTimer = useRef<number | null>(null);
   const itemRef = useRef<HTMLPreElement | null>(null);
@@ -405,7 +501,7 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
   const hovered = isWord && activeHoverWord === hoverKey;
   const pinned = isWord && pinnedWord === hoverKey;
   // The pinned click action wins over the transient hover action.
-  const action: TTokenAction = pinned ? clickAction : hovered ? hoverAction : "none";
+  const action: TTokenAction = pinned ? clickAction : hovered && !(noHoverLabel && hoverAction !== "popup") ? hoverAction : "none";
   // Inline ruby over kanji tokens: always, or only while hovered.
   const showRuby = isWord && hasKanji(subItem.text) && (furigana === "always" || (furigana === "hover" && hovered));
   // showRuby is only the intent — ruby can still fall back to plain text (difficulty gate, pending
@@ -416,8 +512,7 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
   // Dimming, status colouring and difficulty colouring all resolve the token, so look up only when
   // one of them needs it. Statuses are only worth resolving once the user has marked some words.
   const hasStatuses = Object.keys(wordStatuses).length > 0;
-  const newWordsOnly = newWordsLevel !== "off" && dictReady;
-  const { translation: tokenTx } = useLookup(subItem, isWord && (dimKnownWords || colorByDifficulty || hasStatuses || newWordsOnly));
+  const { translation: tokenTx } = useLookup(subItem, isWord && (dimKnownWords || colorByDifficulty || hasStatuses));
   const knownKey = tokenTx && !tokenTx.error ? knownKeyOf(tokenTx) : null;
   const status = statusOf(wordStatuses, knownKey, knownWords);
   const isKnown = dimKnownWords && status === "known";
@@ -425,17 +520,6 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
   const isIgnored = status === "ignored";
   // Ignored words never carry difficulty colour (the user has opted them out of attention).
   const jlptClass = isWord && colorByDifficulty && tokenTx && !tokenTx.error && !isIgnored ? jlptColorClass(tokenTx.jlpt) : "";
-  // New words only: blur punctuation and non-Japanese text, words not resolved yet (no flash of the full
-  // line), words marked known or ignored, and words at or below the learner's level. Words the
-  // dictionary has no difficulty data for stay visible.
-  const hiddenAsKnown =
-    newWordsOnly &&
-    (!isWord ||
-      !isJapaneseToken(subItem.text) ||
-      !tokenTx ||
-      status === "known" ||
-      isIgnored ||
-      (status !== "learning" && tokenTx != null && !tokenTx.error && !isNewWord(tokenTx, newWordsLevel)));
 
   useEffect(() => {
     // After ONNX upgrade remount, restore hover state if the pointer is still over this token.
@@ -495,7 +579,7 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
       ref={itemRef}
       onMouseEnter={handleOnMouseEnter}
       onMouseLeave={handleOnMouseLeave}
-      className={`es-sub-item ${subItem.tag} ${action !== "none" ? "es-sub-item-active" : ""} ${pinned ? "es-sub-item-pinned" : ""} ${isKnown ? "es-sub-item--known" : ""} ${isLearning ? "es-sub-item--learning" : ""} ${isIgnored ? "es-sub-item--ignored" : ""} ${selected ? "es-sub-item--selected" : ""} ${hiddenAsKnown ? "es-sub-item--familiar" : ""} ${jlptClass}`}
+      className={`es-sub-item ${subItem.tag} ${action !== "none" ? "es-sub-item-active" : ""} ${pinned ? "es-sub-item-pinned" : ""} ${isKnown ? "es-sub-item--known" : ""} ${isLearning ? "es-sub-item--learning" : ""} ${isIgnored ? "es-sub-item--ignored" : ""} ${selected ? "es-sub-item--selected" : ""} ${jlptClass}`}
       onClick={handleClick}
     >
       {rubyVisible ? <TokenRuby subItem={subItem} /> : subItem.text}

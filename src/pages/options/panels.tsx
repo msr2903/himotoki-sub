@@ -167,9 +167,9 @@ export const SubtitlesPanel: FC = () => {
         }
       >
         <p className="card-hint">
-          Pick your JLPT level and the subtitles keep only the words you probably don't know yet: harder JLPT words
-          and rare ones. The rest is blurred; hover a word or press H to see it. Words you mark known are always
-          blurred. Needs the offline dictionary.
+          Pick your JLPT level and each subtitle line is replaced by a short glossary of the words you probably
+          don't know yet (harder JLPT words and rare ones), with their meanings. Click a word for the full entry;
+          press H to see the whole line. Needs the offline dictionary.
         </p>
         <ChipsRow id="new-words" title="Your JLPT level" value={newWords} options={NEW_WORDS_LEVEL_OPTIONS} onChange={setNewWords} />
       </Card>

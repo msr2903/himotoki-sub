@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isJapaneseToken, isNewWord, isNewWordsLevel } from "./newWordsOnly";
+import { glossaryGloss, isJapaneseToken, isNewWord, isNewWordsLevel, pickGlossary } from "./newWordsOnly";
 
 describe("isNewWord", () => {
   it("shows everything when off", () => {
@@ -46,5 +46,30 @@ describe("isJapaneseToken", () => {
     expect(isJapaneseToken("When you hear them,")).toBe(false);
     expect(isJapaneseToken("。")).toBe(false);
     expect(isJapaneseToken("2024")).toBe(false);
+  });
+});
+
+describe("pickGlossary", () => {
+  const w = (id: string, jlpt?: string, frequency?: number) => ({ id, jlpt: jlpt ? [jlpt] : undefined, frequency });
+
+  it("keeps short lists as they are", () => {
+    const words = [w("a", "n2"), w("b", "n1")];
+    expect(pickGlossary(words)).toEqual({ shown: words, more: 0 });
+  });
+
+  it("keeps the hardest words in line order and counts the rest", () => {
+    const words = [w("n2", "n2"), w("rare", undefined, 40000), w("n1", "n1"), w("n2b", "n2"), w("rarer", undefined, 90000)];
+    const { shown, more } = pickGlossary(words);
+    expect(shown.map((x) => x.id)).toEqual(["rare", "n1", "rarer"]);
+    expect(more).toBe(2);
+  });
+});
+
+describe("glossaryGloss", () => {
+  it("joins meanings that fit and truncates a long first one", () => {
+    expect(glossaryGloss("after all; as expected; also")).toBe("after all; as expected; also");
+    expect(glossaryGloss("after all; as expected; in the end; still; nevertheless")).toBe("after all; as expected; in the end");
+    expect(glossaryGloss("a".repeat(50))).toBe(`${"a".repeat(39)}…`);
+    expect(glossaryGloss("")).toBe("");
   });
 });

@@ -727,36 +727,41 @@
   opacity: 1;
 }
 
-// New words only (beta): blur the words the learner likely knows, plus the reading and second lines,
-// so only new words stand out. Hovering a blurred word reveals it; H (peek) reveals the whole line.
-// Tokens are inline, where a CSS filter misses the ruby annotation, so blur with a text shadow on
-// transparent text instead (covers the furigana too and keeps the line's shape).
-#es-subs.es-subs--new-words .es-sub-item--familiar,
-#es-subs.es-subs--new-words .es-sub-item--familiar rt {
-  color: transparent;
-  text-shadow: 0 0 0.3em rgba(232, 230, 225, 0.9), 0 0 0.3em rgba(232, 230, 225, 0.5);
-  transition: color 0.12s ease, text-shadow 0.12s ease;
+// New words only (beta): a glossary of the line's new words in place of the subtitle line.
+#es-subs .es-glossary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.15em 0.75em;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0.2em 0.6em;
+  box-sizing: border-box;
+  border-radius: 6px;
+  text-align: left;
 }
 
-#es-subs.es-subs--new-words .es-sub-reading-line,
-#es-subs.es-subs--new-words .es-sub-secondary {
-  filter: blur(6px);
-  opacity: 0.5;
-  transition: filter 0.12s ease, opacity 0.12s ease;
+#es-subs .es-glossary__row {
+  display: contents;
 }
 
-#es-subs.es-subs--new-words .es-sub-item--familiar:hover,
-#es-subs.es-subs--new-words .es-sub-item--familiar:hover rt,
-#es-subs.es-subs--new-words.es-subs--peek .es-sub-item--familiar,
-#es-subs.es-subs--new-words.es-subs--peek .es-sub-item--familiar rt {
-  color: inherit;
-  text-shadow: none;
+#es-subs .es-glossary__word {
+  white-space: nowrap;
 }
 
-#es-subs.es-subs--new-words.es-subs--peek .es-sub-reading-line,
-#es-subs.es-subs--new-words.es-subs--peek .es-sub-secondary {
-  filter: none;
-  opacity: 1;
+#es-subs .es-glossary__gloss {
+  font-family: var(--hm-font-body);
+  font-size: 0.72em;
+  line-height: 1.3;
+  color: rgba(232, 230, 225, 0.85);
+}
+
+#es-subs .es-glossary__more {
+  grid-column: 1 / -1;
+  font-size: 0.45em;
+  color: rgba(232, 230, 225, 0.6);
+  text-align: center;
 }
 
 // Phrase selection (shift-click a run of tokens): highlight and an action bar to translate/save it.
