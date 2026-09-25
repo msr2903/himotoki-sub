@@ -38,5 +38,5 @@ export const TranslationService: FC<HTMLProps<HTMLSelectElement>> = () => {
 
 const services = [
   { label: "Google Translate", value: "google" },
-  { label: "DeepL", value: "deepl" },
+  { label: "DeepL (API key)", value: "deepl" },
 ];
