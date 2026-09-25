@@ -729,6 +729,7 @@
 
 // New words only (beta): a glossary of the line's new words in place of the subtitle line.
 #es-subs .es-glossary {
+  position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: baseline;
@@ -757,31 +758,38 @@
   color: rgba(232, 230, 225, 0.85);
 }
 
-#es-subs .es-glossary__footer {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6em;
-  margin-top: 0.1em;
-}
-
 #es-subs .es-glossary__more {
+  grid-column: 1 / -1;
   font-size: 0.45em;
   color: rgba(232, 230, 225, 0.6);
+  text-align: center;
 }
 
-// "Show line": reveal the whole subtitle line when the glossary missed a word.
+// Clicking the glossary's background (not a word) shows the full line.
+#es-subs .es-glossary--clickable {
+  cursor: pointer;
+}
+
+// "Show line": beside the glossary, vertically centred, so it never adds a row or shifts the glossary.
+// Hidden while the pointer is still (you're watching); appears when the mouse moves over the video.
 #es-subs .es-glossary__toggle {
-  padding: 0.15em 0.7em;
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  transform: translate(0.5em, -50%);
+  padding: 0.2em 0.75em;
   border: 1px solid rgba(232, 230, 225, 0.35);
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.55);
-  color: rgba(232, 230, 225, 0.9);
+  background: rgba(0, 0, 0, 0.6);
+  color: rgba(232, 230, 225, 0.92);
   font-family: var(--hm-font-body);
   font-size: 0.5em;
   line-height: 1.4;
+  white-space: nowrap;
   cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
 
   &:hover,
   &[aria-pressed="true"] {
@@ -790,16 +798,28 @@
   }
 }
 
-// A line with no new words shows only the button, kept faint until pointed at.
+#es-subs .es-glossary__toggle--visible,
+#es-subs .es-glossary:hover .es-glossary__toggle,
+#es-subs .es-glossary__toggle:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+// A line with no new words: only the chip, where the subtitle would be.
 #es-subs .es-glossary--empty {
   display: flex;
   justify-content: center;
   background: none;
-  opacity: 0.8;
-  transition: opacity 0.12s ease;
 
-  &:hover {
-    opacity: 1;
+  .es-glossary__toggle {
+    position: static;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #es-subs .es-glossary__toggle {
+    transition: none;
   }
 }
 

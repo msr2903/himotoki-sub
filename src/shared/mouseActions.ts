@@ -12,6 +12,11 @@ export const MOUSE_ACTIONS: Array<{ value: TMouseAction; label: string; descript
   { value: "loop", label: "Loop line", description: "Loop the current subtitle line; press again to stop." },
   { value: "slowReplay", label: "Slow replay", description: "Replay the current line at 0.75× speed." },
   { value: "playPause", label: "Play / pause", description: "Toggle playback." },
+  {
+    value: "showLine",
+    label: "Show full line",
+    description: "Show or hide the whole subtitle line in new-words-only or listening mode (same as H).",
+  },
 ];
 
 /** `MouseEvent.button` values: 1 = middle (wheel), 3 = back side button, 4 = forward side button. */

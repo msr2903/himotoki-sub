@@ -46,6 +46,8 @@ export const isNewWord = (word: { jlpt?: string[]; frequency?: number }, level: 
 
 /** At most this many glossary rows per line; the rest are counted as "+N". */
 export const GLOSSARY_MAX = 3;
+/** The glossary's Show line chip fades out after the pointer has been still over the video this long. */
+export const SHOW_LINE_IDLE_MS = 2000;
 /** Keep a glossary on screen at least this long, so a word from a quick line can still be read. */
 export const GLOSSARY_HOLD_MS = 3000;
 

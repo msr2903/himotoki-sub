@@ -2,6 +2,7 @@ import { FC, useEffect, useRef, useState } from "react";
 import { useUnit } from "effector-react";
 import Draggable from "react-draggable";
 import toast from "react-hot-toast";
+import cn from "classnames";
 
 import { $currentSecondarySubs, $currentSubs, $sentenceOpen, $transcriptOpen } from "@src/models/subs";
 import { $video, $wasPaused, wasPausedChanged } from "@src/models/videos";
@@ -50,9 +51,10 @@ import { Transcript } from "./Transcript";
 import { TokenRuby } from "./TokenRuby";
 import { hasKanji } from "@src/utils/furigana";
 import { useLookup } from "@src/pages/content/hooks/useLookup";
+import { usePointerActivity } from "@src/pages/content/hooks/usePointerActivity";
 import { knownKeyOf } from "@src/shared/knownWords";
 import { jlptColorClass } from "@src/shared/tokenColor";
-import { GLOSSARY_HOLD_MS, TNewWordsLevel, glossaryGloss, isJapaneseToken, isNewWord, pickGlossary } from "@src/shared/newWordsOnly";
+import { GLOSSARY_HOLD_MS, SHOW_LINE_IDLE_MS, TNewWordsLevel, glossaryGloss, isJapaneseToken, isNewWord, pickGlossary } from "@src/shared/newWordsOnly";
 import { statusOf } from "@src/shared/wordStatus";
 import { PhraseRange, clampRange, isIndexSelected, joinItems, rangeLength } from "@src/shared/phraseSelection";
 import { getLearningService } from "@src/utils/getLearningService";
@@ -117,6 +119,8 @@ export const Subs: FC<TSubsProps> = () => {
   const cueKey = currentSubs.map((sub) => sub.id).join(",");
   const [shownCue, setShownCue] = useState<string | null>(null);
   const lineShown = listeningPeek || (cueKey !== "" && shownCue === cueKey);
+  // The Show line chip appears only while the pointer moves over the video, like the player's controls.
+  const pointerActive = usePointerActivity(newWordsOnly ? video : null, SHOW_LINE_IDLE_MS);
   const toggleLine = () => {
     if (listeningPeek) listeningPeekToggled();
     else setShownCue(shownCue === cueKey ? null : cueKey);
@@ -222,7 +226,13 @@ export const Subs: FC<TSubsProps> = () => {
             <Sub key={sub.id} sub={sub} secondary={secondaryMode === "translate"} furigana={effectiveFurigana} readingLine={readingLine} />
           ))}
         {newWordsOnly && (
-          <NewWordsGlossary subs={currentSubs} level={newWordsLevel} lineShown={lineShown} onToggleLine={cueKey ? toggleLine : undefined} />
+          <NewWordsGlossary
+            subs={currentSubs}
+            level={newWordsLevel}
+            lineShown={lineShown}
+            onToggleLine={cueKey ? toggleLine : undefined}
+            controlsVisible={pointerActive}
+          />
         )}
         {(!newWordsOnly || lineShown) && secondaryMode === "track" && currentSubs.length > 0 && currentSecondary.length > 0 && (
           <div className="es-sub es-sub--secondary" style={{ background: `rgba(0, 0, 0, ${subsBackgroundAlpha(subsBackground, subsBackgroundOpacity)})` }}>
@@ -322,7 +332,9 @@ const NewWordsGlossary: FC<{
   lineShown: boolean;
   /** Reveal or hide the current line; absent between lines. */
   onToggleLine?: () => void;
-}> = ({ subs, level, lineShown, onToggleLine }) => {
+  /** Show the Show line chip (the pointer is moving over the video). */
+  controlsVisible: boolean;
+}> = ({ subs, level, lineShown, onToggleLine, controlsVisible }) => {
   const [lookups, request, knownWords, wordStatuses, subsBackground, subsBackgroundOpacity] = useUnit([
     $lookups,
     lookupRequested,
@@ -380,16 +392,35 @@ const NewWordsGlossary: FC<{
 
   const rows = shown.length ? { shown, more } : held;
   // The glossary can miss a word the learner doesn't know, and a line of "known" words shows no rows at
-  // all, so the full line is always one click away. From there any word can be marked Learning, which
-  // lists it here from then on.
+  // all, so the full line stays one click away: a Show line chip beside the glossary (visible only while
+  // the pointer moves, so it never sits on screen during watching), a click on the glossary background,
+  // H, or a mouse button. From the line any word can be marked Learning, which lists it here from then on.
   const lineToggle = onToggleLine && (
-    <button type="button" className="es-glossary__toggle" aria-pressed={lineShown} onClick={onToggleLine}>
+    <button
+      type="button"
+      className={cn("es-glossary__toggle", { "es-glossary__toggle--visible": controlsVisible })}
+      aria-pressed={lineShown}
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggleLine();
+      }}
+    >
       {lineShown ? "Hide line" : "Show line"}
     </button>
   );
   if (!rows?.shown.length) return lineToggle ? <div className="es-glossary es-glossary--empty">{lineToggle}</div> : null;
+  const handleBackgroundClick = (event: React.MouseEvent) => {
+    // Words keep their own click (pin the pop-up); anything else on the glossary shows the line.
+    if ((event.target as HTMLElement).closest(".es-sub-item, .es-word-translation, button")) return;
+    event.stopPropagation();
+    onToggleLine?.();
+  };
   return (
-    <div className="es-glossary" style={{ background: `rgba(0, 0, 0, ${subsBackgroundAlpha(subsBackground, subsBackgroundOpacity)})` }}>
+    <div
+      className={cn("es-glossary", { "es-glossary--clickable": onToggleLine })}
+      style={{ background: `rgba(0, 0, 0, ${subsBackgroundAlpha(subsBackground, subsBackgroundOpacity)})` }}
+      onClick={handleBackgroundClick}
+    >
       {rows.shown.map((w) => (
         <div className="es-glossary__row" key={`${w.sub.id}:${w.index}`}>
           <span className="es-glossary__word">
@@ -409,12 +440,8 @@ const NewWordsGlossary: FC<{
           <span className="es-glossary__gloss">{w.gloss}</span>
         </div>
       ))}
-      {(rows.more > 0 || lineToggle) && (
-        <div className="es-glossary__footer">
-          {rows.more > 0 && <span className="es-glossary__more">+{rows.more} more</span>}
-          {lineToggle}
-        </div>
-      )}
+      {rows.more > 0 && <div className="es-glossary__more">+{rows.more} more</div>}
+      {lineToggle}
     </div>
   );
 };
