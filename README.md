@@ -97,5 +97,5 @@ Issues and pull requests are welcome. See [ROADMAP.md](./ROADMAP.md) for planned
 
 ## Credits
 
-Built on [EasySubs](https://github.com/Nitrino/easysubs) by Nitrino — this project is a Japanese-only fork that removes its multi-language features (Google word translation, phrasal verbs, English dictionaries, LinguaLeo, Puzzle English) and builds Japanese learning around the Himotoki dictionary and a local word splitter. Dictionary data from [Jitendex](https://jitendex.org/) (CC BY-SA 4.0), built from JMdict (EDRDG) with Tatoeba examples.
+Built on [EasySubs](https://github.com/Nitrino/easysubs) by Nitrino — this project is a Japanese-only fork that removes its multi-language features (Google word translation, phrasal verbs, English dictionaries, LinguaLeo, Puzzle English) and builds Japanese learning around the Himotoki dictionary and a local word splitter. Dictionary data from [Jitendex](https://jitendex.org/) (CC BY-SA 4.0), built from JMdict (EDRDG) with Tatoeba examples; pitch accent from [Kanjium](https://github.com/mifunetoshiro/kanjium) (CC BY-SA 4.0); JLPT levels from [jlpt-word-list](https://github.com/elzup/jlpt-word-list) (based on the tanos.co.uk lists); frequency ranks from JPDB. Fonts: Newsreader and Zen Maru Gothic (SIL OFL 1.1). See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for every component and licence.
 </content>
