@@ -15,7 +15,7 @@ Himotoki Sub is a browser extension that overlays Japanese subtitles on video si
 | Feature | Data sent | Where | When |
 |---|---|---|---|
 | Dictionary download | A plain HTTP request for the dictionary file (no personal data) | GitHub release assets on `github.com` / `githubusercontent.com` (or the URL you configure) | Only when you click "Download dictionary" or "Update dictionary" |
-| Whole-line translation | The subtitle line you clicked | Google Translate, or DeepL if you selected it (with your own API key if you entered one) | Only when you click a subtitle line |
+| Whole-line translation | The subtitle line you clicked | Google Translate, or DeepL's official API with your own API key if you selected DeepL | Only when you click a subtitle line |
 | Save to Himotoki | The word, its reading and gloss, the sentence it appeared in, the video URL, video title and timestamp | Himotoki's backend (Convex) | Only when you are signed in and press Save |
 | Sign in with Google | Google's standard OAuth sign-in; the extension receives an ID token and exchanges it for a Himotoki session | Google, then Himotoki's backend | Only when you press "Sign in with Google" |
 | Save to Anki | The word and gloss | Your own AnkiConnect at `http://localhost:8765` | Only when Anki is selected and you press Save |

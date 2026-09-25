@@ -92,7 +92,7 @@ export const entryLemma = (token: HimotokiToken): string => {
 };
 
 export const isPunctuationSurface = (surface: string): boolean => {
-  return /^[\s\u3000\u3001\u3002！？!?,.。、「」『』（）()\[\]{}…・ー\-]+$/.test(surface);
+  return /^[\s\u3000\u3001\u3002！？!?,.。、「」『』（）()[\]{}…・ー-]+$/.test(surface);
 };
 
 export const himotokiEntryToWordTranslation = (

@@ -1,5 +1,3 @@
-import { query } from "@ifyour/deeplx";
-
 const SUPPORTED_LANGUAGES = [
   "el",
   "bg",
@@ -56,20 +54,9 @@ class DeepLTranslateFetcher {
   async getFullTextTranslation({ text, lang }: TRequest): Promise<string> {
     // Settings use Google-style codes (zh-CN, zh-TW, en, ...); DeepL expects its own codes.
     const targetLang = this.getDeepLLanguageCode(lang);
+    // Only the official API: the keyless web endpoint that used to back "DeepL" is not a public API.
     if (!this.#apiKey || !this.#apiKey.length) {
-      const response = await query({
-        text,
-        source_lang: "auto",
-        // deeplx types only accept its own small union, but passes the code through to DeepL.
-        target_lang: targetLang as TRequest["lang"],
-      });
-
-      if (response.code === 200) {
-        return response.data;
-      } else {
-        const detail = response.message ?? (response.code !== undefined ? `code ${response.code}` : JSON.stringify(response));
-        throw new Error(`DeepL API error: ${detail}`);
-      }
+      throw new Error("DeepL needs an API key (free at deepl.com/pro-api). Add it in the settings, or switch to Google Translate.");
     }
 
     try {

@@ -66,7 +66,7 @@ import {
   $ankiTags,
 } from "@src/models/settings";
 
-type TSubsProps = {};
+type TSubsProps = Record<string, never>;
 
 const subsBackgroundAlpha = (enabled: boolean, opacity: number) => (enabled ? opacity / 100 : 0);
 
