@@ -59,7 +59,7 @@ Hover and click are independent, user-configurable actions (`TTokenAction`: furi
 - `src/pages/background/` - MV3 service worker (API calls, offscreen relay, Google sign-in)
 - `src/pages/offscreen/` - ONNX runtime host
 - `src/pages/popup/` - toolbar popup (dictionary status, sign-in/out, link to settings)
-- `src/pages/options/` - settings page (hover/click actions, offline dictionary, account); shared panels in `src/pages/shared/`
+- `src/pages/options/` - settings page, mirroring the himotoki web app's settings (himotoki.web.app/settings; source in himotoki-web-ts `packages/web/src/pages/Settings`): a hub (search, account, Look & feel with a live subtitle preview, a menu) plus drill-in panels in `panels.tsx` opened via `?panel=<id>` so browser back closes them. Controls in `controls.tsx`, storage hooks in `hooks.ts`; shared popup/welcome panels in `src/pages/shared/`. The Light/Dark theme (`persist:theme`, `src/shared/themeSettings.ts`) is applied to the settings, popup and welcome pages by `src/pages/shared/pageTheme.ts` (`html[data-hm-theme]`, light tokens in `src/assets/style/theme.scss`); the in-player UI stays dark
 - `src/pages/welcome/` - first-run page opened on install (dictionary download, actions, sign-in, test video)
 - `store/` - Chrome Web Store listing text, screenshots, promo tile; `PRIVACY.md` is the privacy policy
 - `manifest.js` embeds a public `key` so the unpacked extension ID is stable; the private key is outside the repo (`~/.himotoki-sub/extension-key.pem`)

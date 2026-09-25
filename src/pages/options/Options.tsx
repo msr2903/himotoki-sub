@@ -1,8 +1,12 @@
-import { FC, ReactNode, useEffect, useRef, useState } from "react";
+/**
+ * Settings — a calm hub (search, account, look & feel, a short menu) with everything else one click
+ * away in drill-in panels (`?panel=<id>`, so the browser back button closes them). Mirrors the
+ * himotoki web app's settings page.
+ */
+import { FC, useEffect, useMemo, useState } from "react";
+import cn from "classnames";
 
-import type { TFuriganaLevel, TFuriganaMode, TMouseAction, TMouseButton, TReadingLineMode, TSecondarySubs, TTokenAction } from "@src/models/types";
-import { onPersistedChange, readPersisted, writePersisted } from "@src/shared/persistedSettings";
-import { ENDPOINT_DEFAULTS, type EndpointKey, originMatchPattern } from "@src/shared/runtimeConfig";
+import type { TFuriganaLevel, TFuriganaMode, TMouseAction, TSecondarySubs, TTokenAction } from "@src/models/types";
 import {
   CLICK_ACTION_SETTING,
   DEFAULT_CLICK_ACTION,
@@ -12,783 +16,416 @@ import {
   isTokenAction,
 } from "@src/shared/tokenActions";
 import { DEFAULT_SECONDARY_SUBS, SECONDARY_SUBS_OPTIONS, SECONDARY_SUBS_SETTING, isSecondarySubs } from "@src/shared/secondarySubs";
-import {
-  DEFAULT_FURIGANA,
-  DEFAULT_READING_LINE,
-  FURIGANA_OPTIONS,
-  FURIGANA_SETTING,
-  READING_LINE_OPTIONS,
-  READING_LINE_SETTING,
-  isFuriganaMode,
-  isReadingLineMode,
-} from "@src/shared/furiganaSettings";
-import { UI_SCALE_DEFAULT, UI_SCALE_MAX, UI_SCALE_MIN, UI_SCALE_SETTING, UI_SCALE_STEP, clampUiScale } from "@src/shared/uiScale";
-import {
-  MEANING_SIZE_DEFAULT,
-  MEANING_SIZE_MAX,
-  MEANING_SIZE_MIN,
-  MEANING_SIZE_SETTING,
-  MEANING_SIZE_STEP,
-  clampMeaningSize,
-} from "@src/shared/labelSettings";
+import { DEFAULT_FURIGANA, FURIGANA_OPTIONS, FURIGANA_SETTING, isFuriganaMode } from "@src/shared/furiganaSettings";
 import {
   DEFAULT_FURIGANA_LEVEL,
-  FURIGANA_LEVEL_OPTIONS,
   FURIGANA_LEVEL_SETTING,
   isFuriganaLevel,
+  showFuriganaForLevel,
 } from "@src/shared/furiganaDifficulty";
-import { COLOR_BY_DIFFICULTY_SETTING, DEFAULT_COLOR_BY_DIFFICULTY } from "@src/shared/tokenColor";
-import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
-import {
-  ANKI_CARD_THEME_OPTIONS,
-  ANKI_CARD_THEME_SETTING,
-  ANKI_RICH_CARDS_SETTING,
-  ANKI_DECK_SETTING,
-  ANKI_TAGS_SETTING,
-  DEFAULT_ANKI_CARD_THEME,
-  DEFAULT_ANKI_RICH_CARDS,
-  DEFAULT_ANKI_DECK,
-  DEFAULT_ANKI_TAGS,
-  isAnkiCardTheme,
-} from "@src/shared/ankiSettings";
-import type { TAnkiCardTheme } from "@src/utils/ankiNote";
+import { COLOR_BY_DIFFICULTY_SETTING, DEFAULT_COLOR_BY_DIFFICULTY, jlptColorClass } from "@src/shared/tokenColor";
+import { KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
+import { WORD_STATUSES_SETTING } from "@src/shared/wordStatus";
+import { ANKI_DECK_SETTING, ANKI_RICH_CARDS_SETTING, DEFAULT_ANKI_DECK, DEFAULT_ANKI_RICH_CARDS } from "@src/shared/ankiSettings";
 import { DEFAULT_LISTENING_MODE, LISTENING_MODE_SETTING } from "@src/shared/listeningMode";
 import { DEFAULT_MOUSE_ACTION, MOUSE_ACTIONS, MOUSE_BUTTONS, isMouseAction } from "@src/shared/mouseActions";
-import { buildRows, toCsv, toJson } from "@src/shared/exportWords";
-import { AccountPanel } from "@src/pages/shared/AccountPanel";
-import { DictionaryPanel } from "@src/pages/shared/DictionaryPanel";
+import { DEFAULT_THEME, THEME_SETTING, TTheme, isTheme } from "@src/shared/themeSettings";
+import { useHimotokiSession } from "@src/pages/shared/useHimotokiSession";
+import { Card, ChipsRow, Icon, IconName, MenuRow, SearchField, Tint, TintedIcon, ToggleRow } from "./controls";
+import { isBool, isString, usePanelParam, usePersistedSetting, useRawStringSetting } from "./hooks";
+import {
+  AboutPanel,
+  AdvancedPanel,
+  AnkiPanel,
+  DataPanel,
+  DictionaryView,
+  MousePanel,
+  SubtitlesPanel,
+  WordsPanel,
+  countKnown,
+  isStringArray,
+  isStringRecord,
+} from "./panels";
 
-/** A persisted setting shared live with the content script (see src/utils/withPersist.ts). */
-function usePersistedSetting<T>(name: string, fallback: T, validate: (v: unknown) => v is T) {
-  const [value, setValue] = useState<T>(fallback);
-  useEffect(() => {
-    void readPersisted<unknown>(name, fallback).then((v) => setValue(validate(v) ? v : fallback));
-    return onPersistedChange<unknown>(name, (v) => {
-      if (validate(v)) setValue(v);
-    });
-  }, [name]);
-  const update = (next: T) => {
-    setValue(next);
-    void writePersisted(name, next);
-  };
-  return [value, update] as const;
-}
+type PanelId = "words" | "subtitles" | "mouse" | "anki" | "dictionary" | "data" | "advanced" | "about";
 
-/**
- * A plain (non-`persist:`) chrome.storage.local string key, used for runtime endpoint overrides.
- * An empty value removes the key so the compiled-in default applies.
- */
-function useRawStringSetting(key: string): readonly [string, (next: string) => void] {
-  const [value, setValue] = useState("");
-  useEffect(() => {
-    void chrome.storage.local.get([key]).then((r) => setValue(typeof r[key] === "string" ? r[key] : ""));
-    const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
-      if (area === "local" && key in changes) {
-        const next = changes[key]?.newValue;
-        setValue(typeof next === "string" ? next : "");
-      }
-    };
-    chrome.storage.onChanged.addListener(listener);
-    return () => chrome.storage.onChanged.removeListener(listener);
-  }, [key]);
-  const update = (next: string) => {
-    setValue(next);
-    const trimmed = next.trim();
-    void (trimmed ? chrome.storage.local.set({ [key]: trimmed }) : chrome.storage.local.remove([key]));
-  };
-  return [value, update] as const;
-}
-
-/** Sidebar sections, matching the himotoki.my.id settings layout. */
-const SETTINGS_NAV = [
-  { id: "words", label: "Words" },
-  { id: "readings", label: "Furigana & readings" },
-  { id: "appearance", label: "Appearance" },
-  { id: "mouse", label: "Mouse controls" },
-  { id: "dictionary", label: "Dictionary" },
-  { id: "account", label: "Account" },
-  { id: "advanced", label: "Advanced" },
-  { id: "about", label: "About" },
-] as const;
-
-/** A titled card section that the jump-nav scrolls to. */
-const Group: FC<{ id: string; title: string; lede?: ReactNode; children: ReactNode }> = ({
-  id,
-  title,
-  lede,
-  children,
-}) => (
-  <section id={`settings-${id}`} className="group" aria-labelledby={`${id}-heading`}>
-    <h2 id={`${id}-heading`}>{title}</h2>
-    {lede && <p className="group-lede">{lede}</p>}
-    {children}
-  </section>
-);
-
-/** One row: title + description on the left, a control on the right. */
-const Row: FC<{ title: string; desc?: ReactNode; control: ReactNode; htmlFor?: string }> = ({
-  title,
-  desc,
-  control,
-  htmlFor,
-}) => (
-  <label className="row" htmlFor={htmlFor}>
-    <span className="row-text">
-      <span className="row-title">{title}</span>
-      {desc && <span className="row-desc">{desc}</span>}
-    </span>
-    {control}
-  </label>
-);
-
-type Option<T extends string> = { value: T; label: string; description?: string };
-
-function SettingSelect<T extends string>({
-  id,
-  value,
-  options,
-  onChange,
-  guard,
-}: {
-  id: string;
-  value: T;
-  options: ReadonlyArray<Option<T>>;
-  onChange: (v: T) => void;
-  guard: (v: unknown) => v is T;
-}) {
-  return (
-    <select
-      id={id}
-      className="lang-select"
-      value={value}
-      onChange={(e) => {
-        if (guard(e.target.value)) onChange(e.target.value);
-      }}
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-/** Trigger a client-side file download of some text. */
-const downloadText = (filename: string, text: string, mime: string) => {
-  const blob = new Blob([text], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+const PANELS: Record<PanelId, { title: string; lede: string; icon: IconName; tint: Tint; View: FC }> = {
+  words: { title: "Words", lede: "What hovering and clicking a subtitle word does, and what the pop-up shows.", icon: "cursor", tint: "teal", View: WordsPanel },
+  subtitles: { title: "Subtitles", lede: "Which words get furigana, and a second subtitle line.", icon: "captions", tint: "blue", View: SubtitlesPanel },
+  mouse: { title: "Mouse controls", lede: "Step through lines with the middle and side mouse buttons.", icon: "mouse", tint: "violet", View: MousePanel },
+  anki: { title: "Anki", lede: "How words are saved as Anki cards.", icon: "cards", tint: "coral", View: AnkiPanel },
+  dictionary: { title: "Dictionary", lede: "The offline dictionary used for every lookup.", icon: "book", tint: "teal", View: DictionaryView },
+  data: { title: "Your data", lede: "Everything here is stored on this device.", icon: "box", tint: "amber", View: DataPanel },
+  advanced: { title: "Advanced", lede: "Servers the extension talks to, if the defaults ever move.", icon: "sliders", tint: "grey", View: AdvancedPanel },
+  about: { title: "About Himotoki Sub", lede: "Credits and licences.", icon: "info", tint: "grey", View: AboutPanel },
 };
 
-const actionDesc = (value: TTokenAction) => TOKEN_ACTIONS.find((a) => a.value === value)?.description ?? "";
-const optionDesc = <T extends string>(options: ReadonlyArray<Option<T>>, value: T) =>
-  options.find((o) => o.value === value)?.description ?? "";
+const isPanelId = (v: string | null): v is PanelId => v != null && v in PANELS;
 
-/** Middle / side mouse button binding; each button is its own persisted key. */
-const MouseActionRow: FC<{ button: TMouseButton }> = ({ button }) => {
-  const { label, setting } = MOUSE_BUTTONS.find((b) => b.id === button)!;
-  const [action, setAction] = usePersistedSetting<TMouseAction>(setting, DEFAULT_MOUSE_ACTION, isMouseAction);
-  return (
-    <Row
-      title={label}
-      desc={optionDesc(MOUSE_ACTIONS, action)}
-      htmlFor={`mouse-${button}`}
-      control={
-        <SettingSelect
-          id={`mouse-${button}`}
-          value={action}
-          options={MOUSE_ACTIONS}
-          onChange={setAction}
-          guard={isMouseAction}
-        />
-      }
-    />
-  );
+/* ── Search ─────────────────────────────────────────────────── */
+
+type SearchEntry = {
+  title: string;
+  keywords: string;
+  /** Hub-level settings have no panel. */
+  panel?: PanelId;
+  /** Element to reveal once the target is shown. */
+  focus: string;
 };
 
-const Options: FC = () => {
-  const [hoverAction, setHoverAction] = usePersistedSetting<TTokenAction>(
-    HOVER_ACTION_SETTING,
-    DEFAULT_HOVER_ACTION,
-    isTokenAction,
-  );
-  const [clickAction, setClickAction] = usePersistedSetting<TTokenAction>(
-    CLICK_ACTION_SETTING,
-    DEFAULT_CLICK_ACTION,
-    isTokenAction,
-  );
-  const [uiScale, setUiScale] = usePersistedSetting<number>(
-    UI_SCALE_SETTING,
-    UI_SCALE_DEFAULT,
-    (v): v is number => typeof v === "number" && Number.isFinite(v),
-  );
-  const [meaningSize, setMeaningSize] = usePersistedSetting<number>(
-    MEANING_SIZE_SETTING,
-    MEANING_SIZE_DEFAULT,
-    (v): v is number => typeof v === "number" && Number.isFinite(v),
-  );
-  const [secondary, setSecondary] = usePersistedSetting<TSecondarySubs>(
-    SECONDARY_SUBS_SETTING,
-    DEFAULT_SECONDARY_SUBS,
-    isSecondarySubs,
-  );
-  const [furigana, setFurigana] = usePersistedSetting<TFuriganaMode>(FURIGANA_SETTING, DEFAULT_FURIGANA, isFuriganaMode);
-  const [furiganaLevel, setFuriganaLevel] = usePersistedSetting<TFuriganaLevel>(
-    FURIGANA_LEVEL_SETTING,
-    DEFAULT_FURIGANA_LEVEL,
-    isFuriganaLevel,
-  );
-  const [colorByDifficulty, setColorByDifficulty] = usePersistedSetting<boolean>(
-    COLOR_BY_DIFFICULTY_SETTING,
-    DEFAULT_COLOR_BY_DIFFICULTY,
-    (v): v is boolean => typeof v === "boolean",
-  );
-  const [readingLine, setReadingLine] = usePersistedSetting<TReadingLineMode>(
-    READING_LINE_SETTING,
-    DEFAULT_READING_LINE,
-    isReadingLineMode,
-  );
-  const [dimKnown, setDimKnown] = usePersistedSetting<boolean>(
-    DIM_KNOWN_SETTING,
-    DEFAULT_DIM_KNOWN,
-    (v): v is boolean => typeof v === "boolean",
-  );
-  const [knownWords, setKnownWords] = usePersistedSetting<string[]>(
-    KNOWN_WORDS_SETTING,
-    [],
-    (v): v is string[] => Array.isArray(v) && v.every((key) => typeof key === "string"),
-  );
-  const [ankiRichCards, setAnkiRichCards] = usePersistedSetting<boolean>(
-    ANKI_RICH_CARDS_SETTING,
-    DEFAULT_ANKI_RICH_CARDS,
-    (v): v is boolean => typeof v === "boolean",
-  );
-  const [ankiCardTheme, setAnkiCardTheme] = usePersistedSetting<TAnkiCardTheme>(
-    ANKI_CARD_THEME_SETTING,
-    DEFAULT_ANKI_CARD_THEME,
-    isAnkiCardTheme,
-  );
-  const [ankiDeck, setAnkiDeck] = usePersistedSetting<string>(
-    ANKI_DECK_SETTING,
-    DEFAULT_ANKI_DECK,
-    (v): v is string => typeof v === "string",
-  );
-  const [ankiTags, setAnkiTags] = usePersistedSetting<string>(
-    ANKI_TAGS_SETTING,
-    DEFAULT_ANKI_TAGS,
-    (v): v is string => typeof v === "string",
-  );
-  // Persist key from src/models/history; kept as a literal so the options bundle avoids the content model.
-  const [lookupHistory, setLookupHistory] = usePersistedSetting<unknown[]>(
-    "lookupHistory",
-    [],
-    (v): v is unknown[] => Array.isArray(v),
-  );
-  const [listeningMode, setListeningMode] = usePersistedSetting<boolean>(
-    LISTENING_MODE_SETTING,
-    DEFAULT_LISTENING_MODE,
-    (v): v is boolean => typeof v === "boolean",
-  );
-  // Persist key from the word-status feature; read defensively so export works with or without it.
-  const [wordStatuses, setWordStatuses] = usePersistedSetting<Record<string, string>>(
-    "wordStatuses",
-    {},
-    (v): v is Record<string, string> => typeof v === "object" && v !== null && !Array.isArray(v),
-  );
-  const version = chrome.runtime.getManifest().version;
+const SEARCH_INDEX: SearchEntry[] = [
+  { title: "Account", keywords: "profile sign in login out google himotoki save", focus: "profile" },
+  { title: "Theme", keywords: "appearance dark light mode night colour color", focus: "theme" },
+  { title: "Furigana", keywords: "reading ruby kana always hover never", focus: "furigana" },
+  { title: "Colour by difficulty", keywords: "color jlpt level tint green red", focus: "color-by-difficulty" },
+  { title: "Listening mode", keywords: "blur hide text practice peek", focus: "listening-mode" },
+  { title: "On hover", panel: "words", keywords: "hover pointer label meaning furigana pop-up popup action", focus: "hover-action" },
+  { title: "On click", panel: "words", keywords: "click pin pop-up popup dictionary action", focus: "click-action" },
+  { title: "Meaning size", panel: "words", keywords: "font text gloss label size", focus: "meaning-size" },
+  { title: "Pop-up size", panel: "words", keywords: "scale zoom popup panel size ui", focus: "ui-scale" },
+  { title: "Pitch accent", panel: "words", keywords: "pitch accent contour number hide pop-up popup dictionary", focus: "pitch-display" },
+  { title: "Dim known words", panel: "words", keywords: "known fade opacity", focus: "dim-known" },
+  { title: "Skip furigana on easy words", panel: "subtitles", keywords: "furigana difficulty jlpt level n5 n4 n3 n2 n1", focus: "furigana-level" },
+  { title: "Kana reading line", panel: "subtitles", keywords: "reading line kana hide text channel", focus: "reading-line" },
+  { title: "Second line", panel: "subtitles", keywords: "dual subtitles second secondary translation track english", focus: "secondary-subs" },
+  { title: "Mouse buttons", panel: "mouse", keywords: "mouse middle click side back forward button previous next replay", focus: "mouse-middle" },
+  { title: "Rich cards", panel: "anki", keywords: "anki screenshot audio sentence mining card", focus: "anki-rich-cards" },
+  { title: "Card theme", panel: "anki", keywords: "anki light dark night", focus: "anki-card-theme" },
+  { title: "Deck and tags", panel: "anki", keywords: "anki deck tags", focus: "anki-deck" },
+  { title: "Offline dictionary", panel: "dictionary", keywords: "jitendex download install update remove offline", focus: "panel-title" },
+  { title: "Known words", panel: "data", keywords: "known forget clear reset", focus: "known-words" },
+  { title: "Recent lookups", panel: "data", keywords: "history lookups clear", focus: "lookup-history" },
+  { title: "Export saved words", panel: "data", keywords: "export download csv json backup", focus: "export-words" },
+  { title: "Endpoints", panel: "advanced", keywords: "url server convex google client id domain", focus: "endpoint-dict" },
+  { title: "About", panel: "about", keywords: "about licence license credits version privacy", focus: "panel-title" },
+];
 
-  // Runtime endpoint overrides (plain storage keys) so a domain/backend move needs no rebuild.
-  const [dictUrl, setDictUrl] = useRawStringSetting("himotokiDictUrl");
-  const [convexUrl, setConvexUrl] = useRawStringSetting("himotokiConvexUrl");
-  const [googleClientId, setGoogleClientId] = useRawStringSetting("himotokiGoogleClientId");
-  // For a custom URL endpoint on a new origin, request host permission (needs a user gesture — a
-  // Blur after typing qualifies) so the extension can actually fetch it.
-  const applyEndpointUrl = (key: EndpointKey, value: string, set: (v: string) => void) => {
-    set(value);
-    const trimmed = value.trim();
-    if (!trimmed) return;
-    const pattern = originMatchPattern(trimmed);
-    if (pattern) void chrome.permissions.request({ origins: [pattern] }).catch(() => undefined);
-  };
+function searchSettings(query: string): SearchEntry[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  return SEARCH_INDEX.filter((e) => {
+    const hay = `${e.title} ${e.panel ? PANELS[e.panel].title : ""} ${e.keywords}`.toLowerCase();
+    return words.every((w) => hay.includes(w));
+  });
+}
 
-  const exportCount = new Set([...knownWords, ...Object.keys(wordStatuses)]).size;
-  // Effective known set: explicit "known" statuses plus legacy-array keys with no status
-  // override (statusOf semantics — an explicit non-known status wins over the array).
-  const knownCount = new Set([
-    ...Object.keys(wordStatuses).filter((k) => wordStatuses[k] === "known"),
-    ...knownWords.filter((k) => !(k in wordStatuses)),
-  ]).size;
-  const exportWords = (format: "json" | "csv") => {
-    const rows = buildRows(knownWords, wordStatuses);
-    const today = new Date().toISOString().slice(0, 10);
-    if (format === "json") downloadText(`himotoki-words-${today}.json`, toJson(rows), "application/json");
-    else downloadText(`himotoki-words-${today}.csv`, toCsv(rows), "text/csv");
-  };
+/** Scroll a control into view and flash its row once it has rendered. */
+const reveal = (id: string) =>
+  requestAnimationFrame(() => {
+    const el = document.getElementById(id);
+    const row = el?.closest(".item, .card, .panel-head") ?? el;
+    if (!el || !row) return;
+    row.scrollIntoView({ block: "center" });
+    row.classList.remove("flash");
+    void (row as HTMLElement).offsetWidth;
+    row.classList.add("flash");
+    row.addEventListener("animationend", () => row.classList.remove("flash"), { once: true });
+    if (el.matches("input, select, button")) (el as HTMLElement).focus({ preventScroll: true });
+  });
 
-  const [activeNav, setActiveNav] = useState<string>(SETTINGS_NAV[0].id);
-  const suppressScrollSpy = useRef(false);
-  const pickActiveRef = useRef<(() => void) | null>(null);
+/* ── Account ────────────────────────────────────────────────── */
 
-  // Highlight the nav item for whichever section is in view (like himotoki.my.id). A plain
-  // scroll listener picks the last section whose top has crossed the 30% line — an
-  // IntersectionObserver ratio contest can never select the final, short section.
-  useEffect(() => {
-    const nodes = SETTINGS_NAV.map((item) => document.getElementById(`settings-${item.id}`)).filter(
-      (n): n is HTMLElement => Boolean(n),
-    );
-    if (!nodes.length) return;
-    const pickActive = () => {
-      if (suppressScrollSpy.current) return;
-      const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
-      if (atBottom) {
-        setActiveNav(SETTINGS_NAV[SETTINGS_NAV.length - 1]!.id);
-        return;
-      }
-      const line = window.innerHeight * 0.3;
-      let active: string = SETTINGS_NAV[0].id;
-      for (const node of nodes) {
-        if (node.getBoundingClientRect().top <= line) active = node.id.replace(/^settings-/, "");
-      }
-      setActiveNav(active);
-    };
-    pickActiveRef.current = pickActive;
-    window.addEventListener("scroll", pickActive, { passive: true });
-    window.addEventListener("resize", pickActive);
-    pickActive();
-    return () => {
-      pickActiveRef.current = null;
-      window.removeEventListener("scroll", pickActive);
-      window.removeEventListener("resize", pickActive);
-    };
-  }, []);
+const GoogleMark: FC = () => (
+  <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
+    <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
+    <path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+    <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z" />
+    <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
+  </svg>
+);
 
-  const scrollToSection = (id: string) => {
-    const el = document.getElementById(`settings-${id}`);
-    if (!el) return;
-    setActiveNav(id);
-    // Don't let the scroll spy fight the smooth scroll's intermediate sections — release when
-    // the scroll settles (scrollend), with a timeout as fallback. Re-pick on release: nothing
-    // else refires if the page is already settled.
-    suppressScrollSpy.current = true;
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
-    const release = () => {
-      suppressScrollSpy.current = false;
-      pickActiveRef.current?.();
-    };
-    if ("onscrollend" in window) window.addEventListener("scrollend", release, { once: true });
-    window.setTimeout(release, 1200);
-  };
-
+const ProfileCard: FC = () => {
+  const { user, busy, error, signIn, signOut } = useHimotokiSession();
   return (
-    <div className="es-options">
-      <header className="page-head">
-        <h1>Settings</h1>
-        <p className="lede">Himotoki Sub · Japanese subtitles, word split and dictionary · v{version}</p>
-      </header>
-
-      <div className="settings-shell">
-        <nav className="settings-nav" aria-label="Settings sections">
-          <p className="settings-nav-label">Jump to</p>
-          <div className="settings-nav-list">
-            {SETTINGS_NAV.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={`settings-nav-item ${activeNav === item.id ? "on" : ""}`}
-                aria-current={activeNav === item.id ? "location" : undefined}
-                onClick={() => scrollToSection(item.id)}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </nav>
-
-        <div className="settings-main">
-          <Group
-            id="words"
-            title="Words"
-            lede="What happens when you hover or click a word in the subtitles. Hover results disappear when the pointer leaves; click results stay until you press Escape, click elsewhere, or the subtitle changes."
-          >
-            <Row
-              title="On hover"
-              desc={actionDesc(hoverAction)}
-              htmlFor="hover-action"
-              control={
-                <SettingSelect
-                  id="hover-action"
-                  value={hoverAction}
-                  options={TOKEN_ACTIONS}
-                  onChange={setHoverAction}
-                  guard={isTokenAction}
-                />
-              }
-            />
-            <Row
-              title="On click"
-              desc={actionDesc(clickAction)}
-              htmlFor="click-action"
-              control={
-                <SettingSelect
-                  id="click-action"
-                  value={clickAction}
-                  options={TOKEN_ACTIONS}
-                  onChange={setClickAction}
-                  guard={isTokenAction}
-                />
-              }
-            />
-            <Row
-              title="Meaning size"
-              desc="Size of the short meaning shown in the hover label above a word."
-              htmlFor="meaning-size"
-              control={
-                <div className="range-control">
-                  <input
-                    id="meaning-size"
-                    type="range"
-                    min={MEANING_SIZE_MIN}
-                    max={MEANING_SIZE_MAX}
-                    step={MEANING_SIZE_STEP}
-                    value={meaningSize}
-                    onChange={(e) => setMeaningSize(clampMeaningSize(e.target.value))}
-                  />
-                  <span className="range-value">{meaningSize}%</span>
-                </div>
-              }
-            />
-            <Row
-              title="Dim known words"
-              desc="Dim words you have marked as known in the dictionary popup."
-              htmlFor="dim-known"
-              control={<input id="dim-known" type="checkbox" checked={dimKnown} onChange={(e) => setDimKnown(e.target.checked)} />}
-            />
-            <div className="row">
-              <span className="row-desc">{knownCount} word{knownCount === 1 ? "" : "s"} marked known.</span>
-              {knownCount > 0 && (
-                <button
-                  type="button"
-                  className="es-options-link"
-                  onClick={() => {
-                    setKnownWords([]);
-                    // "known" entries in the status map win over the legacy array, so they
-                    // must be cleared too — otherwise forgotten words stay Known.
-                    setWordStatuses(
-                      Object.fromEntries(Object.entries(wordStatuses).filter(([, s]) => s !== "known")),
-                    );
-                  }}
-                >
-                  Forget all
-                </button>
-              )}
-            </div>
-            <Row
-              title="Rich Anki cards"
-              desc="When saving to Anki, build a sentence-mining card with the context sentence, reading, JLPT tags, a video screenshot and a cue audio clip. Off saves a plain word/meaning card."
-              htmlFor="anki-rich-cards"
-              control={
-                <input
-                  id="anki-rich-cards"
-                  type="checkbox"
-                  checked={ankiRichCards}
-                  onChange={(e) => setAnkiRichCards(e.target.checked)}
-                />
-              }
-            />
-            <Row
-              title="Anki card theme"
-              desc={optionDesc(ANKI_CARD_THEME_OPTIONS, ankiCardTheme)}
-              htmlFor="anki-card-theme"
-              control={
-                <SettingSelect
-                  id="anki-card-theme"
-                  value={ankiCardTheme}
-                  options={ANKI_CARD_THEME_OPTIONS}
-                  onChange={setAnkiCardTheme}
-                  guard={isAnkiCardTheme}
-                />
-              }
-            />
-            <Row
-              title="Anki deck"
-              desc="Deck new cards are added to. Created automatically in Anki if it does not exist."
-              htmlFor="anki-deck"
-              control={
-                <input
-                  id="anki-deck"
-                  type="text"
-                  className="es-options-text"
-                  value={ankiDeck}
-                  placeholder={DEFAULT_ANKI_DECK}
-                  onChange={(e) => setAnkiDeck(e.target.value)}
-                />
-              }
-            />
-            <Row
-              title="Anki tags"
-              desc="Tags added to each saved card. Separate multiple tags with spaces or commas."
-              htmlFor="anki-tags"
-              control={
-                <input
-                  id="anki-tags"
-                  type="text"
-                  className="es-options-text"
-                  value={ankiTags}
-                  placeholder={DEFAULT_ANKI_TAGS}
-                  onChange={(e) => setAnkiTags(e.target.value)}
-                />
-              }
-            />
-            <div className="row">
-              <span className="row-desc">{lookupHistory.length} recent lookup{lookupHistory.length === 1 ? "" : "s"} saved. Open the in-player panel to browse and jump back to them.</span>
-              {lookupHistory.length > 0 && <button type="button" className="es-options-link" onClick={() => setLookupHistory([])}>Clear history</button>}
-            </div>
-          </Group>
-
-          <Group id="readings" title="Furigana & readings">
-            <Row
-              title="Furigana"
-              desc={optionDesc(FURIGANA_OPTIONS, furigana)}
-              htmlFor="furigana"
-              control={
-                <SettingSelect
-                  id="furigana"
-                  value={furigana}
-                  options={FURIGANA_OPTIONS}
-                  onChange={setFurigana}
-                  guard={isFuriganaMode}
-                />
-              }
-            />
-            <Row
-              title="Furigana difficulty"
-              desc={optionDesc(FURIGANA_LEVEL_OPTIONS, furiganaLevel)}
-              htmlFor="furigana-level"
-              control={
-                <SettingSelect
-                  id="furigana-level"
-                  value={furiganaLevel}
-                  options={FURIGANA_LEVEL_OPTIONS}
-                  onChange={setFuriganaLevel}
-                  guard={isFuriganaLevel}
-                />
-              }
-            />
-            <Row
-              title="Reading line"
-              desc={optionDesc(READING_LINE_OPTIONS, readingLine)}
-              htmlFor="reading-line"
-              control={
-                <SettingSelect
-                  id="reading-line"
-                  value={readingLine}
-                  options={READING_LINE_OPTIONS}
-                  onChange={setReadingLine}
-                  guard={isReadingLineMode}
-                />
-              }
-            />
-            <Row
-              title="Second line"
-              desc={
-                <>
-                  {optionDesc(SECONDARY_SUBS_OPTIONS, secondary)} Press D in the player to cycle.
-                </>
-              }
-              htmlFor="secondary-subs"
-              control={
-                <SettingSelect
-                  id="secondary-subs"
-                  value={secondary}
-                  options={SECONDARY_SUBS_OPTIONS}
-                  onChange={setSecondary}
-                  guard={isSecondarySubs}
-                />
-              }
-            />
-          </Group>
-
-          <Group
-            id="appearance"
-            title="Appearance"
-            lede="Subtitle size, position, delay, playback pausing and translation language live in the settings panel inside the video player (the Himotoki button in the player controls)."
-          >
-            <Row
-              title="Pop-up size"
-              desc="Size of the dictionary pop-up, hover labels and the in-player panel."
-              htmlFor="ui-scale"
-              control={
-                <div className="range-control">
-                  <input
-                    id="ui-scale"
-                    type="range"
-                    min={UI_SCALE_MIN}
-                    max={UI_SCALE_MAX}
-                    step={UI_SCALE_STEP}
-                    value={uiScale}
-                    onChange={(e) => setUiScale(clampUiScale(e.target.value))}
-                  />
-                  <span className="range-value">{uiScale}%</span>
-                </div>
-              }
-            />
-            <Row
-              title="Colour by difficulty"
-              desc="Tint subtitle words by JLPT level (green = easy → red = hard). Off keeps a single colour."
-              htmlFor="color-by-difficulty"
-              control={
-                <input
-                  id="color-by-difficulty"
-                  type="checkbox"
-                  checked={colorByDifficulty}
-                  onChange={(e) => setColorByDifficulty(e.target.checked)}
-                />
-              }
-            />
-            <Row
-              title="Listening mode"
-              desc="Blur the subtitle text for listening practice; reveal the current line on hover or with the H key."
-              htmlFor="listening-mode"
-              control={
-                <input
-                  id="listening-mode"
-                  type="checkbox"
-                  checked={listeningMode}
-                  onChange={(e) => setListeningMode(e.target.checked)}
-                />
-              }
-            />
-          </Group>
-
-          <Group
-            id="mouse"
-            title="Mouse controls"
-            lede="Control playback without the keyboard. These work while the pointer is over the video; everywhere else the buttons keep their usual browser behaviour (back/forward, open link in new tab)."
-          >
-            {MOUSE_BUTTONS.map((b) => (
-              <MouseActionRow key={b.id} button={b.id} />
-            ))}
-          </Group>
-
-          <Group id="dictionary" title="Dictionary">
-            <DictionaryPanel />
-          </Group>
-
-          <Group id="account" title="Account">
-            <AccountPanel />
-            <div className="row" id="export-words">
-              <span className="row-text">
-                <span className="row-title">Export saved words</span>
-                <span className="row-desc">
-                  {exportCount === 0
-                    ? "No saved words yet — mark words known or set a status in the dictionary pop-up."
-                    : `Download your ${exportCount} saved word${exportCount === 1 ? "" : "s"} (keys, headwords and status) as JSON or CSV.`}
-                </span>
-              </span>
-              <span className="export-actions">
-                <button type="button" className="es-options-link" disabled={exportCount === 0} onClick={() => exportWords("json")}>
-                  Export JSON
-                </button>
-                <button type="button" className="es-options-link" disabled={exportCount === 0} onClick={() => exportWords("csv")}>
-                  Export CSV
-                </button>
-              </span>
-            </div>
-          </Group>
-
-          <Group
-            id="advanced"
-            title="Advanced"
-            lede="Endpoints the extension talks to. Leave a field blank to use the built-in default; set one to point at a different host if the domain ever changes — no reinstall needed."
-          >
-            <Row
-              title="Dictionary URL"
-              desc="Where the offline dictionary (.sqlite.gz) is downloaded from. The .json manifest is fetched from the same path. Saving a custom URL asks for permission to access that site."
-              htmlFor="endpoint-dict"
-              control={
-                <input
-                  id="endpoint-dict"
-                  type="text"
-                  className="es-options-text"
-                  value={dictUrl}
-                  placeholder={ENDPOINT_DEFAULTS.himotokiDictUrl}
-                  onChange={(e) => setDictUrl(e.target.value)}
-                  onBlur={(e) => applyEndpointUrl("himotokiDictUrl", e.target.value, setDictUrl)}
-                />
-              }
-            />
-            <Row
-              title="Convex URL"
-              desc="Backend for Save to Himotoki (account favorites). Only used when you sign in."
-              htmlFor="endpoint-convex"
-              control={
-                <input
-                  id="endpoint-convex"
-                  type="text"
-                  className="es-options-text"
-                  value={convexUrl}
-                  placeholder={ENDPOINT_DEFAULTS.himotokiConvexUrl}
-                  onChange={(e) => setConvexUrl(e.target.value)}
-                  onBlur={(e) => applyEndpointUrl("himotokiConvexUrl", e.target.value, setConvexUrl)}
-                />
-              }
-            />
-            <Row
-              title="Google client ID"
-              desc="OAuth client ID used for Himotoki account sign-in."
-              htmlFor="endpoint-google"
-              control={
-                <input
-                  id="endpoint-google"
-                  type="text"
-                  className="es-options-text"
-                  value={googleClientId}
-                  placeholder={ENDPOINT_DEFAULTS.himotokiGoogleClientId}
-                  onChange={(e) => setGoogleClientId(e.target.value)}
-                />
-              }
-            />
-            {(dictUrl || convexUrl || googleClientId) && (
-              <div className="row">
-                <span className="row-desc">Custom endpoints are set.</span>
-                <button
-                  type="button"
-                  className="es-options-link"
-                  onClick={() => {
-                    setDictUrl("");
-                    setConvexUrl("");
-                    setGoogleClientId("");
-                  }}
-                >
-                  Reset to defaults
-                </button>
-              </div>
-            )}
-          </Group>
-
-          <Group id="about" title="About">
-            <p className="row-desc">
-              Japanese subtitles are split into words with a local model and looked up in Jitendex on your
-              device. Whole-line translation uses Google Translate or DeepL.
-            </p>
-            <p className="row-desc">
-              Dictionary data: <a className="inline-link" href="https://jitendex.org/" target="_blank" rel="noreferrer">Jitendex</a> © Stephen Kraus,{" "}
-              <a className="inline-link" href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer">CC BY-SA 4.0</a>, built from{" "}
-              <a className="inline-link" href="https://www.edrdg.org/jmdict/j_jmdict.html" target="_blank" rel="noreferrer">JMdict</a> (EDRDG) and{" "}
-              <a className="inline-link" href="https://tatoeba.org/" target="_blank" rel="noreferrer">Tatoeba</a> examples (CC BY 2.0 FR). Word lookups run on your device using the offline dictionary. Whole-line translation and saving to your account use online services (see the{" "}
-              <a className="inline-link" href="https://github.com/msr2903/himotoki-sub/blob/master/PRIVACY.md" target="_blank" rel="noreferrer">privacy policy</a>).
-            </p>
-          </Group>
+    <section className="card" aria-label="Account" id="profile">
+      <div className="profile">
+        {user?.picture ? (
+          <img className="avatar" src={user.picture} alt="" referrerPolicy="no-referrer" />
+        ) : (
+          <span className="avatar" aria-hidden="true">
+            <Icon name="user" size={26} />
+          </span>
+        )}
+        <div className="profile-text">
+          <span className="profile-name">{user ? user.name || "Signed in" : "Not signed in"}</span>
+          <span className="item-hint">
+            {user ? user.email : "Sign in to save subtitle words to your Himotoki account. Everything else works without one."}
+          </span>
+          {error && <span className="error">{error}</span>}
+        </div>
+        <div className="profile-action">
+          {user ? (
+            <button type="button" className="pill quiet" disabled={busy} onClick={signOut}>
+              Sign out
+            </button>
+          ) : (
+            <button type="button" className="google-btn" disabled={busy} onClick={signIn}>
+              <GoogleMark />
+              {busy ? "Signing in…" : "Sign in with Google"}
+            </button>
+          )}
         </div>
       </div>
+    </section>
+  );
+};
+
+/* ── Look & feel ────────────────────────────────────────────── */
+
+type PreviewToken = { parts: Array<[string, string?]>; jlpt?: string[] };
+
+/** 昨日、偶然懐かしい映画を見つけた — mixed JLPT levels so every setting shows. */
+const PREVIEW_LINE: PreviewToken[] = [
+  { parts: [["昨日", "きのう"]], jlpt: ["N5"] },
+  { parts: [["、"]] },
+  { parts: [["偶然", "ぐうぜん"]], jlpt: ["N2"] },
+  { parts: [["懐", "なつ"], ["かしい"]], jlpt: ["N2"] },
+  { parts: [["映画", "えいが"]], jlpt: ["N5"] },
+  { parts: [["を"]] },
+  { parts: [["見", "み"], ["つけた"]], jlpt: ["N4"] },
+];
+/** The token drawn as "under the pointer" when furigana is on hover. */
+const PREVIEW_HOVER = 3;
+
+/** A sample subtitle line that reacts live to the look & feel settings. */
+const SubtitlePreview: FC<{ furigana: TFuriganaMode; level: TFuriganaLevel; color: boolean; listening: boolean }> = ({
+  furigana,
+  level,
+  color,
+  listening,
+}) => (
+  <div className="preview" aria-hidden="true">
+    <span className="preview-tag">Preview</span>
+    <p className={cn("preview-sub", { listening })}>
+      {PREVIEW_LINE.map((token, i) => {
+        const hovered = furigana === "hover" && i === PREVIEW_HOVER;
+        const ruby =
+          (furigana === "always" || hovered) && token.jlpt !== undefined && showFuriganaForLevel(token.jlpt, level);
+        return (
+          <span key={i} className={cn("preview-token", color && jlptColorClass(token.jlpt), { hovered })}>
+            {token.parts.map(([text, reading], j) =>
+              ruby && reading ? (
+                <ruby key={j}>
+                  {text}
+                  <rt>{reading}</rt>
+                </ruby>
+              ) : (
+                <span key={j}>{text}</span>
+              ),
+            )}
+          </span>
+        );
+      })}
+    </p>
+  </div>
+);
+
+const THEMES: ReadonlyArray<{ value: TTheme; label: string; icon: IconName }> = [
+  { value: "light", label: "Light", icon: "sun" },
+  { value: "dark", label: "Dark", icon: "moon" },
+];
+
+/** Theme tiles, as on the web app. Applies to the extension pages; the in-player UI stays dark. */
+const ThemePicker: FC = () => {
+  const [theme, setTheme] = usePersistedSetting<TTheme>(THEME_SETTING, DEFAULT_THEME, isTheme);
+  return (
+    <div className="theme-tiles" role="radiogroup" aria-label="Theme" id="theme">
+      {THEMES.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={theme === o.value}
+          className={cn("theme-tile", { on: theme === o.value })}
+          data-variant={o.value}
+          onClick={() => setTheme(o.value)}
+        >
+          <span className="theme-art" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
+          <span className="theme-label">
+            <Icon name={o.icon} size={16} />
+            {o.label}
+          </span>
+        </button>
+      ))}
     </div>
+  );
+};
+
+const LookAndFeel: FC = () => {
+  const [furigana, setFurigana] = usePersistedSetting<TFuriganaMode>(FURIGANA_SETTING, DEFAULT_FURIGANA, isFuriganaMode);
+  const [level] = usePersistedSetting<TFuriganaLevel>(FURIGANA_LEVEL_SETTING, DEFAULT_FURIGANA_LEVEL, isFuriganaLevel);
+  const [color, setColor] = usePersistedSetting<boolean>(COLOR_BY_DIFFICULTY_SETTING, DEFAULT_COLOR_BY_DIFFICULTY, isBool);
+  const [listening, setListening] = usePersistedSetting<boolean>(LISTENING_MODE_SETTING, DEFAULT_LISTENING_MODE, isBool);
+
+  return (
+    <Card title="Look & feel">
+      <ThemePicker />
+      <SubtitlePreview furigana={furigana} level={level} color={color} listening={listening} />
+      <ChipsRow id="furigana" title="Furigana" value={furigana} options={FURIGANA_OPTIONS} onChange={setFurigana} />
+      <ToggleRow
+        id="color-by-difficulty"
+        title="Colour by difficulty"
+        hint="Tint words by JLPT level, green for easy to red for hard."
+        checked={color}
+        onChange={setColor}
+      />
+      <ToggleRow
+        id="listening-mode"
+        title="Listening mode"
+        hint="Blur the subtitles; hover or press H to peek."
+        checked={listening}
+        onChange={setListening}
+      />
+    </Card>
+  );
+};
+
+/* ── Menu summaries ─────────────────────────────────────────── */
+
+const actionLabel = (value: TTokenAction) => TOKEN_ACTIONS.find((a) => a.value === value)?.label ?? value;
+
+type DictSummary = { state?: string } | null;
+
+function useSummaries(): Partial<Record<PanelId, string>> {
+  const [hover] = usePersistedSetting<TTokenAction>(HOVER_ACTION_SETTING, DEFAULT_HOVER_ACTION, isTokenAction);
+  const [click] = usePersistedSetting<TTokenAction>(CLICK_ACTION_SETTING, DEFAULT_CLICK_ACTION, isTokenAction);
+  const [secondary] = usePersistedSetting<TSecondarySubs>(SECONDARY_SUBS_SETTING, DEFAULT_SECONDARY_SUBS, isSecondarySubs);
+  const [mouseMiddle] = usePersistedSetting<TMouseAction>(MOUSE_BUTTONS[0].setting, DEFAULT_MOUSE_ACTION, isMouseAction);
+  const [mouseBack] = usePersistedSetting<TMouseAction>(MOUSE_BUTTONS[1].setting, DEFAULT_MOUSE_ACTION, isMouseAction);
+  const [mouseForward] = usePersistedSetting<TMouseAction>(MOUSE_BUTTONS[2].setting, DEFAULT_MOUSE_ACTION, isMouseAction);
+  const [richCards] = usePersistedSetting<boolean>(ANKI_RICH_CARDS_SETTING, DEFAULT_ANKI_RICH_CARDS, isBool);
+  const [deck] = usePersistedSetting<string>(ANKI_DECK_SETTING, DEFAULT_ANKI_DECK, isString);
+  const [knownWords] = usePersistedSetting<string[]>(KNOWN_WORDS_SETTING, [], isStringArray);
+  const [statuses] = usePersistedSetting<Record<string, string>>(WORD_STATUSES_SETTING, {}, isStringRecord);
+  const [dictUrl] = useRawStringSetting("himotokiDictUrl");
+  const [convexUrl] = useRawStringSetting("himotokiConvexUrl");
+  const [clientId] = useRawStringSetting("himotokiGoogleClientId");
+  const [dict, setDict] = useState<DictSummary>(null);
+
+  useEffect(() => {
+    void chrome.runtime
+      .sendMessage({ type: "himotokiDictStatus" })
+      .then((resp) => setDict(resp?.ok ? resp.data : { state: "error" }))
+      .catch(() => setDict({ state: "error" }));
+  }, []);
+
+  const mouseSet = [mouseMiddle, mouseBack, mouseForward]
+    .map((action, i) => ({ action, label: MOUSE_BUTTONS[i]!.label }))
+    .filter((b) => b.action !== "none");
+  const known = countKnown(knownWords, statuses);
+  const dictState = dict?.state;
+
+  return {
+    words: `Hover: ${actionLabel(hover)} · Click: ${actionLabel(click)}`,
+    subtitles: `Second line: ${SECONDARY_SUBS_OPTIONS.find((o) => o.value === secondary)?.label ?? secondary}`,
+    mouse:
+      mouseSet.length === 0
+        ? "Off"
+        : mouseSet.length === 1
+          ? `${mouseSet[0]!.label}: ${MOUSE_ACTIONS.find((a) => a.value === mouseSet[0]!.action)?.label}`
+          : `${mouseSet.length} buttons set`,
+    anki: `${richCards ? "Rich" : "Plain"} cards · ${deck || DEFAULT_ANKI_DECK}`,
+    dictionary:
+      dictState === "ready"
+        ? "Installed"
+        : dictState === "downloading" || dictState === "importing" || dictState === "booting"
+          ? "Installing…"
+          : dictState
+            ? "Not downloaded"
+            : undefined,
+    data: known ? `${known.toLocaleString()} known word${known === 1 ? "" : "s"}` : "Known words, history and export",
+    advanced: dictUrl || convexUrl || clientId ? "Custom endpoints" : "Default endpoints",
+  };
+}
+
+/* ── Page ───────────────────────────────────────────────────── */
+
+const MENU: PanelId[] = ["words", "subtitles", "mouse", "anki", "dictionary", "data", "advanced", "about"];
+
+const Options: FC = () => {
+  const [panel, openPanel] = usePanelParam(isPanelId);
+  const [query, setQuery] = useState("");
+  const results = useMemo(() => searchSettings(query), [query]);
+  const summaries = useSummaries();
+
+  const go = (entry: SearchEntry) => {
+    setQuery("");
+    if (entry.panel) openPanel(entry.panel);
+    reveal(entry.focus);
+  };
+
+  if (panel) {
+    const meta = PANELS[panel];
+    return (
+      <main className="page">
+        <button type="button" className="back" onClick={() => openPanel(null)}>
+          <Icon name="back" size={18} />
+          Settings
+        </button>
+        <header className="panel-head">
+          <TintedIcon name={meta.icon} tint={meta.tint} />
+          <div>
+            <h1 id="panel-title">{meta.title}</h1>
+            <p className="lede">{meta.lede}</p>
+          </div>
+        </header>
+        <meta.View />
+      </main>
+    );
+  }
+
+  return (
+    <main className="page">
+      <header className="brand">
+        <h1>
+          Himotoki Sub <span>Settings</span>
+        </h1>
+      </header>
+      <SearchField value={query} onChange={setQuery} />
+
+      {query.trim() ? (
+        results.length ? (
+          <div className="card menu">
+            {results.map((e) => {
+              const where = e.panel ? PANELS[e.panel] : null;
+              return (
+                <MenuRow
+                  key={e.title}
+                  icon={where?.icon ?? "pulse"}
+                  tint={where?.tint ?? "violet"}
+                  title={e.title}
+                  summary={where?.title ?? (e.focus === "profile" ? "Account" : "Look & feel")}
+                  onClick={() => go(e)}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <p className="empty">No settings match “{query.trim()}”.</p>
+        )
+      ) : (
+        <>
+          <ProfileCard />
+          <LookAndFeel />
+          <nav className="card menu" aria-label="More settings">
+            {MENU.map((id) => (
+              <MenuRow
+                key={id}
+                icon={PANELS[id].icon}
+                tint={PANELS[id].tint}
+                title={PANELS[id].title}
+                summary={summaries[id]}
+                onClick={() => openPanel(id)}
+              />
+            ))}
+          </nav>
+        </>
+      )}
+    </main>
   );
 };
 

@@ -1,4 +1,5 @@
 import { FC } from "react";
+import { TPitchDisplay } from "@src/shared/pitchSettings";
 
 /** Split a kana reading into morae (small ゃゅょ etc. attach to the preceding kana). */
 const toMorae = (reading: string): string[] => {
@@ -32,19 +33,24 @@ const pitchPattern = (moraCount: number, accent: number): { highs: boolean[]; pa
  * after the accented mora). Falls back to a numeric badge when no reading is available. `pitch` may
  * be one number or several joined by "/".
  */
-export const PitchAccent: FC<{ pitch: string; reading?: string }> = ({ pitch, reading }) => {
+export const PitchAccent: FC<{ pitch: string; reading?: string; display?: TPitchDisplay }> = ({ pitch, reading, display = "contour" }) => {
+  if (display === "hidden") return null;
   const values = pitch
     .split("/")
-    .map((v) => Number(v.trim()))
-    .filter((v) => Number.isFinite(v));
+    .map((v) => v.trim())
+    .filter((v) => /^\d+$/.test(v))
+    .map(Number);
   if (!values.length) return null;
 
   const morae = reading ? toMorae(reading) : [];
-  if (!morae.length) {
+  const accents = [...new Set(values)].filter((value) => !morae.length || value <= morae.length);
+  if (!accents.length) return null;
+  if (display === "number" || !morae.length) {
     return (
-      <span className="es-pitch">
-        {values.map((v, i) => (
-          <span key={i} className="es-pitch-num">
+      <span className="es-pitch" role="img" aria-label={`Pitch accent: ${accents.join(", ")}`}>
+        <span className="es-pitch-label" aria-hidden="true">Pitch</span>
+        {accents.map((v) => (
+          <span key={v} className="es-pitch-num" aria-hidden="true">
             {v}
           </span>
         ))}
@@ -52,24 +58,31 @@ export const PitchAccent: FC<{ pitch: string; reading?: string }> = ({ pitch, re
     );
   }
 
-  const accent = values[0]!;
-  const { highs, particleHigh } = pitchPattern(morae.length, accent);
-
   return (
-    <span className="es-pitch" title={`pitch accent ${values.join(", ")}`}>
-      <span className="es-pitch-diagram">
-        {morae.map((mora, i) => {
-          const high = highs[i]!;
-          const drop = high && (i + 1 >= morae.length ? !particleHigh : !highs[i + 1]!);
-          return (
-            <span key={i} className={`es-pitch-mora ${high ? "high" : "low"} ${drop ? "drop" : ""}`}>
-              {mora}
+    <span className="es-pitch" role="img" aria-label={`Pitch accent: ${accents.join(", ")}`}>
+      <span className="es-pitch-label" aria-hidden="true">Pitch</span>
+      {accents.map((accent) => {
+        const { highs, particleHigh } = pitchPattern(morae.length, accent);
+        const patternName = accent === 0 ? "flat" : accent === 1 ? "head" : accent === morae.length ? "tail" : "middle";
+        return (
+          <span className="es-pitch-variant" key={accent} aria-hidden="true" title={`${patternName} pattern, accent ${accent}`}>
+            <span className="es-pitch-diagram">
+              {morae.map((mora, i) => {
+                const high = highs[i]!;
+                const drop = high && (i + 1 >= morae.length ? !particleHigh : !highs[i + 1]!);
+                return (
+                  <span key={i} className={`es-pitch-mora ${high ? "high" : "low"} ${drop ? "drop" : ""}`}>
+                    {mora}
+                  </span>
+                );
+              })}
+              <span className={`es-pitch-particle ${particleHigh ? "high" : "low"}`} />
             </span>
-          );
-        })}
-        <span className={`es-pitch-particle ${particleHigh ? "high" : "low"}`} aria-hidden />
-      </span>
-      {values.length > 1 && <span className="es-pitch-num">{values.join("/")}</span>}
+            <span className="es-pitch-num">{accent}</span>
+            <span className="es-pitch-type">{patternName}</span>
+          </span>
+        );
+      })}
     </span>
   );
 };

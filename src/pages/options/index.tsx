@@ -2,8 +2,11 @@ import { createRoot } from "react-dom/client";
 import "@pages/options/index.scss";
 import Options from "@pages/options/Options";
 import refreshOnUpdate from "virtual:reload-on-update-in-view";
+import { initPageTheme } from "@src/pages/shared/pageTheme";
 
 refreshOnUpdate("pages/options");
+
+initPageTheme();
 
 function init() {
   const appContainer = document.querySelector("#es-options");

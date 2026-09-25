@@ -10,6 +10,7 @@ import {
   $ankiTags,
   $knownWords,
   $learningService,
+  $pitchDisplay,
   $wordStatuses,
   ankiWordSaved,
   wordStatusSet,
@@ -64,6 +65,7 @@ export const SubItemTranslation: FC<{
   const { translation, pending } = useLookup(subItem);
   const [
     learningService,
+    pitchDisplay,
     video,
     unpin,
     knownWords,
@@ -77,6 +79,7 @@ export const SubItemTranslation: FC<{
     markAnkiSaved,
   ] = useUnit([
     $learningService,
+    $pitchDisplay,
     $video,
     tokenUnpinned,
     $knownWords,
@@ -321,13 +324,13 @@ export const SubItemTranslation: FC<{
           </span>
         </div>
         {reading && <p className="es-popup-reading">{reading}</p>}
-        {(current.pitch ||
+        {((current.pitch && pitchDisplay !== "hidden") ||
           current.common ||
           current.jlpt?.length ||
           current.frequency ||
           translation.conjugationNote) && (
           <div className="es-popup-tags">
-            {current.pitch && <PitchAccent pitch={current.pitch} reading={current.reading} />}
+            {current.pitch && pitchDisplay !== "hidden" && <PitchAccent pitch={current.pitch} reading={current.reading} display={pitchDisplay} />}
             {current.jlpt?.map((level) => (
               <span key={level} className="es-tag">
                 {level.toUpperCase()}
