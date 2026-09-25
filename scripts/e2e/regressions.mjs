@@ -136,11 +136,33 @@ try {
   await page.evaluate(() => window.audit.settings.newWordsLevelChanged("n1"));
   await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-glossary__row").length === 1);
   assert.equal(await glossary(), "邂逅chance meeting", "N1 lists only rare words");
+  // A word the glossary missed: show the line, mark the word Learning, and it joins the glossary.
+  await page.getByRole("button", { name: "Show line" }).click();
+  await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-sub").length === 1);
+  await page.mouse.move(5, 5);
+  await page.locator("#es-subs").screenshot({ path: "/tmp/himotoki-glossary-show-line.png" });
+  await page.locator("#es-subs .es-sub .es-sub-item", { hasText: "懐かしい" }).click();
+  await page.locator(".es-word-translation").getByRole("button", { name: "Learning", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-glossary__row").length === 2);
+  assert.equal(await glossary(), "懐かしいnostalgic | 邂逅chance meeting", "A word marked Learning is always listed");
+  assert.equal(await page.getByRole("button", { name: "Hide line" }).count(), 1, "The line stays shown until the next one");
+  // The next line starts hidden again; a line with no new words still offers the button.
+  await page.evaluate(async () => {
+    const { subs: s } = window.audit;
+    const text = "昨日 映画";
+    const line = { id: 10, start: 4000, end: 8000, text, cleanedText: text, items: text.split(" ").map((t) => ({ text: t, cleanedText: t, type: "word", tag: "span" })) };
+    s.updateCurrentSubsFx.use(async () => [line]); await s.updateCurrentSubsFx({ subs: [], video: null });
+  });
+  await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-sub").length === 0 && document.querySelector("#es-subs .es-glossary--empty"));
+  await page.locator("#es-subs").screenshot({ path: "/tmp/himotoki-glossary-empty-line.png" });
+  await page.getByRole("button", { name: "Show line" }).click();
+  await page.waitForFunction(() => document.querySelector("#es-subs .es-sub")?.textContent === "昨日映画");
   await page.evaluate(() => window.audit.settings.listeningPeekToggled());
   await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-sub").length === 1 && document.querySelector("#es-subs .es-glossary"));
   await page.evaluate(() => window.audit.settings.newWordsLevelChanged("off"));
   await page.waitForFunction(() => !document.querySelector("#es-subs .es-glossary") && document.querySelectorAll("#es-subs .es-sub").length === 1);
-  console.log("PASS New words only swaps the line for a glossary of words above the learner's level; H shows the line");
+  console.log("PASS New words only swaps the line for a glossary; Show line reveals it and a word marked Learning joins the glossary");
   await page.keyboard.press("Escape");
   assert.equal(await page.locator(".es-word-translation").count(), 0);
   await page.locator("#typing").focus(); await page.keyboard.press("b");

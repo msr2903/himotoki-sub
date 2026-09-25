@@ -19,6 +19,7 @@ import {
   $readingLine,
   $listeningMode,
   $listeningPeek,
+  listeningPeekToggled,
   $dimKnownWords,
   $knownWords,
   $wordStatuses,
@@ -112,6 +113,14 @@ export const Subs: FC<TSubsProps> = () => {
   const newWordsLevel = useUnit($newWordsLevel);
   // New words only needs the offline dictionary to rate every token; without it, show plain subtitles.
   const newWordsOnly = newWordsLevel !== "off" && dictReady;
+  // New words only: "Show line" reveals the current line until the next one starts; H peeks until toggled.
+  const cueKey = currentSubs.map((sub) => sub.id).join(",");
+  const [shownCue, setShownCue] = useState<string | null>(null);
+  const lineShown = listeningPeek || (cueKey !== "" && shownCue === cueKey);
+  const toggleLine = () => {
+    if (listeningPeek) listeningPeekToggled();
+    else setShownCue(shownCue === cueKey ? null : cueKey);
+  };
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   // Attach the keyboard shortcuts unconditionally: D/B/T/R/L/H/,/./\ must work regardless of the
@@ -208,12 +217,14 @@ export const Subs: FC<TSubsProps> = () => {
         onMouseEnter={handleOnMouseEnter}
         style={{ fontSize: `${fontSizePx}px`, "--es-ui-scale": String(uiScale / 100), "--es-meaning-scale": String(meaningSize / 100) } as React.CSSProperties}
       >
-        {(!newWordsOnly || listeningPeek) &&
+        {(!newWordsOnly || lineShown) &&
           currentSubs.map((sub) => (
             <Sub key={sub.id} sub={sub} secondary={secondaryMode === "translate"} furigana={effectiveFurigana} readingLine={readingLine} />
           ))}
-        {newWordsOnly && <NewWordsGlossary subs={currentSubs} level={newWordsLevel} />}
-        {(!newWordsOnly || listeningPeek) && secondaryMode === "track" && currentSubs.length > 0 && currentSecondary.length > 0 && (
+        {newWordsOnly && (
+          <NewWordsGlossary subs={currentSubs} level={newWordsLevel} lineShown={lineShown} onToggleLine={cueKey ? toggleLine : undefined} />
+        )}
+        {(!newWordsOnly || lineShown) && secondaryMode === "track" && currentSubs.length > 0 && currentSecondary.length > 0 && (
           <div className="es-sub es-sub--secondary" style={{ background: `rgba(0, 0, 0, ${subsBackgroundAlpha(subsBackground, subsBackgroundOpacity)})` }}>
             <div className="es-sub-secondary">{currentSecondary.map((cue) => cue.text).join(" ")}</div>
           </div>
@@ -305,7 +316,13 @@ type GlossaryEntry = { sub: TSub; item: TSubItem; index: number; tx: TWordTransl
  * with its short meaning. The word is a normal token (hover, click to pin the pop-up). A glossary stays
  * up for GLOSSARY_HOLD_MS even if the line ends sooner, so quick lines can still be read.
  */
-const NewWordsGlossary: FC<{ subs: TSub[]; level: Exclude<TNewWordsLevel, "off"> }> = ({ subs, level }) => {
+const NewWordsGlossary: FC<{
+  subs: TSub[];
+  level: Exclude<TNewWordsLevel, "off">;
+  lineShown: boolean;
+  /** Reveal or hide the current line; absent between lines. */
+  onToggleLine?: () => void;
+}> = ({ subs, level, lineShown, onToggleLine }) => {
   const [lookups, request, knownWords, wordStatuses, subsBackground, subsBackgroundOpacity] = useUnit([
     $lookups,
     lookupRequested,
@@ -362,7 +379,15 @@ const NewWordsGlossary: FC<{ subs: TSub[]; level: Exclude<TNewWordsLevel, "off">
   }, [signature]);
 
   const rows = shown.length ? { shown, more } : held;
-  if (!rows?.shown.length) return null;
+  // The glossary can miss a word the learner doesn't know, and a line of "known" words shows no rows at
+  // all, so the full line is always one click away. From there any word can be marked Learning, which
+  // lists it here from then on.
+  const lineToggle = onToggleLine && (
+    <button type="button" className="es-glossary__toggle" aria-pressed={lineShown} onClick={onToggleLine}>
+      {lineShown ? "Hide line" : "Show line"}
+    </button>
+  );
+  if (!rows?.shown.length) return lineToggle ? <div className="es-glossary es-glossary--empty">{lineToggle}</div> : null;
   return (
     <div className="es-glossary" style={{ background: `rgba(0, 0, 0, ${subsBackgroundAlpha(subsBackground, subsBackgroundOpacity)})` }}>
       {rows.shown.map((w) => (
@@ -384,7 +409,12 @@ const NewWordsGlossary: FC<{ subs: TSub[]; level: Exclude<TNewWordsLevel, "off">
           <span className="es-glossary__gloss">{w.gloss}</span>
         </div>
       ))}
-      {rows.more > 0 && <div className="es-glossary__more">+{rows.more} more · press H for the line</div>}
+      {(rows.more > 0 || lineToggle) && (
+        <div className="es-glossary__footer">
+          {rows.more > 0 && <span className="es-glossary__more">+{rows.more} more</span>}
+          {lineToggle}
+        </div>
+      )}
     </div>
   );
 };
