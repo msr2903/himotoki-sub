@@ -12,7 +12,8 @@ const temp = fs.mkdtempSync(path.join(os.tmpdir(), "himotoki-regressions-"));
 const ext = path.join(temp, "extension");
 fs.cpSync(path.join(root, "dist"), ext, { recursive: true });
 await build({ entryPoints: [path.join(root, "scripts/e2e/fixtures/regressions.tsx")], bundle: true, outfile: path.join(ext, "audit.js"), format: "iife", platform: "browser", define: { "process.env.NODE_ENV": '"production"' }, alias: { "@src": path.join(root, "src") } });
-fs.writeFileSync(path.join(ext, "audit.html"), '<html><head><meta charset="utf-8"></head><body><input id="typing"><div id="root"></div><script src="audit.js"></script></body></html>');
+const contentCss = fs.readdirSync(path.join(ext, "assets/css")).find((name) => name.startsWith("contentStyle"));
+fs.writeFileSync(path.join(ext, "audit.html"), `<html><head><meta charset="utf-8"><link rel="stylesheet" href="assets/css/${contentCss}"></head><body class="es-enabled"><input id="typing"><div id="es" style="display:block;position:absolute;top:390px;left:100px;width:900px"><div id="root"></div></div><script src="audit.js"></script></body></html>`);
 const ctx = await chromium.launchPersistentContext(path.join(temp, "profile"), { headless: false, args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`] });
 try {
   const sw = ctx.serviceWorkers()[0] ?? await ctx.waitForEvent("serviceworker", { timeout: 20000 });
@@ -79,7 +80,7 @@ try {
     v.loopLineToggled();
     // Populate the real popup cache with two different dictionary entries.
     st.furiganaChanged("never"); st.hoverActionChanged("none"); st.clickActionChanged("popup");
-    const word = { source: "猫", headword: "猫", reading: "ねこ", mainTranslation: "cat", translations: [{ word: "cat", partOfSpeech: "noun", synonyms: [], popularity: 0 }], targetLanguage: "en", transcription: "", himotokiSave: { source: "jitendex", seq: 1, headword: "猫" } };
+    const word = { source: "猫", headword: "猫", reading: "ねこ", pitch: "0/2", mainTranslation: "cat", translations: [{ word: "cat", partOfSpeech: "noun", synonyms: [], popularity: 0 }], targetLanguage: "en", transcription: "", himotokiSave: { source: "jitendex", seq: 1, headword: "猫" } };
     tr.fetchWordTranslationFx.use(async () => ({ ...word, alternatives: [{ ...word, headword: "ネコ", himotokiSave: { source: "jitendex", seq: 2, headword: "ネコ" } }] }));
     await tr.fetchWordTranslationFx({ source: "猫" });
     // Use a real element for React's layout reads; no actual media source is required.
@@ -92,6 +93,18 @@ try {
   for (const check of checks) console.log("PASS", check);
   await page.locator(".es-sub-item").click();
   await page.waitForSelector(".es-word-translation");
+  // Pitch accent: every recorded contour, numbers only, or hidden, following the persisted setting.
+  assert.equal(await page.locator(".es-pitch-variant").count(), 2, "Both recorded pitch contours should be visible");
+  await page.locator(".es-word-translation").screenshot({ path: "/tmp/himotoki-pitch-contour.png" });
+  await page.evaluate(() => window.audit.settings.pitchDisplayChanged("number"));
+  await page.waitForFunction(() => document.querySelectorAll(".es-pitch-num").length === 2 && document.querySelectorAll(".es-pitch-variant").length === 0);
+  await page.locator(".es-word-translation").screenshot({ path: "/tmp/himotoki-pitch-number.png" });
+  await page.evaluate(() => window.audit.settings.pitchDisplayChanged("hidden"));
+  await page.waitForFunction(() => document.querySelectorAll(".es-pitch").length === 0);
+  await page.locator(".es-word-translation").screenshot({ path: "/tmp/himotoki-pitch-hidden.png" });
+  await page.evaluate(() => window.audit.settings.pitchDisplayChanged("contour"));
+  await page.waitForFunction(() => document.querySelectorAll(".es-pitch-variant").length === 2);
+  console.log("PASS Pitch accent shows contours, numbers only, or nothing");
   assert.equal(await page.locator(".es-entry-count").textContent(), "1 / 2");
   await page.getByTitle("Next entry").click();
   assert.equal(await page.locator(".es-entry-count").textContent(), "2 / 2");
@@ -136,7 +149,14 @@ try {
   while (await increaseScale.isEnabled()) await increaseScale.click();
   await persisted(options, "uiScale", 150);
   await options.locator("#dim-known").check();
+  await options.locator("#pitch-display").getByRole("radio", { name: "Number" }).click();
+  await persisted(options, "pitchDisplay", "number");
   await options.goBack();
+  // Theme: defaults to dark, the Light tile switches this page and other open extension pages.
+  assert.equal(await options.evaluate(() => document.documentElement.dataset.hmTheme), "dark");
+  await options.locator("#theme").getByRole("radio", { name: "Light" }).click();
+  await persisted(options, "theme", "light");
+  await options.waitForFunction(() => getComputedStyle(document.body).backgroundColor === "rgb(250, 250, 248)");
   await options.waitForSelector("#furigana");
   await options.fill("input[type=search]", "second line");
   await options.getByRole("button", { name: /^Second line/ }).click();
@@ -163,6 +183,8 @@ try {
   await options2.waitForFunction(() => document.querySelector("#hover-action")?.value === "meaning");
   assert.equal(await options2.locator("#dim-known").isChecked(), true, "Forget all must not toggle dimming");
   assert.equal(await options2.locator("#ui-scale .step-value").textContent(), "150%");
+  assert.equal(await options2.locator("#pitch-display").getByRole("radio", { name: "Number" }).getAttribute("aria-checked"), "true");
+  assert.equal(await options2.evaluate(() => document.documentElement.dataset.hmTheme), "light", "Theme applies to every extension page");
   await options2.locator("#hover-action").selectOption("both");
   await options.waitForFunction(() => document.querySelector("#hover-action")?.value === "both");
   await options.goto(`${optionsUrl}?panel=subtitles`);
@@ -180,6 +202,13 @@ try {
   }
   await options.goto(optionsUrl);
   await options.screenshot({ path: "/tmp/himotoki-audit-options-mobile.png", fullPage: true });
+  const popup = await ctx.newPage();
+  popup.on("pageerror", (e) => errors.push(String(e)));
+  await popup.goto(`chrome-extension://${new URL(sw.url()).host}/src/pages/popup/index.html`);
+  await popup.waitForFunction(() => document.documentElement.dataset.hmTheme === "light");
+  await options.locator("#theme").getByRole("radio", { name: "Dark" }).click();
+  await popup.waitForFunction(() => document.documentElement.dataset.hmTheme === "dark");
+  console.log("PASS Theme persists and follows live on the popup");
   console.log("PASS Options preserve controls, persist values, sync across pages, navigate panels and search, and fit narrow windows");
   assert.deepEqual(errors, [], "Browser runtime errors");
   console.log(`PASS browser runtime errors: ${errors.length}`);

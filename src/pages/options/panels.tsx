@@ -38,6 +38,7 @@ import {
 } from "@src/shared/ankiSettings";
 import type { TAnkiCardTheme } from "@src/utils/ankiNote";
 import { DEFAULT_MOUSE_ACTION, MOUSE_ACTIONS, MOUSE_BUTTONS, isMouseAction } from "@src/shared/mouseActions";
+import { DEFAULT_PITCH_DISPLAY, PITCH_DISPLAY_OPTIONS, PITCH_DISPLAY_SETTING, isPitchDisplay, type TPitchDisplay } from "@src/shared/pitchSettings";
 import { LOOKUP_HISTORY_SETTING } from "@src/shared/lookupHistory";
 import { buildRows, toCsv, toJson } from "@src/shared/exportWords";
 import { DictionaryPanel } from "@src/pages/shared/DictionaryPanel";
@@ -56,6 +57,9 @@ export const countKnown = (knownWords: string[], statuses: Record<string, string
   ]).size;
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+
+const PITCH_CHIP_LABELS: Record<TPitchDisplay, string> = { contour: "Contour", number: "Number", hidden: "Hidden" };
+export const PITCH_CHIPS = PITCH_DISPLAY_OPTIONS.map((o) => ({ ...o, label: PITCH_CHIP_LABELS[o.value] }));
 
 /** Trigger a client-side file download of some text. */
 const downloadText = (filename: string, text: string, mime: string) => {
@@ -76,12 +80,16 @@ export const WordsPanel: FC = () => {
   const [meaningSize, setMeaningSize] = usePersistedSetting<number>(MEANING_SIZE_SETTING, MEANING_SIZE_DEFAULT, isFiniteNumber);
   const [uiScale, setUiScale] = usePersistedSetting<number>(UI_SCALE_SETTING, UI_SCALE_DEFAULT, isFiniteNumber);
   const [dimKnown, setDimKnown] = usePersistedSetting<boolean>(DIM_KNOWN_SETTING, DEFAULT_DIM_KNOWN, isBool);
+  const [pitchDisplay, setPitchDisplay] = usePersistedSetting<TPitchDisplay>(PITCH_DISPLAY_SETTING, DEFAULT_PITCH_DISPLAY, isPitchDisplay);
 
   return (
     <>
       <Card title="Hover and click">
         <SelectRow id="hover-action" title="On hover" value={hoverAction} options={TOKEN_ACTIONS} onChange={setHoverAction} guard={isTokenAction} />
         <SelectRow id="click-action" title="On click" value={clickAction} options={TOKEN_ACTIONS} onChange={setClickAction} guard={isTokenAction} />
+      </Card>
+      <Card title="Dictionary pop-up">
+        <ChipsRow id="pitch-display" title="Pitch accent" value={pitchDisplay} options={PITCH_CHIPS} onChange={setPitchDisplay} />
       </Card>
       <Card title="Size">
         <StepperRow

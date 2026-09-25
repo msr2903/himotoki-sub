@@ -29,6 +29,7 @@ import { WORD_STATUSES_SETTING } from "@src/shared/wordStatus";
 import { ANKI_DECK_SETTING, ANKI_RICH_CARDS_SETTING, DEFAULT_ANKI_DECK, DEFAULT_ANKI_RICH_CARDS } from "@src/shared/ankiSettings";
 import { DEFAULT_LISTENING_MODE, LISTENING_MODE_SETTING } from "@src/shared/listeningMode";
 import { DEFAULT_MOUSE_ACTION, MOUSE_ACTIONS, MOUSE_BUTTONS, isMouseAction } from "@src/shared/mouseActions";
+import { DEFAULT_THEME, THEME_SETTING, TTheme, isTheme } from "@src/shared/themeSettings";
 import { useHimotokiSession } from "@src/pages/shared/useHimotokiSession";
 import { Card, ChipsRow, Icon, IconName, MenuRow, SearchField, Tint, TintedIcon, ToggleRow } from "./controls";
 import { isBool, isString, usePanelParam, usePersistedSetting, useRawStringSetting } from "./hooks";
@@ -49,7 +50,7 @@ import {
 type PanelId = "words" | "subtitles" | "mouse" | "anki" | "dictionary" | "data" | "advanced" | "about";
 
 const PANELS: Record<PanelId, { title: string; lede: string; icon: IconName; tint: Tint; View: FC }> = {
-  words: { title: "Words", lede: "What hovering and clicking a subtitle word does.", icon: "cursor", tint: "teal", View: WordsPanel },
+  words: { title: "Words", lede: "What hovering and clicking a subtitle word does, and what the pop-up shows.", icon: "cursor", tint: "teal", View: WordsPanel },
   subtitles: { title: "Subtitles", lede: "Which words get furigana, and a second subtitle line.", icon: "captions", tint: "blue", View: SubtitlesPanel },
   mouse: { title: "Mouse controls", lede: "Step through lines with the middle and side mouse buttons.", icon: "mouse", tint: "violet", View: MousePanel },
   anki: { title: "Anki", lede: "How words are saved as Anki cards.", icon: "cards", tint: "coral", View: AnkiPanel },
@@ -74,6 +75,7 @@ type SearchEntry = {
 
 const SEARCH_INDEX: SearchEntry[] = [
   { title: "Account", keywords: "profile sign in login out google himotoki save", focus: "profile" },
+  { title: "Theme", keywords: "appearance dark light mode night colour color", focus: "theme" },
   { title: "Furigana", keywords: "reading ruby kana always hover never", focus: "furigana" },
   { title: "Colour by difficulty", keywords: "color jlpt level tint green red", focus: "color-by-difficulty" },
   { title: "Listening mode", keywords: "blur hide text practice peek", focus: "listening-mode" },
@@ -81,6 +83,7 @@ const SEARCH_INDEX: SearchEntry[] = [
   { title: "On click", panel: "words", keywords: "click pin pop-up popup dictionary action", focus: "click-action" },
   { title: "Meaning size", panel: "words", keywords: "font text gloss label size", focus: "meaning-size" },
   { title: "Pop-up size", panel: "words", keywords: "scale zoom popup panel size ui", focus: "ui-scale" },
+  { title: "Pitch accent", panel: "words", keywords: "pitch accent contour number hide pop-up popup dictionary", focus: "pitch-display" },
   { title: "Dim known words", panel: "words", keywords: "known fade opacity", focus: "dim-known" },
   { title: "Skip furigana on easy words", panel: "subtitles", keywords: "furigana difficulty jlpt level n5 n4 n3 n2 n1", focus: "furigana-level" },
   { title: "Kana reading line", panel: "subtitles", keywords: "reading line kana hide text channel", focus: "reading-line" },
@@ -217,6 +220,41 @@ const SubtitlePreview: FC<{ furigana: TFuriganaMode; level: TFuriganaLevel; colo
   </div>
 );
 
+const THEMES: ReadonlyArray<{ value: TTheme; label: string; icon: IconName }> = [
+  { value: "light", label: "Light", icon: "sun" },
+  { value: "dark", label: "Dark", icon: "moon" },
+];
+
+/** Theme tiles, as on the web app. Applies to the extension pages; the in-player UI stays dark. */
+const ThemePicker: FC = () => {
+  const [theme, setTheme] = usePersistedSetting<TTheme>(THEME_SETTING, DEFAULT_THEME, isTheme);
+  return (
+    <div className="theme-tiles" role="radiogroup" aria-label="Theme" id="theme">
+      {THEMES.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={theme === o.value}
+          className={cn("theme-tile", { on: theme === o.value })}
+          data-variant={o.value}
+          onClick={() => setTheme(o.value)}
+        >
+          <span className="theme-art" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
+          <span className="theme-label">
+            <Icon name={o.icon} size={16} />
+            {o.label}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+};
+
 const LookAndFeel: FC = () => {
   const [furigana, setFurigana] = usePersistedSetting<TFuriganaMode>(FURIGANA_SETTING, DEFAULT_FURIGANA, isFuriganaMode);
   const [level] = usePersistedSetting<TFuriganaLevel>(FURIGANA_LEVEL_SETTING, DEFAULT_FURIGANA_LEVEL, isFuriganaLevel);
@@ -225,6 +263,7 @@ const LookAndFeel: FC = () => {
 
   return (
     <Card title="Look & feel">
+      <ThemePicker />
       <SubtitlePreview furigana={furigana} level={level} color={color} listening={listening} />
       <ChipsRow id="furigana" title="Furigana" value={furigana} options={FURIGANA_OPTIONS} onChange={setFurigana} />
       <ToggleRow

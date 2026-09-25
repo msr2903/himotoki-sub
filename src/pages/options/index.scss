@@ -97,6 +97,10 @@ body {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 6px 20px -14px rgba(0, 0, 0, 0.6);
 }
 
+html[data-hm-theme="light"] .card {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 6px 20px -14px rgba(0, 0, 0, 0.18);
+}
+
 .card-title {
   display: block;
   margin: 0 0 0.35rem;
@@ -456,7 +460,7 @@ select.field {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--hm-ink-muted);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .preview-sub {
@@ -497,6 +501,78 @@ select.field {
 .preview-token.es-jlpt-n3 { color: #e6cf7e; }
 .preview-token.es-jlpt-n2 { color: #e8ab6f; }
 .preview-token.es-jlpt-n1 { color: #e79191; }
+
+/* ── Theme ── */
+
+.theme-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  margin: 0.4rem 0 0.9rem;
+}
+
+.theme-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0.5rem 0.6rem;
+  border: 2px solid var(--hm-border);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--hm-ink-muted);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+
+  &:hover {
+    transform: translateY(-1px);
+  }
+
+  &.on {
+    border-color: var(--hm-accent);
+    color: var(--hm-accent);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: $focus-ring;
+  }
+}
+
+.theme-art {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  height: 3.6rem;
+  padding: 0.55rem;
+  border-radius: 9px;
+  box-sizing: border-box;
+
+  span {
+    height: 7px;
+    border-radius: 4px;
+  }
+
+  span:nth-child(1) { width: 45%; }
+  span:nth-child(2) { width: 80%; opacity: 0.55; }
+  span:nth-child(3) { width: 65%; opacity: 0.55; }
+}
+
+.theme-tile[data-variant="light"] .theme-art { background: #f4f2ed; }
+.theme-tile[data-variant="light"] .theme-art span { background: #c9c5bc; }
+.theme-tile[data-variant="light"] .theme-art span:first-child { background: #2a9d8f; }
+.theme-tile[data-variant="dark"] .theme-art { background: #1c1c1a; }
+.theme-tile[data-variant="dark"] .theme-art span { background: #4a4843; }
+.theme-tile[data-variant="dark"] .theme-art span:first-child { background: #3dbeb0; }
+
+.theme-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
 
 /* ── Menu ── */
 
@@ -681,6 +757,7 @@ select.field {
 
 @media (prefers-reduced-motion: reduce) {
   .toggle::after,
+  .theme-tile,
   .preview-sub,
   .flash {
     transition: none;

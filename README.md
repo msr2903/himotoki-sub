@@ -24,7 +24,7 @@ YouTube, Netflix, KinoPub, Coursera, Plex, Udemy, Kinopoisk, Amazon Prime Video,
 - **Local word splitting** with an instant `Intl.Segmenter` first paint.
 - **Offline dictionary** (Jitendex, SQLite WebAssembly) with deinflection; online fallback until installed.
 - **Configurable hover and click** — each can be furigana, meaning, furigana + meaning, pop-up dictionary, or nothing.
-- **Dictionary pop-up** with senses, pitch accent, JLPT and frequency, an example, the deconjugation chain and an on-demand conjugation table, an entry switcher, word audio (speech synthesis + replay the line from the video), and save / mark-known.
+- **Dictionary pop-up** with senses, pitch accent, JLPT and frequency, an example, the deconjugation chain and an on-demand conjugation table, an entry switcher, word audio (speech synthesis + replay the line from the video), and save / mark-known. Pitch accent can show every recorded contour, compact numbers, or be hidden.
 - **Furigana** ruby over the kanji only; always/on-hover/never, and can be limited to words above a chosen JLPT level.
 - **Colour words by JLPT difficulty**, and **dim known words** with per-video coverage and i+1 stats.
 - **Dual subtitles** (a second track or a translation) and **whole-line translation** on click.

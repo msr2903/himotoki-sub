@@ -1,4 +1,4 @@
-/* Himotoki dark-theme tokens (aligned with himotoki-web html[data-theme=dark]) */
+/* Himotoki theme tokens (aligned with himotoki-web html[data-theme=dark] and :root) */
 /* Font URLs are relative to dist/assets/css/*.css → ../../fonts (public/fonts). */
 
 @font-face {
@@ -42,4 +42,19 @@
   --hm-font-body: "Zen Maru Gothic", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
   --hm-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
   --hm-duration: 0.18s;
+}
+
+/* Light theme for the extension pages (settings, popup, welcome), matching himotoki-web :root. The
+   in-player #es root sets its own dark values above, so subtitles and the pop-up stay dark over video. */
+html[data-hm-theme="light"] {
+  --hm-ink: #1a1a1a;
+  --hm-ink-muted: #5c5c5c;
+  --hm-surface: #fafaf8;
+  --hm-raised: #ffffff;
+  --hm-border: #e8e6e1;
+  --hm-accent: #2a9d8f;
+  --hm-accent-hover: #238b7f;
+  --hm-accent-muted: rgba(42, 157, 143, 0.12);
+  --hm-accent-muted-hover: rgba(42, 157, 143, 0.18);
+  --hm-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
 }
