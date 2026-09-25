@@ -15,9 +15,9 @@ UI-change rule: for any UI/UX refinement or visual bug fix, always show the user
 - `pnpm build` - Build extension for Chrome (runs `tsc --noEmit` first)
 - `pnpm build:firefox` - Build for Firefox (note: `chrome.offscreen` is unavailable there, so the ONNX splitter falls back to `Intl.Segmenter`)
 - `pnpm dev` - Watch build with hot reload
-- `pnpm lint` - ESLint (no config file is committed yet; `npx tsc --noEmit` is the reliable check)
+- `pnpm lint` - ESLint (`.eslintrc.cjs`); must report 0 errors (CI runs it). Warnings mark inherited code to tidy.
 - `pnpm test:unit` - Vitest unit tests for pure logic (`src/**/*.test.ts`, node env, no DOM/extension APIs). Runs in CI.
-- `pnpm test` - Deterministic Chromium regression checks (`scripts/e2e/regressions.mjs`); build `dist/` first
+- `pnpm test` - Deterministic Chromium regression checks (`scripts/e2e/regressions.mjs`); build `dist/` first (CI runs it under Xvfb)
 - `pnpm test:e2e` - Playwright smoke test on YouTube (`scripts/e2e/youtube.mjs`); `node scripts/e2e/dict.mjs <dictDir>` tests the offline dictionary. Both need `npx playwright install chromium` and a built `dist/`.
 
 If `pnpm` scripts abort with `ERR_PNPM_IGNORED_BUILDS`, check `pnpm-workspace.yaml` `allowBuilds`.

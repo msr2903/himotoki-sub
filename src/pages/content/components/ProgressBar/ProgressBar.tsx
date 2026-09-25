@@ -5,7 +5,7 @@ import { $video, moveToTimeRequested } from "@src/models/videos";
 import { $subs } from "@src/models/subs";
 import { getCurrentVideoTime } from "@src/utils/getCurrentVideoTime";
 
-type TProgressBarProps = {};
+type TProgressBarProps = Record<string, never>;
 const TIME_PERIOD = 30000;
 
 export const ProgressBar: FC<TProgressBarProps> = () => {

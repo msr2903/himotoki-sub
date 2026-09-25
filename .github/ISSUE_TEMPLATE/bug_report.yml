@@ -1,0 +1,39 @@
+name: Bug report
+description: Something in the extension does not work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead. Screenshots help.
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Site and video URL
+      placeholder: https://www.youtube.com/watch?v=…
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Browser and extension version
+      description: The extension version is at the bottom of Settings → About.
+      placeholder: Chrome 141, Himotoki Sub 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: dictionary
+    attributes:
+      label: Is the offline dictionary installed?
+      options: ["Yes", "No", "Not sure"]
+    validations:
+      required: true
+  - type: textarea
+    id: console
+    attributes:
+      label: Errors (optional)
+      description: Anything red in DevTools → Console on the video page, or on the extension's service worker.
+      render: text

@@ -31,7 +31,7 @@ export const videoKeyFromUrl = (rawUrl: string | undefined): string | undefined 
     const url = new URL(rawUrl);
     const v = url.searchParams.get("v");
     if (v) return `yt:${v}`;
-    const m = url.pathname.match(/^\/(shorts|live|embed|v)\/([^\/?#]+)/);
+    const m = url.pathname.match(/^\/(shorts|live|embed|v)\/([^/?#]+)/);
     if (m) return `yt:${m[2]}`;
     return `${url.origin}${url.pathname}`;
   } catch {
