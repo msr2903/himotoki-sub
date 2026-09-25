@@ -360,7 +360,14 @@ export const AboutPanel: FC = () => (
       Dictionary data: <a href="https://jitendex.org/" target="_blank" rel="noreferrer">Jitendex</a> © Stephen Kraus,{" "}
       <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer">CC BY-SA 4.0</a>, built from{" "}
       <a href="https://www.edrdg.org/jmdict/j_jmdict.html" target="_blank" rel="noreferrer">JMdict</a> (EDRDG) and{" "}
-      <a href="https://tatoeba.org/" target="_blank" rel="noreferrer">Tatoeba</a> examples (CC BY 2.0 FR). Whole-line
+      <a href="https://tatoeba.org/" target="_blank" rel="noreferrer">Tatoeba</a> examples (CC BY 2.0 FR). Pitch accent from{" "}
+      <a href="https://github.com/mifunetoshiro/kanjium" target="_blank" rel="noreferrer">Kanjium</a> (CC BY-SA 4.0), JLPT
+      levels from <a href="https://github.com/elzup/jlpt-word-list" target="_blank" rel="noreferrer">jlpt-word-list</a> (tanos.co.uk
+      lists), frequency ranks from JPDB. Full list of{" "}
+      <a href="https://github.com/msr2903/himotoki-sub/blob/master/THIRD_PARTY_NOTICES.md" target="_blank" rel="noreferrer">
+        third-party notices
+      </a>
+      . Whole-line
       translation and saving to your account use online services (see the{" "}
       <a href="https://github.com/msr2903/himotoki-sub/blob/master/PRIVACY.md" target="_blank" rel="noreferrer">privacy policy</a>).
     </p>
