@@ -39,7 +39,6 @@ const manifest = {
         "https://kino.pub/*",
         "https://kinopub.cc/*",
         "https://app.plex.tv/*",
-        "https://plex.ukrapka.tech/*",
         "https://www.udemy.com/course/*/learn/lecture/*",
         "https://hd.kinopoisk.ru/*",
         "https://www.amazon.de/Amazon-Video/*",
@@ -92,7 +91,7 @@ const manifest = {
   },
   browser_specific_settings: {
     gecko: {
-      id: "{4077aa9d-b753-4913-8e52-27ef408d4c82}",
+      id: "himotoki-sub@msr2903.github.io",
     },
   },
 };
