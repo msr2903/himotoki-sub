@@ -33,6 +33,7 @@ import {
 import type { TAnkiCardTheme } from "@src/utils/ankiNote";
 import { PLAYBACK_RATE_DEFAULT, PLAYBACK_RATE_SETTING, PLAYBACK_RATE_STEP, clampRate, stepRate } from "@src/shared/playbackRate";
 import { DEFAULT_LISTENING_MODE, LISTENING_MODE_SETTING } from "@src/shared/listeningMode";
+import { DEFAULT_NEW_WORDS_LEVEL, NEW_WORDS_LEVEL_SETTING, TNewWordsLevel } from "@src/shared/newWordsOnly";
 import { DEFAULT_MOUSE_ACTION, MOUSE_BUTTONS } from "@src/shared/mouseActions";
 import { DEFAULT_PITCH_DISPLAY, PITCH_DISPLAY_SETTING, TPitchDisplay } from "@src/shared/pitchSettings";
 
@@ -277,10 +278,15 @@ export const $listeningMode = withPersist(createStore<boolean>(DEFAULT_LISTENING
 export const listeningModeChanged = createEvent<boolean>();
 $listeningMode.on(listeningModeChanged, (_, value) => value);
 
-/** Transient "peek" toggle (H): reveal the blurred text until toggled off. Reset when mode changes. */
+/** New words only (beta): blur words at or below the learner's JLPT level (see src/shared/newWordsOnly.ts). */
+export const $newWordsLevel = withPersist(createStore<TNewWordsLevel>(DEFAULT_NEW_WORDS_LEVEL, { name: NEW_WORDS_LEVEL_SETTING }));
+export const newWordsLevelChanged = createEvent<TNewWordsLevel>();
+$newWordsLevel.on(newWordsLevelChanged, (_, value) => value);
+
+/** Transient "peek" toggle (H): reveal the blurred text until toggled off. Reset when either mode changes. */
 export const $listeningPeek = createStore<boolean>(false);
 export const listeningPeekToggled = createEvent();
-$listeningPeek.on(listeningPeekToggled, (peek) => !peek).reset(listeningModeChanged);
+$listeningPeek.on(listeningPeekToggled, (peek) => !peek).reset([listeningModeChanged, newWordsLevelChanged]);
 
 export const esRenderSetings = createEvent();
 

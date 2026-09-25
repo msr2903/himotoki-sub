@@ -30,6 +30,7 @@ import { ANKI_DECK_SETTING, ANKI_RICH_CARDS_SETTING, DEFAULT_ANKI_DECK, DEFAULT_
 import { DEFAULT_LISTENING_MODE, LISTENING_MODE_SETTING } from "@src/shared/listeningMode";
 import { DEFAULT_MOUSE_ACTION, MOUSE_ACTIONS, MOUSE_BUTTONS, isMouseAction } from "@src/shared/mouseActions";
 import { DEFAULT_THEME, THEME_SETTING, TTheme, isTheme } from "@src/shared/themeSettings";
+import { DEFAULT_NEW_WORDS_LEVEL, NEW_WORDS_LEVEL_SETTING, TNewWordsLevel, isNewWordsLevel } from "@src/shared/newWordsOnly";
 import { useHimotokiSession } from "@src/pages/shared/useHimotokiSession";
 import { Card, ChipsRow, Icon, IconName, MenuRow, SearchField, Tint, TintedIcon, ToggleRow } from "./controls";
 import { isBool, isString, usePanelParam, usePersistedSetting, useRawStringSetting } from "./hooks";
@@ -51,7 +52,7 @@ type PanelId = "words" | "subtitles" | "mouse" | "anki" | "dictionary" | "data" 
 
 const PANELS: Record<PanelId, { title: string; lede: string; icon: IconName; tint: Tint; View: FC }> = {
   words: { title: "Words", lede: "What hovering and clicking a subtitle word does, and what the pop-up shows.", icon: "cursor", tint: "teal", View: WordsPanel },
-  subtitles: { title: "Subtitles", lede: "Which words get furigana, and a second subtitle line.", icon: "captions", tint: "blue", View: SubtitlesPanel },
+  subtitles: { title: "Subtitles", lede: "Which words get furigana, a second subtitle line, and showing only new words.", icon: "captions", tint: "blue", View: SubtitlesPanel },
   mouse: { title: "Mouse controls", lede: "Step through lines with the middle and side mouse buttons.", icon: "mouse", tint: "violet", View: MousePanel },
   anki: { title: "Anki", lede: "How words are saved as Anki cards.", icon: "cards", tint: "coral", View: AnkiPanel },
   dictionary: { title: "Dictionary", lede: "The offline dictionary used for every lookup.", icon: "book", tint: "teal", View: DictionaryView },
@@ -87,6 +88,7 @@ const SEARCH_INDEX: SearchEntry[] = [
   { title: "Dim known words", panel: "words", keywords: "known fade opacity", focus: "dim-known" },
   { title: "Skip furigana on easy words", panel: "subtitles", keywords: "furigana difficulty jlpt level n5 n4 n3 n2 n1", focus: "furigana-level" },
   { title: "Kana reading line", panel: "subtitles", keywords: "reading line kana hide text channel", focus: "reading-line" },
+  { title: "New words only (beta)", panel: "subtitles", keywords: "new unknown words jlpt level filter hide blur beta rare", focus: "new-words" },
   { title: "Second line", panel: "subtitles", keywords: "dual subtitles second secondary translation track english", focus: "secondary-subs" },
   { title: "Mouse buttons", panel: "mouse", keywords: "mouse middle click side back forward button previous next replay", focus: "mouse-middle" },
   { title: "Rich cards", panel: "anki", keywords: "anki screenshot audio sentence mining card", focus: "anki-rich-cards" },
@@ -294,6 +296,7 @@ function useSummaries(): Partial<Record<PanelId, string>> {
   const [hover] = usePersistedSetting<TTokenAction>(HOVER_ACTION_SETTING, DEFAULT_HOVER_ACTION, isTokenAction);
   const [click] = usePersistedSetting<TTokenAction>(CLICK_ACTION_SETTING, DEFAULT_CLICK_ACTION, isTokenAction);
   const [secondary] = usePersistedSetting<TSecondarySubs>(SECONDARY_SUBS_SETTING, DEFAULT_SECONDARY_SUBS, isSecondarySubs);
+  const [newWords] = usePersistedSetting<TNewWordsLevel>(NEW_WORDS_LEVEL_SETTING, DEFAULT_NEW_WORDS_LEVEL, isNewWordsLevel);
   const [mouseMiddle] = usePersistedSetting<TMouseAction>(MOUSE_BUTTONS[0].setting, DEFAULT_MOUSE_ACTION, isMouseAction);
   const [mouseBack] = usePersistedSetting<TMouseAction>(MOUSE_BUTTONS[1].setting, DEFAULT_MOUSE_ACTION, isMouseAction);
   const [mouseForward] = usePersistedSetting<TMouseAction>(MOUSE_BUTTONS[2].setting, DEFAULT_MOUSE_ACTION, isMouseAction);
@@ -321,7 +324,12 @@ function useSummaries(): Partial<Record<PanelId, string>> {
 
   return {
     words: `Hover: ${actionLabel(hover)} · Click: ${actionLabel(click)}`,
-    subtitles: `Second line: ${SECONDARY_SUBS_OPTIONS.find((o) => o.value === secondary)?.label ?? secondary}`,
+    subtitles: [
+      `Second line: ${SECONDARY_SUBS_OPTIONS.find((o) => o.value === secondary)?.label ?? secondary}`,
+      newWords !== "off" && `New words only: ${newWords.toUpperCase()}`,
+    ]
+      .filter(Boolean)
+      .join(" · "),
     mouse:
       mouseSet.length === 0
         ? "Off"

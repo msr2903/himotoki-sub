@@ -727,6 +727,38 @@
   opacity: 1;
 }
 
+// New words only (beta): blur the words the learner likely knows, plus the reading and second lines,
+// so only new words stand out. Hovering a blurred word reveals it; H (peek) reveals the whole line.
+// Tokens are inline, where a CSS filter misses the ruby annotation, so blur with a text shadow on
+// transparent text instead (covers the furigana too and keeps the line's shape).
+#es-subs.es-subs--new-words .es-sub-item--familiar,
+#es-subs.es-subs--new-words .es-sub-item--familiar rt {
+  color: transparent;
+  text-shadow: 0 0 0.3em rgba(232, 230, 225, 0.9), 0 0 0.3em rgba(232, 230, 225, 0.5);
+  transition: color 0.12s ease, text-shadow 0.12s ease;
+}
+
+#es-subs.es-subs--new-words .es-sub-reading-line,
+#es-subs.es-subs--new-words .es-sub-secondary {
+  filter: blur(6px);
+  opacity: 0.5;
+  transition: filter 0.12s ease, opacity 0.12s ease;
+}
+
+#es-subs.es-subs--new-words .es-sub-item--familiar:hover,
+#es-subs.es-subs--new-words .es-sub-item--familiar:hover rt,
+#es-subs.es-subs--new-words.es-subs--peek .es-sub-item--familiar,
+#es-subs.es-subs--new-words.es-subs--peek .es-sub-item--familiar rt {
+  color: inherit;
+  text-shadow: none;
+}
+
+#es-subs.es-subs--new-words.es-subs--peek .es-sub-reading-line,
+#es-subs.es-subs--new-words.es-subs--peek .es-sub-secondary {
+  filter: none;
+  opacity: 1;
+}
+
 // Phrase selection (shift-click a run of tokens): highlight and an action bar to translate/save it.
 #es-subs .es-sub-item--selected {
   background-color: var(--hm-accent-muted);

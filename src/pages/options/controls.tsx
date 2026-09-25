@@ -99,7 +99,7 @@ export const TintedIcon: FC<{ name: IconName; tint: Tint }> = ({ name, tint }) =
   </span>
 );
 
-export const Card: FC<{ title?: string; className?: string; children: ReactNode }> = ({ title, className, children }) => (
+export const Card: FC<{ title?: ReactNode; className?: string; children: ReactNode }> = ({ title, className, children }) => (
   <section className={cn("card", className)}>
     {title && <h2 className="card-title">{title}</h2>}
     {children}

@@ -41,6 +41,9 @@ If `pnpm` scripts abort with `ERR_PNPM_IGNORED_BUILDS`, check `pnpm-workspace.ya
 ### Token interaction
 Hover and click are independent, user-configurable actions (`TTokenAction`: furigana, meaning, both, popup, none; options in `src/shared/tokenActions.ts`). `Subs.tsx` resolves the action per token: a pinned click result (`$pinnedWord`) wins over the transient hover (`$activeHoverWord`). Labels are rendered by `TokenLabel.tsx` (reading derived by `src/utils/furigana.ts`), the full entry by `SubItemTranslation.tsx`; both read the shared lookup cache through `useLookup`. The popup pages across a token's dictionary entries (`TWordTranslation.alternatives`, populated in `src/models/translations`) and can replay the cue's audio from the video (cue timing passed as `cueStart`/`cueEnd`).
 
+### New words only (beta)
+`$newWordsLevel` (off / n3 / n2 / n1, `src/shared/newWordsOnly.ts`) blurs every token the learner likely knows: JLPT words at or below the level, unlisted words more common than `RARE_RANK`, words marked known or ignored, and non-Japanese text. Words with no difficulty data stay visible. `Subs.tsx` tags them `es-sub-item--familiar` (needs `$dictReady`); hover reveals one word, H (`$listeningPeek`) the line.
+
 ### Known words
 `$knownWords` (persisted array of stable keys from `knownKeyOf`, `src/shared/knownWords.ts`) tracks words the user marked known via the pop-up (also set on save). `$dimKnownWords` (opt-in) dims those tokens; `Subs.tsx` resolves each visible token via `useLookup(subItem, enabled)` only when dimming is on. Per-video coverage (`$videoStats`) is derived from `$coverageKeys` (every distinct word resolved once by `computeCoverageFx` via a batch lookup) and `$knownWords`; shown by `VideoStats` in the panel.
 

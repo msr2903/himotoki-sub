@@ -112,6 +112,33 @@ try {
   assert.equal(await page.locator(".es-sub-item-pinned").count(), 1);
   assert.ok(await page.evaluate(() => window.audit.settings.$knownWords.getState().includes("seq:jitendex:2")));
   console.log("PASS Entry switching and mark-known keep the popup pinned and select the correct entry");
+  // New words only (beta): with the learner at N3 only harder JLPT words and rare words stay sharp.
+  await page.keyboard.press("Escape");
+  await page.evaluate(async () => {
+    const { subs: s, settings: st, translations: tr } = window.audit;
+    const data = { 昨日: { jlpt: ["n5"] }, 偶然: { jlpt: ["n2"] }, 懐かしい: { jlpt: ["n3"] }, 映画: { jlpt: ["n5"] }, を: { jlpt: ["n5"] }, 見つけた: { jlpt: ["n4"] }, 邂逅: { frequency: 40000 }, 名前: {} };
+    tr.fetchWordTranslationFx.use(async ({ source }) => ({ source, headword: source, reading: "", mainTranslation: source, translations: [{ word: source, partOfSpeech: "noun", synonyms: [], popularity: 0 }], targetLanguage: "en", transcription: "", lookupSource: "local", ...data[source] }));
+    await tr.fetchWordTranslationFx({ source: "warm-up" }); // marks the dictionary ready
+    const text = "昨日 偶然 懐かしい 映画 を 見つけた 邂逅 名前";
+    const line = { id: 9, start: 0, end: 4000, text, cleanedText: text, items: text.split(" ").map((t) => ({ text: t, cleanedText: t, type: "word", tag: "span" })) };
+    s.updateCurrentSubsFx.use(async () => [line]); await s.updateCurrentSubsFx({ subs: [], video: null });
+    st.newWordsLevelChanged("n3");
+  });
+  const sharpWords = () => page.evaluate(() => [...document.querySelectorAll("#es-subs .es-sub-item:not(.es-sub-item--familiar)")].map((el) => el.textContent).join(" "));
+  await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-sub-item--familiar").length === 5);
+  assert.equal(await sharpWords(), "偶然 邂逅 名前", "N3 keeps N2/N1, rare and unrated words");
+  await page.mouse.move(5, 5);
+  await page.locator("#es-subs").screenshot({ path: "/tmp/himotoki-new-words-n3.png" });
+  await page.evaluate(() => window.audit.settings.newWordsLevelChanged("n1"));
+  await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-sub-item--familiar").length === 6);
+  assert.equal(await sharpWords(), "邂逅 名前", "N1 keeps only rare and unrated words");
+  await page.evaluate(() => window.audit.settings.listeningPeekToggled());
+  await page.waitForFunction(() => document.querySelector("#es-subs.es-subs--peek"));
+  await page.locator("#es-subs").screenshot({ path: "/tmp/himotoki-new-words-peek.png" });
+  await page.evaluate(() => window.audit.settings.newWordsLevelChanged("off"));
+  await page.waitForFunction(() => !document.querySelector("#es-subs.es-subs--new-words, #es-subs.es-subs--peek, .es-sub-item--familiar"));
+  await page.locator("#es-subs").screenshot({ path: "/tmp/himotoki-new-words-off.png" });
+  console.log("PASS New words only blurs words at or below the learner's level, and H reveals the line");
   await page.keyboard.press("Escape");
   assert.equal(await page.locator(".es-word-translation").count(), 0);
   await page.locator("#typing").focus(); await page.keyboard.press("b");
