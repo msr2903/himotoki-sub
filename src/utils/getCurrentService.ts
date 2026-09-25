@@ -15,7 +15,7 @@ export const getCurrentService = (): Service => {
   const titleContent = document.querySelector("title")?.textContent;
   if (titleContent?.includes("YouTube") || window.location.host === "www.youtube.com") {
     document.querySelector("html")?.setAttribute("id", "youtube");
-    if (!!document.querySelector(".ytp-delhi-modern")) {
+    if (document.querySelector(".ytp-delhi-modern")) {
       // Add class for new youtube delphi design
       document.body.classList.add("es-youtube-delphi");
     }

@@ -94,14 +94,14 @@ const Welcome: FC = () => {
           <h2>Try it</h2>
           <p className="es-popup-hint">
             Open a video with Japanese captions. The Himotoki button appears in the player controls; the subtitles
-            appear over the video. If the site shows the player's own captions, this extension prefers the Japanese
+            appear over the video. If the site shows the player’s own captions, this extension prefers the Japanese
             track automatically on YouTube.
           </p>
           <a className="es-popup-btn es-popup-btn-primary es-welcome-cta" href={TEST_VIDEO} target="_blank" rel="noreferrer">
             Open a test video
           </a>
           <p className="es-popup-hint">
-            If you also use Yomitan, exclude video sites in Yomitan's settings so you do not get two pop-ups.
+            If you also use Yomitan, exclude video sites in Yomitan’s settings so you do not get two pop-ups.
           </p>
         </div>
       </section>
