@@ -1,7 +1,7 @@
 export type TPitchDisplay = "contour" | "number" | "hidden";
 
 export const PITCH_DISPLAY_SETTING = "pitchDisplay";
-export const DEFAULT_PITCH_DISPLAY: TPitchDisplay = "contour";
+export const DEFAULT_PITCH_DISPLAY: TPitchDisplay = "hidden";
 export const PITCH_DISPLAY_OPTIONS: ReadonlyArray<{
   value: TPitchDisplay;
   label: string;

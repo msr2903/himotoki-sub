@@ -93,8 +93,10 @@ try {
   for (const check of checks) console.log("PASS", check);
   await page.locator(".es-sub-item").click();
   await page.waitForSelector(".es-word-translation");
-  // Pitch accent: every recorded contour, numbers only, or hidden, following the persisted setting.
-  assert.equal(await page.locator(".es-pitch-variant").count(), 2, "Both recorded pitch contours should be visible");
+  // Pitch accent: hidden by default; every recorded contour or numbers only when chosen.
+  assert.equal(await page.locator(".es-pitch").count(), 0, "Pitch accent is hidden by default");
+  await page.evaluate(() => window.audit.settings.pitchDisplayChanged("contour"));
+  await page.waitForFunction(() => document.querySelectorAll(".es-pitch-variant").length === 2);
   await page.locator(".es-word-translation").screenshot({ path: "/tmp/himotoki-pitch-contour.png" });
   await page.evaluate(() => window.audit.settings.pitchDisplayChanged("number"));
   await page.waitForFunction(() => document.querySelectorAll(".es-pitch-num").length === 2 && document.querySelectorAll(".es-pitch-variant").length === 0);
@@ -102,8 +104,6 @@ try {
   await page.evaluate(() => window.audit.settings.pitchDisplayChanged("hidden"));
   await page.waitForFunction(() => document.querySelectorAll(".es-pitch").length === 0);
   await page.locator(".es-word-translation").screenshot({ path: "/tmp/himotoki-pitch-hidden.png" });
-  await page.evaluate(() => window.audit.settings.pitchDisplayChanged("contour"));
-  await page.waitForFunction(() => document.querySelectorAll(".es-pitch-variant").length === 2);
   console.log("PASS Pitch accent shows contours, numbers only, or nothing");
   assert.equal(await page.locator(".es-entry-count").textContent(), "1 / 2");
   await page.getByTitle("Next entry").click();
@@ -149,6 +149,7 @@ try {
   while (await increaseScale.isEnabled()) await increaseScale.click();
   await persisted(options, "uiScale", 150);
   await options.locator("#dim-known").check();
+  assert.equal(await options.locator("#pitch-display").getByRole("radio", { name: "Hidden" }).getAttribute("aria-checked"), "true", "Pitch accent defaults to hidden");
   await options.locator("#pitch-display").getByRole("radio", { name: "Number" }).click();
   await persisted(options, "pitchDisplay", "number");
   await options.goBack();
