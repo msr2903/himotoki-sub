@@ -23,7 +23,10 @@ export const AccountPanel: FC = () => {
         </>
       ) : (
         <>
-          <p className="es-popup-hint">Sign in to save subtitle words to your Himotoki account.</p>
+          <p className="es-popup-hint">
+            Sign in to save subtitle words straight to your Himotoki account. They sync to himotoki.web.app
+            and the Himotoki app.
+          </p>
           <button className="es-popup-btn es-popup-btn-primary" disabled={busy} onClick={signIn}>
             {busy ? "Signing in…" : "Sign in with Google"}
           </button>
