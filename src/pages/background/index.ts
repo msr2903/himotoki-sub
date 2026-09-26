@@ -2,9 +2,37 @@ import reloadOnUpdate from "virtual:reload-on-update-in-background-script";
 
 import { googleTranslateSingleFetcher } from "@src/utils/googleTranslateSingleFetcher";
 import { deeplTranslateFetcher } from "@src/utils/deeplTranslateFetcher";
-import { signInWithGoogleIdToken, addHimotokiFavorite } from "@src/utils/himotokiConvex";
-import { dictManifestUrlFor } from "@src/shared/himotokiConfig";
-import { resolveEndpoint, resolveEndpoints } from "@src/shared/runtimeConfig";
+import { createHimotokiAccount, type HimotokiSession } from "@src/utils/himotokiAccount";
+import {
+  dictManifestUrlFor,
+  HIMOTOKI_FIREBASE_API_KEY,
+  HIMOTOKI_FIREBASE_PROJECT_ID,
+} from "@src/shared/himotokiConfig";
+import { resolveEndpoint } from "@src/shared/runtimeConfig";
+
+/** Firebase session for Save to Himotoki (see utils/himotokiAccount.ts). */
+const HIMOTOKI_SESSION_KEY = "himotokiSession";
+/** Keys from the retired Convex backend — never valid again, cleared on sight. */
+const LEGACY_HIMOTOKI_KEYS = ["himotokiAccessToken", "himotokiUser"];
+
+const himotokiAccount = createHimotokiAccount({
+  apiKey: HIMOTOKI_FIREBASE_API_KEY,
+  projectId: HIMOTOKI_FIREBASE_PROJECT_ID,
+  fetch: (input, init) => fetch(input, init),
+  storage: {
+    async get() {
+      return (await chrome.storage.local.get([HIMOTOKI_SESSION_KEY]))[HIMOTOKI_SESSION_KEY];
+    },
+    async set(session: HimotokiSession) {
+      await chrome.storage.local.set({ [HIMOTOKI_SESSION_KEY]: session });
+    },
+    async remove() {
+      await chrome.storage.local.remove([HIMOTOKI_SESSION_KEY, ...LEGACY_HIMOTOKI_KEYS]);
+    },
+  },
+  launchAuthFlow: (url) => chrome.identity.launchWebAuthFlow({ url, interactive: true }),
+  redirectUrl: chrome.identity?.getRedirectURL?.() ?? "",
+});
 
 export type DictManifest = { name?: string; revision?: string; sha256?: string; bytes?: number; gzipBytes?: number; title?: string };
 
@@ -205,14 +233,10 @@ chrome.runtime.onMessage.addListener(function (message, _sender, sendResponse) {
   if (message.type === "himotokiSignIn") {
     void (async () => {
       try {
-        const { himotokiConvexUrl, himotokiGoogleClientId } = await resolveEndpoints();
-        const idToken = await getGoogleIdTokenInteractive(himotokiGoogleClientId);
-        const session = await signInWithGoogleIdToken(himotokiConvexUrl, idToken);
-        await chrome.storage.local.set({
-          himotokiAccessToken: session.access_token,
-          himotokiUser: session.user,
-        });
-        sendResponse({ ok: true, data: session });
+        const clientId = await resolveEndpoint("himotokiGoogleClientId");
+        await chrome.storage.local.remove(LEGACY_HIMOTOKI_KEYS);
+        const user = await himotokiAccount.signIn(clientId);
+        sendResponse({ ok: true, data: { user } });
       } catch (error) {
         sendResponse({
           ok: false,
@@ -223,22 +247,19 @@ chrome.runtime.onMessage.addListener(function (message, _sender, sendResponse) {
   }
 
   if (message.type === "himotokiSignOut") {
-    void chrome.storage.local.remove(["himotokiAccessToken", "himotokiUser"]).then(() => {
+    void himotokiAccount.signOut().then(() => {
       sendResponse({ ok: true });
     });
   }
 
   if (message.type === "himotokiGetSession") {
     void (async () => {
-      const data = await chrome.storage.local.get(["himotokiAccessToken", "himotokiUser"]);
-      const { himotokiConvexUrl, himotokiGoogleClientId } = await resolveEndpoints();
       sendResponse({
         ok: true,
         data: {
-          accessToken: data.himotokiAccessToken ?? null,
-          user: data.himotokiUser ?? null,
-          convexUrl: himotokiConvexUrl,
-          googleClientId: himotokiGoogleClientId,
+          user: await himotokiAccount.getUser(),
+          // Shown on the options page: it must be an Authorized redirect URI of the client.
+          redirectUrl: chrome.identity?.getRedirectURL?.() ?? "",
         },
       });
     })();
@@ -247,14 +268,7 @@ chrome.runtime.onMessage.addListener(function (message, _sender, sendResponse) {
   if (message.type === "himotokiAddFavorite") {
     void (async () => {
       try {
-        const stored = await chrome.storage.local.get(["himotokiAccessToken"]);
-        const token = stored.himotokiAccessToken as string | undefined;
-        if (!token) {
-          sendResponse({ ok: false, error: "Sign in via the extension popup first." });
-          return;
-        }
-        const convexUrl = await resolveEndpoint("himotokiConvexUrl");
-        const result = await addHimotokiFavorite(convexUrl, token, message.favorite);
+        const result = await himotokiAccount.addFavorite(message.favorite);
         sendResponse({ ok: true, data: result });
       } catch (error) {
         sendResponse({
@@ -288,30 +302,3 @@ chrome.runtime.onMessage.addListener(function (message, _sender, sendResponse) {
   return HANDLED_MESSAGE_TYPES.has(type) || type in DICT_OPS;
 });
 
-/**
- * Obtain a Google ID token for Himotoki Convex sign-in.
- * Uses launchWebAuthFlow against Google's OAuth endpoint (implicit id_token).
- */
-async function getGoogleIdTokenInteractive(clientId: string): Promise<string> {
-  const redirectUrl = chrome.identity.getRedirectURL();
-  const nonce = crypto.randomUUID();
-  const params = new URLSearchParams({
-    client_id: clientId,
-    response_type: "id_token",
-    redirect_uri: redirectUrl,
-    scope: "openid email profile",
-    nonce,
-    prompt: "select_account",
-  });
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-  const responseUrl = await chrome.identity.launchWebAuthFlow({
-    url: authUrl,
-    interactive: true,
-  });
-  if (!responseUrl) throw new Error("Google sign-in was cancelled");
-  const hash = new URL(responseUrl).hash.replace(/^#/, "");
-  const result = new URLSearchParams(hash);
-  const idToken = result.get("id_token");
-  if (!idToken) throw new Error("No id_token returned from Google");
-  return idToken;
-}
