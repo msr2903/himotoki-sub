@@ -60,9 +60,12 @@ const manifest = {
     // github.com to *.githubusercontent.com, so both origins are needed.
     "https://github.com/*",
     "https://*.githubusercontent.com/*",
-    // Convex backs the optional "Save to Himotoki" account feature.
-    "https://*.convex.cloud/*",
+    // The optional "Save to Himotoki" account feature: Google sign-in, Firebase Auth and the
+    // user's saved-words document in Firestore (the same account as himotoki.web.app).
     "https://accounts.google.com/*",
+    "https://identitytoolkit.googleapis.com/*",
+    "https://securetoken.googleapis.com/*",
+    "https://firestore.googleapis.com/*",
     "https://translate.google.com/*",
     "http://localhost:8765/*",
     "https://api-free.deepl.com/*",
@@ -86,10 +89,6 @@ const manifest = {
       matches: ["*://*/*"],
     },
   ],
-  oauth2: {
-    client_id: "584773048392-114lmg42epe0gig6a9edmhshs20kkmti.apps.googleusercontent.com",
-    scopes: ["openid", "email", "profile"],
-  },
   browser_specific_settings: {
     gecko: {
       id: "{4077aa9d-b753-4913-8e52-27ef408d4c82}",

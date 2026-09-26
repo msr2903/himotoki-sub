@@ -7,14 +7,13 @@
  * These are raw storage keys (not the `persist:` JSON format) so the value is a plain string and
  * end-to-end scripts / power users can set them directly.
  */
-import { HIMOTOKI_DICT_URL, HIMOTOKI_CONVEX_URL, HIMOTOKI_GOOGLE_CLIENT_ID } from "./himotokiConfig";
+import { HIMOTOKI_DICT_URL, HIMOTOKI_GOOGLE_CLIENT_ID } from "./himotokiConfig";
 
-export type EndpointKey = "himotokiDictUrl" | "himotokiConvexUrl" | "himotokiGoogleClientId";
+export type EndpointKey = "himotokiDictUrl" | "himotokiGoogleClientId";
 
 /** Compiled-in defaults, used whenever there is no runtime override. */
 export const ENDPOINT_DEFAULTS: Record<EndpointKey, string> = {
   himotokiDictUrl: HIMOTOKI_DICT_URL,
-  himotokiConvexUrl: HIMOTOKI_CONVEX_URL,
   himotokiGoogleClientId: HIMOTOKI_GOOGLE_CLIENT_ID,
 };
 

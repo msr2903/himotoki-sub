@@ -66,7 +66,9 @@ gh release create dict-<revision> dist-dict/jitendex-lite.sqlite.gz dist-dict/ji
 
 `latest/download` always resolves to the newest release, and a new release with a higher manifest `revision` triggers the in-app "update available" prompt.
 
-All deployment-tied endpoints are runtime-configurable so a domain/backend move needs no rebuild: the **Advanced** section of the options page overrides the dictionary URL, the Convex URL (Save to Himotoki), and the Google OAuth client ID. Each falls back to the compiled default when left blank, and setting a custom dictionary/Convex URL requests host permission for that origin. The same values can be set directly as plain `chrome.storage.local` keys (`himotokiDictUrl`, `himotokiConvexUrl`, `himotokiGoogleClientId`) — the end-to-end scripts set `himotokiDictUrl` this way.
+All deployment-tied endpoints are runtime-configurable so a domain/backend move needs no rebuild: the **Advanced** section of the options page overrides the dictionary URL and the Google OAuth client ID used by Save to Himotoki. Each falls back to the compiled default when left blank, and setting a custom dictionary URL requests host permission for that origin. The same values can be set directly as plain `chrome.storage.local` keys (`himotokiDictUrl`, `himotokiGoogleClientId`) — the end-to-end scripts set `himotokiDictUrl` this way.
+
+**Save to Himotoki** signs in with Google once (from the popup or options page), then every save goes straight into the same Himotoki account as himotoki.web.app and the Himotoki app — no confirm page. It writes only the signed-in user's own saved-words document in Himotoki's Firebase project, with the same merge rules as the website, and retries instead of overwriting when another device saves at the same moment. For sign-in to work, the `himotoki` project's Google Web client must list this extension's redirect URL (`https://<extension-id>.chromiumapp.org/`, shown under Advanced) as an Authorized redirect URI.
 
 ## Testing
 

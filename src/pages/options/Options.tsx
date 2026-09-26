@@ -282,8 +282,9 @@ const Options: FC = () => {
 
   // Runtime endpoint overrides (plain storage keys) so a domain/backend move needs no rebuild.
   const [dictUrl, setDictUrl] = useRawStringSetting("himotokiDictUrl");
-  const [convexUrl, setConvexUrl] = useRawStringSetting("himotokiConvexUrl");
   const [googleClientId, setGoogleClientId] = useRawStringSetting("himotokiGoogleClientId");
+  // What Google redirects to after sign-in; the OAuth client must list it.
+  const himotokiRedirectUrl = chrome.identity?.getRedirectURL?.() ?? "https://<extension-id>.chromiumapp.org/";
   // For a custom URL endpoint on a new origin, request host permission (needs a user gesture — a
   // Blur after typing qualifies) so the extension can actually fetch it.
   const applyEndpointUrl = (key: EndpointKey, value: string, set: (v: string) => void) => {
@@ -691,24 +692,8 @@ const Options: FC = () => {
               }
             />
             <Row
-              title="Convex URL"
-              desc="Backend for Save to Himotoki (account favorites). Only used when you sign in."
-              htmlFor="endpoint-convex"
-              control={
-                <input
-                  id="endpoint-convex"
-                  type="text"
-                  className="es-options-text"
-                  value={convexUrl}
-                  placeholder={ENDPOINT_DEFAULTS.himotokiConvexUrl}
-                  onChange={(e) => setConvexUrl(e.target.value)}
-                  onBlur={(e) => applyEndpointUrl("himotokiConvexUrl", e.target.value, setConvexUrl)}
-                />
-              }
-            />
-            <Row
               title="Google client ID"
-              desc="OAuth client ID used for Himotoki account sign-in."
+              desc={`OAuth client ID used for Himotoki account sign-in. Its Authorized redirect URIs must include ${himotokiRedirectUrl}`}
               htmlFor="endpoint-google"
               control={
                 <input
@@ -721,7 +706,7 @@ const Options: FC = () => {
                 />
               }
             />
-            {(dictUrl || convexUrl || googleClientId) && (
+            {(dictUrl || googleClientId) && (
               <div className="row">
                 <span className="row-desc">Custom endpoints are set.</span>
                 <button
@@ -729,7 +714,6 @@ const Options: FC = () => {
                   className="es-options-link"
                   onClick={() => {
                     setDictUrl("");
-                    setConvexUrl("");
                     setGoogleClientId("");
                   }}
                 >

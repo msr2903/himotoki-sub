@@ -29,7 +29,6 @@
     "@ifyour/deeplx": "^0.1.17",
     "@sqlite.org/sqlite-wasm": "3.53.4-build1",
     "classnames": "^2.5.1",
-    "convex": "^1.43.0",
     "effector": "^23.2.2",
     "effector-react": "^23.2.1",
     "fflate": "^0.8.3",
