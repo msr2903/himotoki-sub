@@ -8,6 +8,11 @@ const packageJson = JSON.parse(fs.readFileSync("./package.json", "utf8"));
 
 const manifest = {
   manifest_version: 3,
+  // Public key that pins the Chrome extension ID to nokohimndngikmodbepekdbhobminahp, so
+  // unpacked builds and the Google sign-in redirect URL
+  // (https://nokohimndngikmodbepekdbhobminahp.chromiumapp.org/) are the same on every machine.
+  // Not a secret: the matching private key is only needed to pack a .crx. Firefox ignores it.
+  key: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmfY5tVUmW2qDvqfqCnbugqrpkwD5aZfB9ZF5nr3WVZzVmaEfXIMu9F+g6E+0HfJNtttYcHHgx/XYfHDGJWN999RrvF4JBdbkRdG6BdTNmYKeXQFHlhImpunK9hW+/LyEn5Caghb0U9YOL0VQRu/ApLaqEyeOgze0uKEWMFVLx23GtZ5pKBlHtPKLPVsZh7Xz6JxEJP05IygyN9X00PAGeoM9IP/a+VlhyN37QpaYm0nlM3fxldN9gwHHuYwg45WbrNiqOPDdjiXuG6gkifslALUcy5lkxWLkPWFgxDQlMnzPKM9fwpOR6Ti8TQCEA3D2JiTbFhElcN9HSgLl4JacYQIDAQAB",
   // Public key: keeps the extension ID stable across machines and unpacked reloads (see store/README.md).
   key: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvwDOMGKm/xmBAUn/BEuxgg8na1+SY5Eqn3TbNpsvm2VW+MBxYAPzmRQmE40pOm9Hu2+QLlKFEKQWbGvJ6yv0zVHrJCpVGAaYoQCHKrBw1XPg44O9gbvSX6BRwLPqnnbqAf+YksP+VRUDg/rzWxHpKV/Q1zU11GhIZexd0Jl2YaZlym0fh5oyngE3kjtz3/4XOWypvTnca12lz2VxhFG0A6wBCeXeZg9iMo+6foS79rwq4/pvEBfcS1alS9zU17LNByIAt71SvbbU+ZHi/k5hg4ipLuDGpJPggwBIPoXSfEwxrqCO8EDzMbGCnmu5gelGV2IKEQySWGyHzr0KKY5zBwIDAQAB",
   default_locale: "en",
