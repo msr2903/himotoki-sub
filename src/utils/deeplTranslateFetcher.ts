@@ -44,9 +44,12 @@ class DeepLTranslateFetcher {
     this.#apiKey = null;
   }
 
-  setApiKey(apiKey: string) {
-    this.#apiKey = apiKey;
-    this.#baseUrl = apiKey.endsWith(":fx")
+  setApiKey(apiKey: string | null | undefined) {
+    // Keys are pasted, so trim them: a trailing space would send a free-tier (":fx") key to the paid
+    // endpoint. A missing key is stored as none, never as undefined.
+    const key = (apiKey ?? "").trim();
+    this.#apiKey = key || null;
+    this.#baseUrl = key.endsWith(":fx")
       ? "https://api-free.deepl.com/v2/translate"
       : "https://api.deepl.com/v2/translate";
   }
