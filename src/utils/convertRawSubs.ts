@@ -191,9 +191,17 @@ export const convertJapaneseSubsWithLocalSplit = async (rawSubs: Captions): Prom
   const fallback = convertJapaneseSubsFallback(rawSubs);
   const split = rawSubs.map((sub) => splitReadingLine(cleanCueText(sub.text)));
   const perCue = split.map((s) => chunkCue(s.body));
+  // Repeated captions/text runs need only one inference and dictionary repair per
+  // batch. Keep timing and layout per cue, and avoid a long-lived dictionary cache.
   const texts: string[] = [];
+  const textIndexes = new Map<string, number>();
   for (const chunks of perCue) {
-    for (const chunk of chunks) if (chunk.kind === "text") texts.push(chunk.text);
+    for (const chunk of chunks) {
+      if (chunk.kind === "text" && !textIndexes.has(chunk.text)) {
+        textIndexes.set(chunk.text, texts.length);
+        texts.push(chunk.text);
+      }
+    }
   }
   if (!texts.length) return fallback;
 
@@ -204,9 +212,8 @@ export const convertJapaneseSubsWithLocalSplit = async (rawSubs: Captions): Prom
     }
     const results = await repairSegmentsViaDictionary(splitResults.map((r) => r.segments ?? []));
 
-    let cursor = 0;
     return rawSubs.map((sub, index) => {
-      const items = chunksToItems(perCue[index]!, () => results[cursor++]!);
+      const items = chunksToItems(perCue[index]!, (text) => results[textIndexes.get(text)!]!);
       if (!items.some((item) => item.type === "word")) return fallback[index]!;
       return buildSub(sub, index, split[index]!.body, items, true, split[index]!.readingLine);
     });

@@ -149,12 +149,18 @@ export const $lineTranslations = createStore<Record<string, { text: string; erro
 export const $lineTranslationPendings = createStore<Record<string, boolean>>({});
 export const lineTranslationRequested = createEvent<string>();
 
+// An epoch distinguishes even A → B → A setting changes. Requests from an older
+// epoch must neither publish a result nor clear a newer request's pending flag.
+export const $lineTranslationGeneration = createStore(0)
+  .on([$translateLanguage.updates, $translationService.updates, $deeplApiKey.updates], (generation) => generation + 1);
+
 export const fetchSubTranslationFx = createEffect<
   {
     source: string;
     language: string;
     translationService: string;
     deeplApiKey: string;
+    generation: number;
   },
   string
 >(async ({ source, language, translationService, deeplApiKey }) => {
@@ -179,6 +185,7 @@ sample({
     language: $translateLanguage,
     translationService: $translationService,
     deeplApiKey: $deeplApiKey,
+    generation: $lineTranslationGeneration,
   },
   filter: ({ translations, pendings }, source) => {
     const key = source.trim();
@@ -186,11 +193,12 @@ sample({
     const cached = translations[key];
     return !cached || Boolean(cached.error);
   },
-  fn: ({ language, translationService, deeplApiKey }, source) => ({
+  fn: ({ language, translationService, deeplApiKey, generation }, source) => ({
     source: source.trim(),
     language,
     translationService,
     deeplApiKey,
+    generation,
   }),
   target: fetchSubTranslationFx,
 });
@@ -198,21 +206,18 @@ sample({
 const lineTranslationDone = createEvent<{ source: string; text: string }>();
 const lineTranslationFailed = createEvent<{ source: string; error: string }>();
 
-// Results only land while the request's language/service still matches the current
-// settings — a response that lands after a switch must not be cached under the new one.
+// Cache only responses from the current settings epoch.
 sample({
   clock: fetchSubTranslationFx.done,
-  source: { language: $translateLanguage, service: $translationService },
-  filter: ({ language, service }, { params }) =>
-    params.language === language && params.translationService === service,
+  source: $lineTranslationGeneration,
+  filter: (generation, { params }) => params.generation === generation,
   fn: (_, { params, result }) => ({ source: params.source, text: result }),
   target: lineTranslationDone,
 });
 sample({
   clock: fetchSubTranslationFx.fail,
-  source: { language: $translateLanguage, service: $translationService },
-  filter: ({ language, service }, { params }) =>
-    params.language === language && params.translationService === service,
+  source: $lineTranslationGeneration,
+  filter: (generation, { params }) => params.generation === generation,
   fn: (_, { params, error }) => ({
     source: params.source,
     error: error instanceof Error ? error.message : String(error),
@@ -223,12 +228,19 @@ sample({
 $lineTranslations
   .on(lineTranslationDone, (all, { source, text }) => ({ ...all, [source]: { text } }))
   .on(lineTranslationFailed, (all, { source, error }) => ({ ...all, [source]: { text: "", error } }))
-  // A different target language or service invalidates everything.
-  .reset($translateLanguage.updates, $translationService.updates);
+  .reset($lineTranslationGeneration.updates);
+
+const currentLineTranslationSettled = sample({
+  clock: fetchSubTranslationFx.finally,
+  source: $lineTranslationGeneration,
+  filter: (generation, { params }) => params.generation === generation,
+  fn: (_, { params }) => params.source,
+});
 $lineTranslationPendings
   .on(fetchSubTranslationFx, (pendings, { source }) => ({ ...pendings, [source]: true }))
-  .on(fetchSubTranslationFx.finally, (pendings, { params: { source } }) => {
+  .on(currentLineTranslationSettled, (pendings, source) => {
     const copy = { ...pendings };
     delete copy[source];
     return copy;
-  });
+  })
+  .reset($lineTranslationGeneration.updates);
