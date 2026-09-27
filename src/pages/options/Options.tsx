@@ -98,7 +98,7 @@ const SEARCH_INDEX: SearchEntry[] = [
   { title: "Known words", panel: "data", keywords: "known forget clear reset", focus: "known-words" },
   { title: "Recent lookups", panel: "data", keywords: "history lookups clear", focus: "lookup-history" },
   { title: "Export saved words", panel: "data", keywords: "export download csv json backup", focus: "export-words" },
-  { title: "Endpoints", panel: "advanced", keywords: "url server convex google client id domain", focus: "endpoint-dict" },
+  { title: "Endpoints", panel: "advanced", keywords: "url server google client id redirect sign-in domain", focus: "endpoint-dict" },
   { title: "About", panel: "about", keywords: "about licence license credits version privacy", focus: "panel-title" },
 ];
 
@@ -305,7 +305,6 @@ function useSummaries(): Partial<Record<PanelId, string>> {
   const [knownWords] = usePersistedSetting<string[]>(KNOWN_WORDS_SETTING, [], isStringArray);
   const [statuses] = usePersistedSetting<Record<string, string>>(WORD_STATUSES_SETTING, {}, isStringRecord);
   const [dictUrl] = useRawStringSetting("himotokiDictUrl");
-  const [convexUrl] = useRawStringSetting("himotokiConvexUrl");
   const [clientId] = useRawStringSetting("himotokiGoogleClientId");
   const [dict, setDict] = useState<DictSummary>(null);
 
@@ -346,7 +345,7 @@ function useSummaries(): Partial<Record<PanelId, string>> {
             ? "Not downloaded"
             : undefined,
     data: known ? `${known.toLocaleString()} known word${known === 1 ? "" : "s"}` : "Known words, history and export",
-    advanced: dictUrl || convexUrl || clientId ? "Custom endpoints" : "Default endpoints",
+    advanced: dictUrl || clientId ? "Custom endpoints" : "Default endpoints",
   };
 }
 

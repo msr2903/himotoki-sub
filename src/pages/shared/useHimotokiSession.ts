@@ -8,23 +8,20 @@ export type HimotokiUser = {
 };
 
 type SessionState = {
-  accessToken: string | null;
   user: HimotokiUser | null;
 };
 
 /** Himotoki account session with sign-in / sign-out through the background worker. */
 export function useHimotokiSession() {
-  const [session, setSession] = useState<SessionState>({ accessToken: null, user: null });
+  const [session, setSession] = useState<SessionState>({ user: null });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refreshSession = async () => {
     const resp = await chrome.runtime.sendMessage({ type: "himotokiGetSession" });
     if (resp?.ok) {
-      setSession({
-        accessToken: resp.data?.accessToken ?? null,
-        user: resp.data?.user ?? null,
-      });
+      // The background keeps the Firebase session; pages only see who is signed in.
+      setSession({ user: resp.data?.user ?? null });
     }
   };
 
@@ -51,12 +48,11 @@ export function useHimotokiSession() {
     setError(null);
     try {
       await chrome.runtime.sendMessage({ type: "himotokiSignOut" });
-      setSession({ accessToken: null, user: null });
+      setSession({ user: null });
     } finally {
       setBusy(false);
     }
   };
 
-  const signedIn = Boolean(session.accessToken && session.user);
-  return { user: signedIn ? session.user : null, busy, error, signIn, signOut };
+  return { user: session.user, busy, error, signIn, signOut };
 }

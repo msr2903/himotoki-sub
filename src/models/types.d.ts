@@ -72,7 +72,7 @@ export type TWordTranslation = {
   targetLanguage: string;
   translations: TWordTranslationItem[];
   transcription: string;
-  /** Populated from the offline dictionary lookup, for Convex saved.addFavorite (Save to Himotoki). */
+  /** Populated from the offline dictionary lookup, for Save to Himotoki (the account's saved-words document). */
   himotokiSave?: THimotokiSaveMeta;
   /** Set when the dictionary request itself failed (network, server), as opposed to "no entry". */
   error?: string;

@@ -289,8 +289,9 @@ export const DataPanel: FC = () => {
 
 export const AdvancedPanel: FC = () => {
   const [dictUrl, setDictUrl] = useRawStringSetting("himotokiDictUrl");
-  const [convexUrl, setConvexUrl] = useRawStringSetting("himotokiConvexUrl");
   const [googleClientId, setGoogleClientId] = useRawStringSetting("himotokiGoogleClientId");
+  // What Google redirects to after sign-in; the OAuth client must list it.
+  const redirectUrl = chrome.identity?.getRedirectURL?.() ?? "https://<extension-id>.chromiumapp.org/";
   // A custom URL on a new origin needs host permission, which needs a user gesture — a blur
   // after typing qualifies.
   const applyEndpointUrl = (key: EndpointKey, value: string, set: (v: string) => void) => {
@@ -300,7 +301,7 @@ export const AdvancedPanel: FC = () => {
     const pattern = originMatchPattern(trimmed);
     if (pattern) void chrome.permissions.request({ origins: [pattern] }).catch(() => undefined);
   };
-  const custom = Boolean(dictUrl || convexUrl || googleClientId);
+  const custom = Boolean(dictUrl || googleClientId);
 
   return (
     <Card>
@@ -315,18 +316,9 @@ export const AdvancedPanel: FC = () => {
         onBlur={(v) => applyEndpointUrl("himotokiDictUrl", v, setDictUrl)}
       />
       <TextRow
-        id="endpoint-convex"
-        title="Convex URL"
-        hint="Backend for saving words to your Himotoki account."
-        value={convexUrl}
-        placeholder={ENDPOINT_DEFAULTS.himotokiConvexUrl}
-        onChange={setConvexUrl}
-        onBlur={(v) => applyEndpointUrl("himotokiConvexUrl", v, setConvexUrl)}
-      />
-      <TextRow
         id="endpoint-google"
         title="Google client ID"
-        hint="OAuth client used for account sign-in."
+        hint={`OAuth client used for account sign-in. Its authorized redirect URIs must include ${redirectUrl}`}
         value={googleClientId}
         placeholder={ENDPOINT_DEFAULTS.himotokiGoogleClientId}
         onChange={setGoogleClientId}
@@ -338,7 +330,6 @@ export const AdvancedPanel: FC = () => {
             className="pill"
             onClick={() => {
               setDictUrl("");
-              setConvexUrl("");
               setGoogleClientId("");
             }}
           >
