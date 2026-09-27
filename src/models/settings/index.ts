@@ -34,6 +34,7 @@ import type { TAnkiCardTheme } from "@src/utils/ankiNote";
 import { PLAYBACK_RATE_DEFAULT, PLAYBACK_RATE_SETTING, PLAYBACK_RATE_STEP, clampRate, stepRate } from "@src/shared/playbackRate";
 import { DEFAULT_LISTENING_MODE, LISTENING_MODE_SETTING } from "@src/shared/listeningMode";
 import { DEFAULT_MOUSE_ACTION, MOUSE_BUTTONS } from "@src/shared/mouseActions";
+import { DEFAULT_PITCH_DISPLAY, PITCH_DISPLAY_SETTING, TPitchDisplay } from "@src/shared/pitchSettings";
 
 // Every persisted store carries an explicit name: it is the chrome.storage key (`persist:<name>`)
 // and is shared with the options page. See src/utils/withPersist.ts.
@@ -162,6 +163,11 @@ $uiScale.on(uiScaleChanged, (_, value) => clampUiScale(value));
 export const $meaningSize = withPersist(createStore<number>(MEANING_SIZE_DEFAULT, { name: MEANING_SIZE_SETTING }));
 export const meaningSizeChanged = createEvent<number>();
 $meaningSize.on(meaningSizeChanged, (_, value) => clampMeaningSize(value));
+
+/** Pitch accent presentation in the dictionary pop-up. */
+export const $pitchDisplay = withPersist(createStore<TPitchDisplay>(DEFAULT_PITCH_DISPLAY, { name: PITCH_DISPLAY_SETTING }));
+export const pitchDisplayChanged = createEvent<TPitchDisplay>();
+$pitchDisplay.on(pitchDisplayChanged, (_, value) => value);
 
 /** Second subtitle line: off, subtitle track in the translate-to language, or machine translation. */
 export const $secondarySubs = withPersist(

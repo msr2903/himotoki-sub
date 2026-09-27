@@ -559,7 +559,29 @@
 }
 
 /* Pitch-accent diagram: overline over high morae, downstep after the accented mora. */
-.es-pitch { display: inline-flex; align-items: center; gap: 4px; }
+.es-pitch {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 7px;
+  max-width: 100%;
+}
+.es-pitch-label {
+  color: var(--hm-ink-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.es-pitch-variant {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 5px;
+  border: 1px solid var(--hm-border);
+  border-radius: var(--hm-radius-sm);
+  background: var(--hm-surface);
+}
 .es-pitch-diagram {
   display: inline-flex;
   align-items: flex-start;
@@ -587,12 +609,16 @@
   &.high { border-top-color: var(--hm-accent); }
 }
 .es-pitch-num {
-  padding: 0 4px;
-  border: 1px solid var(--hm-accent);
+  padding: 0 3px;
   border-radius: 3px;
+  background: var(--hm-accent-muted);
   font-size: 10px;
   color: var(--hm-accent);
   line-height: 1.5;
+}
+.es-pitch-type {
+  color: var(--hm-ink-muted);
+  font-size: 10px;
 }
 .es-tag-freq {
   text-transform: none;

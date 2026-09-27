@@ -26,6 +26,7 @@ import { DimKnownToggle } from "./DimKnownToggle";
 import { DifficultyColorToggle } from "./DifficultyColorToggle";
 import { AnkiRichCardsToggle, AnkiCardThemeSelect } from "./AnkiRichCardsToggle";
 import { MeaningSize } from "./MeaningSize";
+import { PitchDisplaySelect } from "./PitchDisplaySelect";
 import { VideoStats } from "./VideoStats";
 import { LookupHistory } from "./LookupHistory";
 import { useClickOutside } from "@src/hooks/useClickOutside";
@@ -151,6 +152,9 @@ export const SettingsContent: FC<{ onClose: () => void }> = ({ onClose }) => {
               </div>
               <div className="es-settings-content__item">
                 <MeaningSize />
+              </div>
+              <div className="es-settings-content__item">
+                <PitchDisplaySelect />
               </div>
               <div className="es-settings-content__item">
                 <FuriganaSelect />
