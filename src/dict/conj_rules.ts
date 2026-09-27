@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment -- generated port, type-checked at its call sites
 // @ts-nocheck — large auto-port; runtime-critical peels fixed below.
 /** Port of conj_rules.py — pure conjugation rule tables and helpers. */
 
@@ -57,7 +58,7 @@ export const PARADIGM_KEYS = ["Dictionary", "Polite", "Past", "Te-form", "Negati
 export function conjStepToDict(step: ConjStep, form: string = ""): Record<string, unknown> {
   let tip = (TIPS[step.conj_type] ?? "");
   if (step.alt_conj_type) {
-    let alt_tip = (TIPS[step.alt_conj_type] ?? "");
+    const alt_tip = (TIPS[step.alt_conj_type] ?? "");
     if ((alt_tip && (alt_tip !== tip))) {
       tip = `${tip} ${alt_tip}`.trim();
     }
@@ -66,9 +67,9 @@ export function conjStepToDict(step: ConjStep, form: string = ""): Record<string
 }
 
 function _te_aux_rules(): Array<PeelRule> {
-  let aux = [];
+  const aux = [];
   for (const [end, repl, suf, neg, fml] of [["てしまいました", "て", "しまいました", false, true], ["でしまいました", "で", "しまいました", false, true], ["てしまった", "て", "しまった", false, false], ["でしまった", "で", "しまった", false, false], ["てしまう", "て", "しまう", false, false], ["でしまう", "で", "しまう", false, false], ["ちゃった", "て", "ちゃった", false, false], ["じゃった", "で", "じゃった", false, false], ["ちゃう", "て", "ちゃう", false, false], ["じゃう", "で", "じゃう", false, false], ["しちゃった", "する", "しちゃった", false, false], ["しちゃう", "する", "しちゃう", false, false], ["されちゃった", "する", "されちゃった", false, false], ["されてしまった", "する", "されてしまった", false, false], ["されてしまう", "する", "されてしまう", false, false], ["された", "する", "された", false, false], ["しまいました", "", "しまいました", false, true], ["しまった", "", "しまった", false, false], ["しまう", "", "しまう", false, false]]) {
-    let ctype = "Completion (しまう)";
+    const ctype = "Completion (しまう)";
     if ((end.startsWith("され") || ["された"].includes(end))) {
       aux.push(peelRule({ ends_with: end, replace_with: repl, conj_type: "Passive", suffix: (!end.includes("しま") ? suf : "され"), neg: neg, fml: fml, transform: "suru_passive" }));
       if ((end.includes("しま") || end.includes("ちゃ"))) {
@@ -115,7 +116,7 @@ function _desire_rules(): Array<PeelRule> {
 }
 
 function _conditional_rules(): Array<PeelRule> {
-  let rules = [peelRule({ ends_with: "なければ", replace_with: "", conj_type: "Conditional (ば)", suffix: "なければ", neg: true, transform: "godan_neg_cond" }), peelRule({ ends_with: "なかったら", replace_with: "", conj_type: "Provisional (たら)", suffix: "なかったら", neg: true, transform: "ichidan_neg_past" }), peelRule({ ends_with: "だったら", replace_with: "", conj_type: "Provisional (たら)", suffix: "だったら", transform: "strip_da" }), peelRule({ ends_with: "したら", replace_with: "する", conj_type: "Provisional (たら)", suffix: "したら" }), peelRule({ ends_with: "きたら", replace_with: "来る", conj_type: "Provisional (たら)", suffix: "きたら" }), peelRule({ ends_with: "来たら", replace_with: "来る", conj_type: "Provisional (たら)", suffix: "来たら" }), peelRule({ ends_with: "たら", replace_with: "", conj_type: "Provisional (たら)", suffix: "たら", transform: "strip_ta" }), peelRule({ ends_with: "なら", replace_with: "", conj_type: "Provisional (なら)", suffix: "なら" })];
+  const rules = [peelRule({ ends_with: "なければ", replace_with: "", conj_type: "Conditional (ば)", suffix: "なければ", neg: true, transform: "godan_neg_cond" }), peelRule({ ends_with: "なかったら", replace_with: "", conj_type: "Provisional (たら)", suffix: "なかったら", neg: true, transform: "ichidan_neg_past" }), peelRule({ ends_with: "だったら", replace_with: "", conj_type: "Provisional (たら)", suffix: "だったら", transform: "strip_da" }), peelRule({ ends_with: "したら", replace_with: "する", conj_type: "Provisional (たら)", suffix: "したら" }), peelRule({ ends_with: "きたら", replace_with: "来る", conj_type: "Provisional (たら)", suffix: "きたら" }), peelRule({ ends_with: "来たら", replace_with: "来る", conj_type: "Provisional (たら)", suffix: "来たら" }), peelRule({ ends_with: "たら", replace_with: "", conj_type: "Provisional (たら)", suffix: "たら", transform: "strip_ta" }), peelRule({ ends_with: "なら", replace_with: "", conj_type: "Provisional (なら)", suffix: "なら" })];
   for (const [end, repl, suf] of [["けば", "く", "けば"], ["げば", "ぐ", "げば"], ["せば", "す", "せば"], ["てば", "つ", "てば"], ["ねば", "ぬ", "ねば"], ["べば", "ぶ", "べば"], ["めば", "む", "めば"], ["えば", "う", "えば"], ["れば", "る", "れば"]]) {
     rules.push(peelRule({ ends_with: end, replace_with: repl, conj_type: "Conditional (ば)", suffix: suf }));
   }
@@ -124,7 +125,7 @@ function _conditional_rules(): Array<PeelRule> {
 }
 
 function _negative_imperative_rules(): Array<PeelRule> {
-  let rules = [peelRule({ ends_with: "るな", replace_with: "る", conj_type: "Negative imperative", suffix: "な", neg: true, transform: "ichidan_neg_imperative" })];
+  const rules = [peelRule({ ends_with: "るな", replace_with: "る", conj_type: "Negative imperative", suffix: "な", neg: true, transform: "ichidan_neg_imperative" })];
   for (const [end, repl] of [["うな", "う"], ["くな", "く"], ["ぐな", "ぐ"], ["すな", "す"], ["つな", "つ"], ["ぬな", "ぬ"], ["ぶな", "ぶ"], ["むな", "む"]]) {
     rules.push(peelRule({ ends_with: end, replace_with: repl, conj_type: "Negative imperative", suffix: "な", neg: true, transform: "godan_neg_imperative" }));
   }
@@ -140,7 +141,7 @@ function _compound_suffix_rules(): Array<PeelRule> {
 }
 
 function _volitional_imperative_rules(): Array<PeelRule> {
-  let rules = [peelRule({ ends_with: "ましょうか", replace_with: "ます", conj_type: "Volitional", suffix: "ましょうか", fml: true }), peelRule({ ends_with: "ましょう", replace_with: "ます", conj_type: "Volitional", suffix: "ましょう", fml: true }), peelRule({ ends_with: "よう", replace_with: "る", conj_type: "Volitional", suffix: "よう", transform: "ichidan_volitional" }), peelRule({ ends_with: "ろ", replace_with: "る", conj_type: "Imperative", suffix: "ろ", transform: "ichidan_imperative" }), peelRule({ ends_with: "よ", replace_with: "る", conj_type: "Imperative", suffix: "よ", transform: "ichidan_imperative" })];
+  const rules = [peelRule({ ends_with: "ましょうか", replace_with: "ます", conj_type: "Volitional", suffix: "ましょうか", fml: true }), peelRule({ ends_with: "ましょう", replace_with: "ます", conj_type: "Volitional", suffix: "ましょう", fml: true }), peelRule({ ends_with: "よう", replace_with: "る", conj_type: "Volitional", suffix: "よう", transform: "ichidan_volitional" }), peelRule({ ends_with: "ろ", replace_with: "る", conj_type: "Imperative", suffix: "ろ", transform: "ichidan_imperative" }), peelRule({ ends_with: "よ", replace_with: "る", conj_type: "Imperative", suffix: "よ", transform: "ichidan_imperative" })];
   for (const [end, repl] of [["おう", "う"], ["こう", "く"], ["ごう", "ぐ"], ["そう", "す"], ["とう", "つ"], ["のう", "ぬ"], ["ぼう", "ぶ"], ["もう", "む"], ["ろう", "る"]]) {
     rules.push(peelRule({ ends_with: end, replace_with: repl, conj_type: "Volitional", suffix: end }));
   }
@@ -198,7 +199,7 @@ export function normalize_i_adj_lemma(lemma: string): string {
 }
 
 function _godan_base(lemma: string): [string, string] | unknown {
-  let ending = godan_dict_ending(lemma);
+  const ending = godan_dict_ending(lemma);
   if ((ending === null)) {
     return null;
   }
@@ -206,7 +207,7 @@ function _godan_base(lemma: string): [string, string] | unknown {
 }
 
 export function forward_conjugate(lemma: string, pos_tags: Array<string>): Record<string, string> | unknown {
-  let cls = pos_class(pos_tags);
+  const cls = pos_class(pos_tags);
   if ((cls === null)) {
     return null;
   }
@@ -232,7 +233,7 @@ function _forward_ichidan(lemma: string): Record<string, string> {
   if ((!lemma.endsWith("る"))) {
     return { ["Dictionary"]: lemma };
   }
-  let stem = lemma.slice(0, (-1));
+  const stem = lemma.slice(0, (-1));
   return { ["Dictionary"]: lemma, ["Polite"]: (stem + "ます"), ["Past"]: (stem + "た"), ["Te-form"]: (stem + "て"), ["Negative"]: (stem + "ない"), ["Potential"]: (stem + "られる"), ["Passive"]: (stem + "られる"), ["Causative"]: (stem + "させる"), ["Causative-Passive"]: (stem + "させられる"), ["Volitional"]: (stem + "よう"), ["Conditional (ば)"]: (stem + "れば"), ["Imperative"]: (stem + "ろ"), ["Desire (〜たい)"]: (stem + "たい"), ["Provisional (たら)"]: (stem + "たら"), ["Progressive (ている)"]: ((stem + "て") + "いる"), ["Te-shimau (てしまう)"]: ((stem + "て") + "しまう") };
 }
 
@@ -304,7 +305,7 @@ function _forward_suru(lemma: string): Record<string, string> {
     return { ["Dictionary"]: dict, ["Polite"]: "します", ["Past"]: "した", ["Te-form"]: "して", ["Negative"]: "しない", ["Potential"]: "できる", ["Passive"]: "される", ["Causative"]: "させる", ["Causative-Passive"]: "させられる", ["Volitional"]: "しよう", ["Conditional (ば)"]: "すれば", ["Imperative"]: "しろ", ["Desire (〜たい)"]: "したい", ["Provisional (たら)"]: "したら", ["Progressive (ている)"]: "している", ["Te-shimau (てしまう)"]: "してしまう" };
   }
   if (lemma.endsWith("する")) {
-    let prefix = lemma.slice(0, (-2));
+    const prefix = lemma.slice(0, (-2));
     return { ["Dictionary"]: lemma, ["Polite"]: (prefix + "します"), ["Past"]: (prefix + "した"), ["Te-form"]: (prefix + "して"), ["Negative"]: (prefix + "しない"), ["Potential"]: (prefix + "できる"), ["Passive"]: (prefix + "される"), ["Causative"]: (prefix + "させる"), ["Causative-Passive"]: (prefix + "させられる"), ["Volitional"]: (prefix + "しよう"), ["Conditional (ば)"]: (prefix + "すれば"), ["Imperative"]: (prefix + "しろ"), ["Desire (〜たい)"]: (prefix + "したい"), ["Provisional (たら)"]: (prefix + "したら"), ["Progressive (ている)"]: (prefix + "している"), ["Te-shimau (てしまう)"]: (prefix + "してしまう") };
   }
   return { ["Dictionary"]: lemma };
@@ -437,7 +438,7 @@ function _obligation_neg_te_to_dict(stem: string): Array<string> {
 }
 
 function _apply_transform(form: string, rule: PeelRule): Array<string> {
-  let t = rule.transform;
+  const t = rule.transform;
   if ((t === null)) {
     return [form];
   }
@@ -448,7 +449,7 @@ function _apply_transform(form: string, rule: PeelRule): Array<string> {
     return _masu_stem_to_dict(form);
   }
   if ((t === "strip_ta")) {
-    let out = [];
+    const out = [];
     if (["られ", "れ", "せ"].some((_s) => form.endsWith(_s))) {
       out.push(form);
     }
@@ -610,8 +611,8 @@ function _apply_transform(form: string, rule: PeelRule): Array<string> {
 }
 
 function _auxiliary_steps(rule: PeelRule, step: ConjStep): Array<ConjStep> {
-  let steps = [step];
-  let past_markers = ["た", "だ", "いた", "した", "った", "かった", "なかった", "りました", "ました", "れた", "られた"];
+  const steps = [step];
+  const past_markers = ["た", "だ", "いた", "した", "った", "かった", "なかった", "りました", "ました", "れた", "られた"];
   if (!step.conj_type.includes("Past")) {
     // Python's str.endswith(tuple) means "ends with ANY of these markers".
     // Passing the array straight to String.prototype.endsWith coerces it to a
@@ -623,7 +624,7 @@ function _auxiliary_steps(rule: PeelRule, step: ConjStep): Array<ConjStep> {
   }
   if ((step.neg && (step.conj_type !== "Negative imperative"))) {
     if ((!steps.some((s) => (s.conj_type === "Negative")))) {
-      let polite_neg = (step.fml || rule.ends_with.includes("ません") || (rule.suffix || "").includes("ません") || rule.ends_with.includes("ありません"));
+      const polite_neg = (step.fml || rule.ends_with.includes("ません") || (rule.suffix || "").includes("ません") || rule.ends_with.includes("ありません"));
       if ((!polite_neg)) {
         steps.push(conjStep({ conj_type: "Negative", suffix: "ない", gloss: "negative", neg: true }));
       }
@@ -684,13 +685,13 @@ export function apply_peel(surface: string, rule: PeelRule): Array<[string, Arra
     }
   }
   if (((rule.ends_with === "せない") && (rule.transform === "godan_a_causative_short"))) {
-    let stem = surface.slice(0, (-("せない").length));
+    const stem = surface.slice(0, (-("せない").length));
     if ((!_a_stem_to_dict(stem))) {
       return [];
     }
   }
   if (((rule.ends_with === "せません") && (rule.transform === "godan_a_causative_short"))) {
-    let stem2 = surface.slice(0, (-("せません").length));
+    const stem2 = surface.slice(0, (-("せません").length));
     if ((!_a_stem_to_dict(stem2))) {
       return [];
     }
@@ -717,7 +718,7 @@ export function apply_peel(surface: string, rule: PeelRule): Array<[string, Arra
     return [];
   }
   if (((rule.conj_type === "Potential") && ["べる", "げる", "める", "ねる"].includes(rule.ends_with))) {
-    let trial = (surface.slice(0, (-(rule.ends_with).length)) + rule.replace_with);
+    const trial = (surface.slice(0, (-(rule.ends_with).length)) + rule.replace_with);
     if ((trial === surface)) {
       return [];
     }
@@ -739,10 +740,10 @@ export function apply_peel(surface: string, rule: PeelRule): Array<[string, Arra
       return [];
     }
   }
-  let base = (surface.slice(0, (-(rule.ends_with).length)) + rule.replace_with);
-  let step = conjStep({ conj_type: rule.conj_type, suffix: rule.suffix, gloss: rule.gloss, neg: rule.neg, fml: rule.fml, transform: rule.transform, alt_conj_type: rule.alt_conj_type });
-  let step_list = _auxiliary_steps(rule, step);
-  let results = [];
+  const base = (surface.slice(0, (-(rule.ends_with).length)) + rule.replace_with);
+  const step = conjStep({ conj_type: rule.conj_type, suffix: rule.suffix, gloss: rule.gloss, neg: rule.neg, fml: rule.fml, transform: rule.transform, alt_conj_type: rule.alt_conj_type });
+  const step_list = _auxiliary_steps(rule, step);
+  const results = [];
   for (const new_form of _apply_transform(base, rule)) {
     if ((new_form !== surface)) {
       results.push([new_form, step_list]);
@@ -793,9 +794,9 @@ function _is_speech_step(step: ConjStep): boolean {
 }
 
 function _speech_flags(steps: Array<ConjStep>): [boolean, boolean, boolean] {
-  let fml = steps.some((s) => ((s.conj_type === "Polite") || (s.fml && _SPEECH_CONJ_TYPES.has(s.conj_type))));
-  let neg = steps.some((s) => ((s.conj_type === "Negative") || (s.neg && _SPEECH_CONJ_TYPES.has(s.conj_type))));
-  let past = steps.some((s) => s.conj_type.startsWith("Past"));
+  const fml = steps.some((s) => ((s.conj_type === "Polite") || (s.fml && _SPEECH_CONJ_TYPES.has(s.conj_type))));
+  const neg = steps.some((s) => ((s.conj_type === "Negative") || (s.neg && _SPEECH_CONJ_TYPES.has(s.conj_type))));
+  const past = steps.some((s) => s.conj_type.startsWith("Past"));
   return [fml, neg, past];
 }
 
@@ -832,18 +833,18 @@ function _masu_family(polite: string): Record<string, string> | unknown {
   if ((!polite.endsWith("ます"))) {
     return null;
   }
-  let stem = polite.slice(0, (-2));
+  const stem = polite.slice(0, (-2));
   return { ["polite"]: polite, ["neg"]: (stem + "ません"), ["past"]: (stem + "ました"), ["neg_past"]: (stem + "ませんでした") };
 }
 
 function _i_adj_polite_family(lemma: string, forms: Record<string, string>): Record<string, string> {
-  let polite = ((forms["Polite"] ?? null) || (lemma + "です"));
-  let neg = ((forms["Negative"] ?? null) || "");
+  const polite = ((forms["Polite"] ?? null) || (lemma + "です"));
+  const neg = ((forms["Negative"] ?? null) || "");
   if (SPECIAL_II.has(lemma)) {
     return { ["polite"]: polite, ["neg"]: "よくありません", ["neg_desu"]: "よくないです", ["past"]: "よかったです", ["neg_past"]: "よくありませんでした", ["plain_neg"]: (neg || "よくない"), ["plain_past"]: ((forms["Past"] ?? null) || "よかった"), ["plain_neg_past"]: _plain_neg_past((neg || "よくない")) };
   }
   if (lemma.endsWith("い")) {
-    let stem = lemma.slice(0, (-1));
+    const stem = lemma.slice(0, (-1));
     return { ["polite"]: polite, ["neg"]: (stem + "くありません"), ["neg_desu"]: ((neg || (stem + "くない")) + "です"), ["past"]: (((forms["Past"] ?? null) || (stem + "かった")) + "です"), ["neg_past"]: (stem + "くありませんでした"), ["plain_neg"]: (neg || (stem + "くない")), ["plain_past"]: ((forms["Past"] ?? null) || (stem + "かった")), ["plain_neg_past"]: _plain_neg_past((neg || (stem + "くない"))) };
   }
   return { ["polite"]: polite, ["neg"]: neg, ["neg_desu"]: neg, ["past"]: ((forms["Past"] ?? null) || lemma), ["neg_past"]: neg, ["plain_neg"]: neg, ["plain_past"]: ((forms["Past"] ?? null) || lemma), ["plain_neg_past"]: (neg ? _plain_neg_past(neg) : lemma) };

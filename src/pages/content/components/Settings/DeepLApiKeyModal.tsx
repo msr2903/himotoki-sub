@@ -6,15 +6,17 @@ import {
   deeplApiKeyModalClosed,
   $deeplApiKey,
   deeplApiKeyChanged,
+  translationServiceChanged,
 } from "@src/models/settings";
 
 export const DeepLApiKeyModal: FC = () => {
-  const [isModalOpen, handleModalClose, currentApiKey, handleApiKeyChange] =
+  const [isModalOpen, handleModalClose, currentApiKey, handleApiKeyChange, handleServiceChange] =
     useUnit([
       $deeplApiKeyModalOpen,
       deeplApiKeyModalClosed,
       $deeplApiKey,
       deeplApiKeyChanged,
+      translationServiceChanged,
     ]);
 
   const [tempApiKey, setTempApiKey] = useState(currentApiKey);
@@ -25,20 +27,19 @@ export const DeepLApiKeyModal: FC = () => {
     }
   }, [isModalOpen, currentApiKey]);
 
+  const trimmedKey = tempApiKey.trim();
+
   const handleSave = () => {
-    handleApiKeyChange(tempApiKey);
+    if (!trimmedKey) return;
+    handleApiKeyChange(trimmedKey);
     handleModalClose();
   };
 
+  // DeepL only works through its official API, which needs a key. Closing without one would leave
+  // every line translation failing, so fall back to Google Translate instead.
   const handleCancel = () => {
     setTempApiKey(currentApiKey);
-    handleModalClose();
-  };
-
-  // "Use without key" must actually drop the stored key — otherwise translations keep going to
-  // the keyed endpoint with the old key and keep failing.
-  const handleUseWithoutKey = () => {
-    handleApiKeyChange("");
+    if (!currentApiKey.trim()) handleServiceChange("google");
     handleModalClose();
   };
 
@@ -71,8 +72,8 @@ export const DeepLApiKeyModal: FC = () => {
 
           <div className="es-modal-info">
             <p>
-              Without API key, DeepL may be slower and less reliable. We
-              strongly recommend getting a personal API key.
+              DeepL translations need your own API key. Without one, line
+              translations use Google Translate instead.
             </p>
             <p>
               Get your free DeepL API key at{" "}
@@ -100,13 +101,8 @@ export const DeepLApiKeyModal: FC = () => {
           </button>
           <button
             className="es-modal-button es-modal-button--primary"
-            onClick={handleUseWithoutKey}
-          >
-            Use without key
-          </button>
-          <button
-            className="es-modal-button es-modal-button--primary"
             onClick={handleSave}
+            disabled={!trimmedKey}
           >
             Save
           </button>

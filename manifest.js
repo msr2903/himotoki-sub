@@ -39,7 +39,6 @@ const manifest = {
         "https://kino.pub/*",
         "https://kinopub.cc/*",
         "https://app.plex.tv/*",
-        "https://plex.ukrapka.tech/*",
         "https://www.udemy.com/course/*/learn/lecture/*",
         "https://hd.kinopoisk.ru/*",
         "https://www.amazon.de/Amazon-Video/*",
@@ -67,7 +66,6 @@ const manifest = {
     "http://localhost:8765/*",
     "https://api-free.deepl.com/*",
     "https://api.deepl.com/*",
-    "https://www2.deepl.com/*",
   ],
   content_security_policy: {
     extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
@@ -92,7 +90,7 @@ const manifest = {
   },
   browser_specific_settings: {
     gecko: {
-      id: "{4077aa9d-b753-4913-8e52-27ef408d4c82}",
+      id: "himotoki-sub@msr2903.github.io",
     },
   },
 };

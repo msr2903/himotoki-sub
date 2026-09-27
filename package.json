@@ -1,11 +1,15 @@
 {
-  "name": "easysubs",
+  "name": "himotoki-sub",
   "version": "0.1.0",
-  "description": "Browser extension for learning languages with watching movies and TV shows",
+  "description": "Browser extension that turns streaming-site subtitles into a Japanese study tool, with a local word splitter and an offline dictionary",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Nitrino/easysubs.git"
+    "url": "https://github.com/msr2903/himotoki-sub.git"
+  },
+  "homepage": "https://github.com/msr2903/himotoki-sub#readme",
+  "bugs": {
+    "url": "https://github.com/msr2903/himotoki-sub/issues"
   },
   "scripts": {
     "build": "tsc --noEmit && vite build",
@@ -25,8 +29,11 @@
     "test:unit": "vitest run"
   },
   "type": "module",
+  "packageManager": "pnpm@11.18.0",
+  "engines": {
+    "node": ">=22.13"
+  },
   "dependencies": {
-    "@ifyour/deeplx": "^0.1.17",
     "@sqlite.org/sqlite-wasm": "3.53.4-build1",
     "classnames": "^2.5.1",
     "convex": "^1.43.0",
@@ -64,6 +71,7 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.2.1",
     "eslint-plugin-react": "^7.35.0",
+    "eslint-plugin-react-hooks": "^4.6.2",
     "fs-extra": "^11.2.0",
     "npm-run-all": "^4.1.5",
     "playwright": "1.63.0",
