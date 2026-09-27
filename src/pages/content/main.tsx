@@ -9,6 +9,7 @@ import { Settings } from "@src/pages/content/components/Settings";
 import { Subs } from "./components/Subs";
 import { ProgressBar } from "./components/ProgressBar";
 import { removeKeyboardEventsListeners } from "@src/utils/keyboardHandler";
+import { removeMouseEventsListeners } from "@src/utils/mouseHandler";
 import { getCurrentService } from "@src/utils/getCurrentService";
 
 refreshOnUpdate("pages/content");
@@ -85,6 +86,7 @@ const mountSubsUi = (language: string) => {
   try {
     console.log("Event:", "esSubsChanged", language);
     removeKeyboardEventsListeners();
+    removeMouseEventsListeners();
     unmountSubsUi();
 
     // Empty language = captions off / reset (EasySubs behavior).

@@ -36,6 +36,7 @@ import {
   tokenUnpinned,
 } from "@src/models/translations";
 import { addKeyboardEventsListeners, removeKeyboardEventsListeners } from "@src/utils/keyboardHandler";
+import { addMouseEventsListeners, removeMouseEventsListeners } from "@src/utils/mouseHandler";
 import { SubItemTranslation } from "./SubItemTranslation";
 import { SecondaryTranslation, SubFullTranslation } from "./SubFullTranslation";
 import { TokenLabel } from "./TokenLabel";
@@ -107,10 +108,13 @@ export const Subs: FC<TSubsProps> = () => {
 
   // Attach the keyboard shortcuts unconditionally: D/B/T/R/L/H/,/./\ must work regardless of the
   // "move by subtitles" setting, which now only gates the arrow keys (inside keyboardHandler itself).
+  // The middle / side mouse bindings (src/utils/mouseHandler.ts) follow the same lifecycle.
   useEffect(() => {
     addKeyboardEventsListeners();
+    addMouseEventsListeners();
     return () => {
       removeKeyboardEventsListeners();
+      removeMouseEventsListeners();
     };
   }, []);
 

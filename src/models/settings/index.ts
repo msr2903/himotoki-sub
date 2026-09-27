@@ -2,7 +2,7 @@ import { createStore, createEvent, sample, createEffect } from "effector";
 import { debug } from "patronum";
 
 import { withPersist } from "@src/utils/withPersist";
-import { TFuriganaLevel, TFuriganaMode, TLearningService, TReadingLineMode, TSecondarySubs, TTokenAction, TTranslationService } from "../types";
+import { TFuriganaLevel, TFuriganaMode, TLearningService, TMouseAction, TMouseButton, TReadingLineMode, TSecondarySubs, TTokenAction, TTranslationService } from "../types";
 import { fetchCurrentStreamingFx } from "../streamings";
 import {
   CLICK_ACTION_SETTING,
@@ -33,6 +33,7 @@ import {
 import type { TAnkiCardTheme } from "@src/utils/ankiNote";
 import { PLAYBACK_RATE_DEFAULT, PLAYBACK_RATE_SETTING, PLAYBACK_RATE_STEP, clampRate, stepRate } from "@src/shared/playbackRate";
 import { DEFAULT_LISTENING_MODE, LISTENING_MODE_SETTING } from "@src/shared/listeningMode";
+import { DEFAULT_MOUSE_ACTION, MOUSE_BUTTONS } from "@src/shared/mouseActions";
 
 // Every persisted store carries an explicit name: it is the chrome.storage key (`persist:<name>`)
 // and is shared with the options page. See src/utils/withPersist.ts.
@@ -138,6 +139,19 @@ export const $clickAction = withPersist(
 );
 export const clickActionChanged = createEvent<TTokenAction>();
 $clickAction.on(clickActionChanged, (_, value) => value);
+
+/** What the middle / side mouse buttons do over the video (see src/utils/mouseHandler.ts). */
+const mouseActionStore = (button: TMouseButton) =>
+  withPersist(createStore<TMouseAction>(DEFAULT_MOUSE_ACTION, { name: MOUSE_BUTTONS.find((b) => b.id === button)!.setting }));
+export const $mouseActions: Record<TMouseButton, ReturnType<typeof mouseActionStore>> = {
+  middle: mouseActionStore("middle"),
+  back: mouseActionStore("back"),
+  forward: mouseActionStore("forward"),
+};
+export const mouseActionChanged = createEvent<{ button: TMouseButton; action: TMouseAction }>();
+for (const button of Object.keys($mouseActions) as TMouseButton[]) {
+  $mouseActions[button].on(mouseActionChanged, (current, change) => (change.button === button ? change.action : current));
+}
 
 /** Size of the pop-up, hover labels and settings panel, in percent (50–150). */
 export const $uiScale = withPersist(createStore<number>(UI_SCALE_DEFAULT, { name: UI_SCALE_SETTING }));

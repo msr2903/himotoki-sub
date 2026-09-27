@@ -75,6 +75,7 @@ Hover and click are independent, user-configurable actions (`TTokenAction`: furi
 - `src/split/model.ts` - ONNX inference + Viterbi decoding
 - `src/split/postprocess.ts` - segment fix-ups (known compounds, pronoun+particle peeling)
 - Playback hotkeys live in `src/utils/keyboardHandler.ts`: arrows (prev/next/repeat), D (second line), R (replay line), L (loop line), B (sentence breakdown, `$sentenceOpen` + `SentenceBreakdown.tsx`, local dictionary only), T (searchable transcript, `$transcriptOpen` + `Transcript.tsx`, click a line to seek), `,`/`.` (playback speed down/up, `$playbackRate` in settings), `\` (slow-replay the current line at 0.75×, `slowReplayRequested` in `src/models/videos`), H (listening-mode peek: reveal the blurred line, `$listeningMode`/`$listeningPeek`)
+- Mouse bindings live in `src/utils/mouseHandler.ts`: the middle and side (back/forward) buttons each map to a `TMouseAction` (previous/next line, replay, loop, slow replay, play/pause; options and `persist:mouse*Action` keys in `src/shared/mouseActions.ts`, stores `$mouseActions`). Off by default, and only claimed while the pointer is over the video, so the buttons keep their browser behaviour elsewhere
 - `src/shared/himotokiConfig.ts` - API base URL, dictionaries, Convex URL, OAuth client ID
 
 ### Model initialization
