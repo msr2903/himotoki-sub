@@ -168,12 +168,22 @@ try {
     s.updateCurrentSubsFx.use(async () => [line]); await s.updateCurrentSubsFx({ subs: [], video: null });
   });
   await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-sub").length === 0 && document.querySelector("#es-subs .es-glossary--empty"));
-  // Move away first: hovering where the pointer already is fires no mousemove, and the chip only
-  // appears on pointer movement.
-  await page.mouse.move(0, 0);
-  await page.hover("#es-subs");
-  await page.waitForFunction(() => document.querySelector("#es-subs .es-glossary__toggle")?.classList.contains("es-glossary__toggle--visible"));
-  await page.waitForFunction(() => getComputedStyle(document.querySelector("#es-subs .es-glossary__toggle")).opacity === "1");
+  // The chip appears on pointer movement over the subtitles and fades in. Keep nudging the pointer
+  // while polling on a timer (not animation frames, which a slow or occluded CI window throttles), so
+  // the idle timeout can't hide it again before the fade finishes.
+  {
+    const box = await page.locator("#es-subs").boundingBox();
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await page.mouse.move(0, 0);
+    let shown = false;
+    for (let i = 0; i < 60 && !shown; i++) {
+      await page.mouse.move(cx + (i % 2 ? 1 : -1), cy);
+      await page.waitForTimeout(100);
+      shown = await chipShown();
+    }
+    assert.ok(shown, "Show line appears when the pointer moves over a line with no new words");
+  }
   await page.locator("#es-subs").screenshot({ path: "/tmp/himotoki-glossary-empty-line.png" });
   await page.getByRole("button", { name: "Show line" }).click();
   await page.waitForFunction(() => document.querySelector("#es-subs .es-sub")?.textContent === "昨日映画");
