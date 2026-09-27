@@ -1,5 +1,5 @@
 import { $streaming } from "@src/models/streamings";
-import { $mouseActions } from "@src/models/settings";
+import { $mouseActions, listeningPeekToggled } from "@src/models/settings";
 import { $video, loopLineToggled, moveKeyPressed, replayLinePressed, slowReplayRequested } from "@src/models/videos";
 import type { TMouseAction } from "@src/models/types";
 import { isPointInRect, mouseButtonOf } from "@src/shared/mouseActions";
@@ -36,6 +36,9 @@ const runMouseAction = (action: TMouseAction) => {
       else video.pause();
       break;
     }
+    case "showLine":
+      listeningPeekToggled();
+      break;
     case "none":
       break;
   }

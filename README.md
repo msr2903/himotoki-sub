@@ -26,7 +26,7 @@ YouTube, Netflix, KinoPub, Coursera, Plex, Udemy, Kinopoisk, Amazon Prime Video,
 - **Configurable hover and click** — each can be furigana, meaning, furigana + meaning, pop-up dictionary, or nothing.
 - **Dictionary pop-up** with senses, pitch accent, JLPT and frequency, an example, the deconjugation chain and an on-demand conjugation table, an entry switcher, word audio (speech synthesis + replay the line from the video), and save / mark-known. Pitch accent can show every recorded contour, compact numbers, or be hidden.
 - **Furigana** ruby over the kanji only; always/on-hover/never, and can be limited to words above a chosen JLPT level.
-- **New words only (beta)**: pick your JLPT level (N3, N2 or N1) and each subtitle line becomes a short glossary of the words above it (harder JLPT words and rare ones) with their meanings. **Show line** (or `H`) reveals the full line; mark a missed word Learning and it is always listed.
+- **New words only (beta)**: pick your JLPT level (N3, N2 or N1) and each subtitle line becomes a short glossary of the words above it (harder JLPT words and rare ones) with their meanings. Move the mouse to get a **Show line** chip beside the glossary (it fades out while you watch), click the glossary, press `H`, or assign a mouse button to reveal the full line; mark a missed word Learning and it is always listed.
 - **Colour words by JLPT difficulty**, and **dim known words** with per-video coverage and i+1 stats.
 - **Dual subtitles** (a second track or a translation) and **whole-line translation** on click.
 - **Reading & shadowing**: searchable transcript, sentence breakdown, replay/loop the current line, and arrow-key subtitle navigation.
@@ -47,7 +47,7 @@ YouTube, Netflix, KinoPub, Coursera, Plex, Udemy, Kinopoisk, Amazon Prime Video,
 | `Esc` | Close a pinned pop-up |
 
 ### Mouse controls
-The middle button and the two side buttons (back / forward) can each be set to previous line, next line, replay, loop, slow replay or play/pause, from the in-player panel or the settings page. They are off by default and only act while the pointer is over the video; elsewhere they keep their normal browser behaviour.
+The middle button and the two side buttons (back / forward) can each be set to previous line, next line, replay, loop, slow replay, play/pause or show full line, from the in-player panel or the settings page. They are off by default and only act while the pointer is over the video; elsewhere they keep their normal browser behaviour.
 
 Settings live in the in-player panel, the full settings page (toolbar popup → Settings), and a welcome page on first install.
 

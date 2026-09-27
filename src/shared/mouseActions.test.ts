@@ -21,6 +21,7 @@ describe("mouseButtonOf", () => {
 describe("isMouseAction", () => {
   it("accepts known actions only", () => {
     expect(isMouseAction("prev")).toBe(true);
+    expect(isMouseAction("showLine")).toBe(true);
     expect(isMouseAction("none")).toBe(true);
     expect(isMouseAction("popup")).toBe(false);
     expect(isMouseAction(undefined)).toBe(false);
