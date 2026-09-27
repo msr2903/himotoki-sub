@@ -5,6 +5,7 @@ import path from "node:path";
 import os from "node:os";
 import { createRequire } from "node:module";
 import { chromium } from "playwright";
+import { checkTranslationPerformance } from "./translation-performance.mjs";
 const require = createRequire(import.meta.url);
 const { build } = createRequire(require.resolve("vite"))("esbuild");
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
@@ -25,6 +26,7 @@ try {
   await page.waitForFunction(() => window.audit);
   // Let settings rehydrate before changing them.
   await page.waitForTimeout(200);
+  await checkTranslationPerformance(page);
   const checks = await page.evaluate(async () => {
     const { subs: s, settings: st, videos: v, translations: tr, $videoStats, knownKeyOf, replayVideoClip, cancelVideoClip } = window.audit;
     const check = (condition, label) => { if (!condition) throw new Error(label); passed.push(label); };

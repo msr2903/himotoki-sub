@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useUnit } from "effector-react";
+import { useStoreMap, useUnit } from "effector-react";
 
 import { $lookupPendings, $lookups, lookupKeyOf, lookupRequested } from "@src/models/translations";
 import type { TSubItem, TWordTranslation } from "@src/models/types";
@@ -10,13 +10,21 @@ export const useLookup = (
   enabled = true,
 ): { translation: TWordTranslation | null; pending: boolean } => {
   const key = lookupKeyOf(subItem);
-  const [lookups, pendings, request] = useUnit([$lookups, $lookupPendings, lookupRequested]);
+  const request = useUnit(lookupRequested);
+  const translation = useStoreMap({
+    store: $lookups,
+    keys: [key, enabled],
+    fn: (lookups, [key, enabled]) => enabled ? lookups[key] ?? null : null,
+  });
+  const pending = useStoreMap({
+    store: $lookupPendings,
+    keys: [key, enabled],
+    fn: (pendings, [key, enabled]) => enabled && Boolean(pendings[key]),
+  });
 
   useEffect(() => {
-    if (key && enabled) request(subItem);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, enabled]);
+    if (key && enabled) request(key);
+  }, [key, enabled, request]);
 
-  if (!enabled) return { translation: null, pending: false };
-  return { translation: lookups[key] ?? null, pending: Boolean(pendings[key]) };
+  return { translation, pending };
 };
