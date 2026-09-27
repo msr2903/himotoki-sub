@@ -168,7 +168,11 @@ try {
     s.updateCurrentSubsFx.use(async () => [line]); await s.updateCurrentSubsFx({ subs: [], video: null });
   });
   await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-sub").length === 0 && document.querySelector("#es-subs .es-glossary--empty"));
+  // Move away first: hovering where the pointer already is fires no mousemove, and the chip only
+  // appears on pointer movement.
+  await page.mouse.move(0, 0);
   await page.hover("#es-subs");
+  await page.waitForFunction(() => document.querySelector("#es-subs .es-glossary__toggle")?.classList.contains("es-glossary__toggle--visible"));
   await page.waitForFunction(() => getComputedStyle(document.querySelector("#es-subs .es-glossary__toggle")).opacity === "1");
   await page.locator("#es-subs").screenshot({ path: "/tmp/himotoki-glossary-empty-line.png" });
   await page.getByRole("button", { name: "Show line" }).click();
