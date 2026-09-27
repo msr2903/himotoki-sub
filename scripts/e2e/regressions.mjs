@@ -112,6 +112,57 @@ try {
   assert.equal(await page.locator(".es-sub-item-pinned").count(), 1);
   assert.ok(await page.evaluate(() => window.audit.settings.$knownWords.getState().includes("seq:jitendex:2")));
   console.log("PASS Entry switching and mark-known keep the popup pinned and select the correct entry");
+  // New words only (beta): the line becomes a glossary of words above the learner's level.
+  await page.keyboard.press("Escape");
+  await page.evaluate(async () => {
+    const { subs: s, settings: st, translations: tr } = window.audit;
+    const data = {
+      昨日: { jlpt: ["n5"], mainTranslation: "yesterday" }, 偶然: { jlpt: ["n2"], mainTranslation: "by chance; unexpectedly" },
+      懐かしい: { jlpt: ["n3"], mainTranslation: "nostalgic" }, 映画: { jlpt: ["n5"], mainTranslation: "movie" },
+      を: { jlpt: ["n5"], mainTranslation: "object marker" }, 見つけた: { jlpt: ["n4"], mainTranslation: "to find" },
+      邂逅: { frequency: 40000, mainTranslation: "chance meeting" }, 未知語: { mainTranslation: "" },
+    };
+    tr.fetchWordTranslationFx.use(async ({ source }) => ({ source, headword: source, reading: "", mainTranslation: source, translations: [{ word: source, partOfSpeech: "noun", synonyms: [], popularity: 0 }], targetLanguage: "en", transcription: "", lookupSource: "local", ...data[source] }));
+    await tr.fetchWordTranslationFx({ source: "warm-up" }); // marks the dictionary ready
+    const text = "昨日 偶然 懐かしい 映画 を 見つけた 邂逅 未知語";
+    const line = { id: 9, start: 0, end: 4000, text, cleanedText: text, items: text.split(" ").map((t) => ({ text: t, cleanedText: t, type: "word", tag: "span" })) };
+    s.updateCurrentSubsFx.use(async () => [line]); await s.updateCurrentSubsFx({ subs: [], video: null });
+    st.newWordsLevelChanged("n3");
+  });
+  const glossary = () => page.evaluate(() => [...document.querySelectorAll("#es-subs .es-glossary__row")].map((r) => r.textContent).join(" | "));
+  await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-glossary__row").length === 2);
+  assert.equal(await glossary(), "偶然by chance; unexpectedly | 邂逅chance meeting", "N3 lists N2/N1 and rare words with meanings");
+  assert.equal(await page.locator("#es-subs .es-sub").count(), 0, "The line itself is replaced by the glossary");
+  await page.evaluate(() => window.audit.settings.newWordsLevelChanged("n1"));
+  await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-glossary__row").length === 1);
+  assert.equal(await glossary(), "邂逅chance meeting", "N1 lists only rare words");
+  // A word the glossary missed: show the line, mark the word Learning, and it joins the glossary.
+  await page.getByRole("button", { name: "Show line" }).click();
+  await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-sub").length === 1);
+  await page.mouse.move(5, 5);
+  await page.locator("#es-subs").screenshot({ path: "/tmp/himotoki-glossary-show-line.png" });
+  await page.locator("#es-subs .es-sub .es-sub-item", { hasText: "懐かしい" }).click();
+  await page.locator(".es-word-translation").getByRole("button", { name: "Learning", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-glossary__row").length === 2);
+  assert.equal(await glossary(), "懐かしいnostalgic | 邂逅chance meeting", "A word marked Learning is always listed");
+  assert.equal(await page.getByRole("button", { name: "Hide line" }).count(), 1, "The line stays shown until the next one");
+  // The next line starts hidden again; a line with no new words still offers the button.
+  await page.evaluate(async () => {
+    const { subs: s } = window.audit;
+    const text = "昨日 映画";
+    const line = { id: 10, start: 4000, end: 8000, text, cleanedText: text, items: text.split(" ").map((t) => ({ text: t, cleanedText: t, type: "word", tag: "span" })) };
+    s.updateCurrentSubsFx.use(async () => [line]); await s.updateCurrentSubsFx({ subs: [], video: null });
+  });
+  await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-sub").length === 0 && document.querySelector("#es-subs .es-glossary--empty"));
+  await page.locator("#es-subs").screenshot({ path: "/tmp/himotoki-glossary-empty-line.png" });
+  await page.getByRole("button", { name: "Show line" }).click();
+  await page.waitForFunction(() => document.querySelector("#es-subs .es-sub")?.textContent === "昨日映画");
+  await page.evaluate(() => window.audit.settings.listeningPeekToggled());
+  await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-sub").length === 1 && document.querySelector("#es-subs .es-glossary"));
+  await page.evaluate(() => window.audit.settings.newWordsLevelChanged("off"));
+  await page.waitForFunction(() => !document.querySelector("#es-subs .es-glossary") && document.querySelectorAll("#es-subs .es-sub").length === 1);
+  console.log("PASS New words only swaps the line for a glossary; Show line reveals it and a word marked Learning joins the glossary");
   await page.keyboard.press("Escape");
   assert.equal(await page.locator(".es-word-translation").count(), 0);
   await page.locator("#typing").focus(); await page.keyboard.press("b");

@@ -436,3 +436,16 @@
     background: var(--hm-accent-muted);
   }
 }
+
+// Small "Beta" badge next to an in-player setting label.
+.es-beta {
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--hm-accent-muted);
+  color: var(--hm-accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

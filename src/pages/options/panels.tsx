@@ -39,6 +39,7 @@ import {
 import type { TAnkiCardTheme } from "@src/utils/ankiNote";
 import { DEFAULT_MOUSE_ACTION, MOUSE_ACTIONS, MOUSE_BUTTONS, isMouseAction } from "@src/shared/mouseActions";
 import { DEFAULT_PITCH_DISPLAY, PITCH_DISPLAY_OPTIONS, PITCH_DISPLAY_SETTING, isPitchDisplay, type TPitchDisplay } from "@src/shared/pitchSettings";
+import { DEFAULT_NEW_WORDS_LEVEL, NEW_WORDS_LEVEL_OPTIONS, NEW_WORDS_LEVEL_SETTING, isNewWordsLevel, type TNewWordsLevel } from "@src/shared/newWordsOnly";
 import { LOOKUP_HISTORY_SETTING } from "@src/shared/lookupHistory";
 import { buildRows, toCsv, toJson } from "@src/shared/exportWords";
 import { DictionaryPanel } from "@src/pages/shared/DictionaryPanel";
@@ -133,6 +134,7 @@ export const SubtitlesPanel: FC = () => {
   const [readingLine, setReadingLine] = usePersistedSetting<TReadingLineMode>(READING_LINE_SETTING, DEFAULT_READING_LINE, isReadingLineMode);
   const [secondary, setSecondary] = usePersistedSetting<TSecondarySubs>(SECONDARY_SUBS_SETTING, DEFAULT_SECONDARY_SUBS, isSecondarySubs);
   const secondaryDesc = SECONDARY_SUBS_OPTIONS.find((o) => o.value === secondary)?.description;
+  const [newWords, setNewWords] = usePersistedSetting<TNewWordsLevel>(NEW_WORDS_LEVEL_SETTING, DEFAULT_NEW_WORDS_LEVEL, isNewWordsLevel);
 
   return (
     <>
@@ -156,6 +158,20 @@ export const SubtitlesPanel: FC = () => {
           options={SECONDARY_SUBS_OPTIONS}
           onChange={setSecondary}
         />
+      </Card>
+      <Card
+        title={
+          <>
+            New words only <span className="beta">Beta</span>
+          </>
+        }
+      >
+        <p className="card-hint">
+          Pick your JLPT level and each subtitle line is replaced by a short glossary of the words you probably
+          don't know yet (harder JLPT words and rare ones), with their meanings. Missed one? Click Show line (or
+          press H), then mark the word Learning to always list it. Needs the offline dictionary.
+        </p>
+        <ChipsRow id="new-words" title="Your JLPT level" value={newWords} options={NEW_WORDS_LEVEL_OPTIONS} onChange={setNewWords} />
       </Card>
     </>
   );
