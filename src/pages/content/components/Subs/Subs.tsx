@@ -323,13 +323,14 @@ const NewWordsGlossary: FC<{
   /** Reveal or hide the current line; absent between lines. */
   onToggleLine?: () => void;
 }> = ({ subs, level, lineShown, onToggleLine }) => {
-  const [lookups, request, knownWords, wordStatuses, subsBackground, subsBackgroundOpacity] = useUnit([
+  const [lookups, request, knownWords, wordStatuses, subsBackground, subsBackgroundOpacity, pinnedWord] = useUnit([
     $lookups,
     lookupRequested,
     $knownWords,
     $wordStatuses,
     $subsBackground,
     $subsBackgroundOpacity,
+    $pinnedWord,
   ]);
   const tokens = subs.flatMap((sub) =>
     sub.items.flatMap((item, index) => (item.type === "word" && isJapaneseToken(item.text) ? [{ sub, item, index }] : [])),
@@ -362,12 +363,16 @@ const NewWordsGlossary: FC<{
 
   // Hold the last glossary when the line ends early; replace it as soon as a line has new words.
   const [held, setHeld] = useState<{ shown: typeof shown; more: number; at: number } | null>(null);
+  // A pinned word's pop-up lives in its glossary row and keeps the video paused until it is unpinned,
+  // so a held glossary with a pinned word must not expire: that would unmount the pop-up and leave
+  // playback paused. The timer resumes once the word is unpinned.
+  const heldPinned = !!held && !!pinnedWord && held.shown.some((w) => `${w.sub.id}:${w.index}` === pinnedWord);
   useEffect(() => {
     if (shown.length) {
       setHeld({ shown, more, at: Date.now() });
       return;
     }
-    if (!held) return;
+    if (!held || heldPinned) return;
     const left = held.at + GLOSSARY_HOLD_MS - Date.now();
     if (left <= 0) {
       setHeld(null);
@@ -376,9 +381,14 @@ const NewWordsGlossary: FC<{
     const timer = window.setTimeout(() => setHeld(null), left);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature]);
+  }, [signature, heldPinned]);
 
-  const rows = shown.length ? { shown, more } : held;
+  // A held word marked known or ignored since (for example the line's only new word) leaves at once.
+  const stillNew = (w: GlossaryEntry) => {
+    const status = statusOf(wordStatuses, knownKeyOf(w.tx), knownWords);
+    return status !== "known" && status !== "ignored";
+  };
+  const rows = shown.length ? { shown, more } : held && { shown: held.shown.filter(stillNew), more: held.more };
   // The glossary can miss a word the learner doesn't know, and a line of "known" words shows no rows at
   // all, so the full line is always one click away. From there any word can be marked Learning, which
   // lists it here from then on.

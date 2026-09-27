@@ -63,6 +63,13 @@ describe("pickGlossary", () => {
     expect(shown.map((x) => x.id)).toEqual(["rare", "n1", "rarer"]);
     expect(more).toBe(2);
   });
+
+  it("keeps words without a frequency rank in line order (no NaN comparisons)", () => {
+    const words = [w("a"), w("b"), w("c"), w("d"), w("e", "n5")];
+    expect(pickGlossary(words).shown.map((x) => x.id)).toEqual(["a", "b", "c"]);
+    const mixed = [w("n2", "n2"), w("x"), w("y"), w("rare", undefined, 90000), w("z")];
+    expect(pickGlossary(mixed).shown.map((x) => x.id)).toEqual(["x", "y", "z"]);
+  });
 });
 
 describe("glossaryGloss", () => {

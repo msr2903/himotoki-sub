@@ -60,7 +60,8 @@ export function pickGlossary<T extends { jlpt?: string[]; frequency?: number }>(
   if (words.length <= max) return { shown: words, more: 0 };
   const keep = words
     .map((word, index) => ({ index, ease: wordEase(word.jlpt), rank: word.frequency ?? Infinity }))
-    .sort((a, b) => a.ease - b.ease || b.rank - a.rank)
+    // Unranked words compare as equal ranks (Infinity - Infinity would be NaN and break the sort).
+    .sort((a, b) => a.ease - b.ease || (a.rank === b.rank ? 0 : b.rank > a.rank ? 1 : -1) || a.index - b.index)
     .slice(0, max)
     .map((w) => w.index)
     .sort((a, b) => a - b);
