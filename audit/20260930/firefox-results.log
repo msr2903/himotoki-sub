@@ -1,0 +1,15 @@
+
+ RUN  v2.1.9 /private/tmp/himotoki-sub-audit-20260930
+
+ ✓ src/utils/audit-firefox.test.ts (1 test) 45ms
+stdout | src/utils/audit-firefox.test.ts > audit: real background without Chrome offscreen (Firefox) > all dictionary routes fail, and lookups perform no online fallback
+himotokiDictStatus {"ok":false,"error":"Cannot read properties of undefined (reading 'createDocument')"}
+himotokiLookup {"ok":false,"error":"Cannot read properties of undefined (reading 'createDocument')"}
+himotokiDictInstall {"ok":false,"error":"Cannot read properties of undefined (reading 'createDocument')"}
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  12:46:06
+   Duration  281ms (transform 51ms, setup 0ms, collect 20ms, tests 45ms, environment 0ms, prepare 50ms)
+

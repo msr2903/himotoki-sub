@@ -1,0 +1,20 @@
+$ node scripts/e2e/regressions.mjs
+PASS Repeated-caption fixture: 300 text runs → 2 inference/repair inputs; timing, layout and fallback preserved
+PASS Unrelated cache updates cause zero probe rerenders; mounted line refreshes after settings change
+PASS Late old captions cannot overwrite coverage
+PASS Reset discards pending coverage
+PASS Coverage deduplicates words and excludes unresolved i+1 cues
+PASS Coverage reacts to known-word changes
+PASS Missing dictionary ends loading state
+PASS Unresolved words cannot be marked known
+PASS Replay continues before the cue end at 2x speed
+PASS Replay pauses at the media cue end
+PASS Cancelled replay does not pause unrelated playback
+PASS Auto-pause does not interrupt an active loop
+PASS Pitch accent shows contours, numbers only, or nothing
+PASS Entry switching and mark-known keep the popup pinned and select the correct entry
+PASS New words only: glossary replaces the line; Show line appears on pointer movement; background click and the chip reveal the line; a word marked Learning joins the glossary
+PASS Editable hotkey guard and offline-only sentence breakdown
+PASS Theme persists and follows live on the popup
+PASS Options preserve controls, persist values, sync across pages, navigate panels and search, and fit narrow windows
+PASS browser runtime errors: 0

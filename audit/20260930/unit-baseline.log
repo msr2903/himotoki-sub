@@ -1,0 +1,31 @@
+$ vitest run
+
+ RUN  v2.1.9 /private/tmp/himotoki-sub-audit-20260930
+
+ ✓ src/utils/ankiNote.test.ts (11 tests) 4ms
+ ✓ src/utils/furigana.test.ts (15 tests) 6ms
+ ✓ src/shared/lookupHistory.test.ts (13 tests) 4ms
+ ✓ src/shared/newWordsOnly.test.ts (11 tests) 4ms
+ ✓ src/dict/conj_rules.test.ts (13 tests) 10ms
+ ✓ src/utils/himotokiAccount.test.ts (10 tests) 26ms
+ ✓ src/models/translations/index.test.ts (6 tests) 29ms
+ ✓ src/utils/withPersist.test.ts (4 tests) 14ms
+ ✓ src/dict/lookup.test.ts (47 tests) 20ms
+ ✓ src/shared/wordStatus.test.ts (11 tests) 4ms
+ ✓ src/utils/convertRawSubs.test.ts (8 tests) 3ms
+ ✓ src/streamings/netflixHelpers.test.ts (7 tests) 4ms
+ ✓ src/shared/exportWords.test.ts (8 tests) 3ms
+ ✓ src/utils/himotokiTypes.test.ts (6 tests) 3ms
+ ✓ src/learning-service/anki.test.ts (2 tests) 4ms
+ ✓ src/shared/mouseActions.test.ts (7 tests) 3ms
+ ✓ src/models/subs/appendRawSubs.test.ts (5 tests) 4ms
+ ✓ src/shared/playbackRate.test.ts (5 tests) 2ms
+ ✓ src/shared/phraseSelection.test.ts (8 tests) 3ms
+ ✓ src/streamings/youtubeHelpers.test.ts (13 tests) 5ms
+ ✓ src/shared/ankiSettings.test.ts (2 tests) 3ms
+
+ Test Files  21 passed (21)
+      Tests  212 passed (212)
+   Start at  12:36:59
+   Duration  1.91s (transform 2.87s, setup 0ms, collect 3.93s, tests 158ms, environment 6ms, prepare 3.69s)
+

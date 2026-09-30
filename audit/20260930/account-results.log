@@ -1,0 +1,22 @@
+
+ RUN  v2.1.9 /private/tmp/himotoki-sub-audit-20260930
+
+stdout | src/utils/audit-account.test.ts > audit: actual account lifecycle > late refresh restores account A after sign-out
+After sign out + old refresh: a
+
+stdout | src/utils/audit-account.test.ts > audit: actual account lifecycle > old invalid refresh clears account B
+New account B after old refresh fails: null
+
+stdout | src/utils/audit-account.test.ts > audit: actual account lifecycle > a save begun in A commits private context into B after account switch
+Read A then wrote to: https://firestore.googleapis.com/v1/projects/himotoki/databases/(default)/documents/saved/b?currentDocument.exists=false
+
+stdout | src/utils/audit-account.test.ts > audit: actual account lifecycle > refresh HTTP429 deletes usable session
+Session after HTTP429: null
+
+ ✓ src/utils/audit-account.test.ts (4 tests) 177ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  12:42:43
+   Duration  567ms (transform 39ms, setup 0ms, collect 38ms, tests 177ms, environment 0ms, prepare 56ms)
+
