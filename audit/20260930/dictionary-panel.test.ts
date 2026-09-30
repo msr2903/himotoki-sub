@@ -1,0 +1,6 @@
+import {it,expect,vi,afterEach} from 'vitest';import React from 'react';import {act,create} from 'react-test-renderer';import {DictionaryPanel} from '../pages/shared/DictionaryPanel';
+afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
+it('late initial busy response starts polling after the dictionary panel unmounts',async()=>{
+ vi.useFakeTimers();vi.stubGlobal('window',{setInterval,clearInterval});let release!:(v:any)=>void;const held=new Promise(r=>release=r);let statuses=0;const send=vi.fn((m:any)=>{if(m.type==='himotokiDictManifest')return Promise.resolve({ok:true,data:null});statuses++;return statuses===1?held:Promise.resolve({ok:true,data:{state:'downloading',received:1,total:10}});});vi.stubGlobal('chrome',{runtime:{sendMessage:send}});
+ let view:any;await act(async()=>{view=create(React.createElement(DictionaryPanel))});await act(async()=>view.unmount());expect(vi.getTimerCount()).toBe(0);await act(async()=>release({ok:true,data:{state:'downloading',received:1,total:10}}));expect(vi.getTimerCount()).toBe(1);await act(async()=>vi.advanceTimersByTimeAsync(2000));expect(statuses).toBe(5);console.log('Panel unmounted with 0 timers; late busy response created 1 repeating timer and issued 4 further worker status requests in 2s.');vi.clearAllTimers();
+});
