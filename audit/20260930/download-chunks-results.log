@@ -1,7 +1,7 @@
 
  RUN  v2.1.9 /private/tmp/himotoki-sub-audit-20260930
 
-(node:82617) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:84225) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
 stdout | src/utils/audit-download-chunks.test.ts > audit: stream header detection in actual dictionary worker > valid gzip and raw SQLite headers are rejected when split across chunks
 gzip first chunk length=1: The dictionary URL returned data that is neither gzip nor a SQLite database (content-type: unknown) at https://dict.test/dict.sqlite.gz.
@@ -13,7 +13,7 @@ Error: The dictionary URL returned data that is neither gzip nor a SQLite databa
     at /private/tmp/himotoki-sub-audit-20260930/src/pages/offscreen/dict.worker.ts:218:15
     at processTicksAndRejections (node:internal/process/task_queues:105:5)
     at Object.self.onmessage (/private/tmp/himotoki-sub-audit-20260930/src/pages/offscreen/dict.worker.ts:351:9)
-    at /private/tmp/himotoki-sub-audit-20260930/src/utils/audit-download-chunks.test.ts:7:549
+    at /private/tmp/himotoki-sub-audit-20260930/src/utils/audit-download-chunks.test.ts:7:882
     at file:///private/tmp/himotoki-sub-audit-20260930/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:533:5
     at runTest (file:///private/tmp/himotoki-sub-audit-20260930/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1056:11)
     at runSuite (file:///private/tmp/himotoki-sub-audit-20260930/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1205:15)
@@ -25,7 +25,7 @@ Error: The dictionary URL returned data that is neither gzip nor a SQLite databa
     at /private/tmp/himotoki-sub-audit-20260930/src/pages/offscreen/dict.worker.ts:218:15
     at processTicksAndRejections (node:internal/process/task_queues:105:5)
     at Object.self.onmessage (/private/tmp/himotoki-sub-audit-20260930/src/pages/offscreen/dict.worker.ts:351:9)
-    at /private/tmp/himotoki-sub-audit-20260930/src/utils/audit-download-chunks.test.ts:7:549
+    at /private/tmp/himotoki-sub-audit-20260930/src/utils/audit-download-chunks.test.ts:7:882
     at file:///private/tmp/himotoki-sub-audit-20260930/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:533:5
     at runTest (file:///private/tmp/himotoki-sub-audit-20260930/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1056:11)
     at runSuite (file:///private/tmp/himotoki-sub-audit-20260930/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1205:15)
@@ -33,10 +33,10 @@ Error: The dictionary URL returned data that is neither gzip nor a SQLite databa
     at runFiles (file:///private/tmp/himotoki-sub-audit-20260930/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1262:5)
     at startTests (file:///private/tmp/himotoki-sub-audit-20260930/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1271:3)
 
- ✓ src/utils/audit-download-chunks.test.ts (1 test) 109ms
+ ✓ src/utils/audit-download-chunks.test.ts (1 test) 107ms
 
  Test Files  1 passed (1)
       Tests  1 passed (1)
-   Start at  13:18:26
-   Duration  353ms (transform 100ms, setup 0ms, collect 38ms, tests 109ms, environment 0ms, prepare 51ms)
+   Start at  13:19:41
+   Duration  450ms (transform 102ms, setup 0ms, collect 28ms, tests 107ms, environment 0ms, prepare 50ms)
 
