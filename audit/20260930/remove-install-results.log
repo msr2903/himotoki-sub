@@ -1,0 +1,14 @@
+
+ RUN  v2.1.9 /private/tmp/himotoki-sub-audit-20260930
+
+stdout | src/utils/audit-remove-install.test.ts > Remove during a held install returns Missing but the download later reinstalls the dictionary
+Remove acknowledged: missing files: []
+Held install released after successful Remove: state= ready files: [ '/jitendex-lite.sqlite' ]
+
+ ✓ src/utils/audit-remove-install.test.ts (1 test) 143ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  13:48:25
+   Duration  396ms (transform 88ms, setup 0ms, collect 27ms, tests 143ms, environment 0ms, prepare 51ms)
+

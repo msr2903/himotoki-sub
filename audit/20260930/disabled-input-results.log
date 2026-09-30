@@ -1,0 +1,28 @@
+
+ RUN  v2.1.9 /private/tmp/himotoki-sub-audit-20260930
+
+stdout | src/utils/audit-disabled-input.test.ts > turning Enabled off still allows keyboard speed changes and claims player keys
+[store] enabled [getState] true
+[store] translateLanguage [getState] en
+[store] learningService [getState] himotoki
+[store] translationService [getState] google
+[store] subsFontSize [getState] 100
+[store] subsBackground [getState] true
+[store] moveBySubsEnabled [getState] true
+[store] hoverAction [getState] both
+[store] clickAction [getState] popup
+
+stdout | src/utils/audit-disabled-input.test.ts > turning Enabled off still allows keyboard speed changes and claims player keys
+[store] enabled false
+Enabled= false ; . shortcut still claims key and changes rate from 1 to 1.25
+
+stdout | src/utils/audit-disabled-input.test.ts > disabled extension still captures an assigned mouse action over the player
+Enabled=false; assigned middle-click still pauses player and suppresses browser action.
+
+ ✓ src/utils/audit-disabled-input.test.ts (2 tests) 116ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  13:43:48
+   Duration  470ms (transform 83ms, setup 0ms, collect 20ms, tests 116ms, environment 0ms, prepare 62ms)
+

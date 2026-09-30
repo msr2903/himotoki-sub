@@ -1,0 +1,17 @@
+import {afterEach,describe,expect,it,vi} from 'vitest';
+const env=vi.hoisted(()=>({pool:null as any}));vi.mock('@sqlite.org/sqlite-wasm',()=>({default:async()=>({installOpfsSAHPoolVfs:async()=>env.pool})}));
+import {createHash} from 'node:crypto';import {createRequire} from 'node:module'; const {DatabaseSync}=createRequire(import.meta.url)('node:sqlite');import {mkdtempSync,readFileSync,writeFileSync,rmSync} from 'node:fs';import {tmpdir} from 'node:os';import {join} from 'node:path';
+function sqliteFile(valid:boolean){const dir=mkdtempSync(join(tmpdir(),'sub-update-'));const path=join(dir,'db');const db=new DatabaseSync(path);db.exec(valid?"CREATE TABLE meta(key TEXT,value TEXT);INSERT INTO meta VALUES('revision','old-working');CREATE TABLE term(id INTEGER PRIMARY KEY,expression TEXT,reading TEXT,def_tags TEXT,rules TEXT,score INTEGER,sequence INTEGER,term_tags TEXT,glossary_json TEXT,expression_raw TEXT,pitch TEXT,freq INTEGER,jlpt TEXT);INSERT INTO term VALUES(1,'猫','ねこ','','n',100,1467640,'','[\"cat\"]','猫','[]',1,'[]');":"CREATE TABLE unrelated(value TEXT);");db.close();const bytes=new Uint8Array(readFileSync(path));rmSync(dir,{recursive:true});return bytes;}
+afterEach(()=>vi.unstubAllGlobals());
+it('Remove during a held install returns Missing but the download later reinstalls the dictionary',async()=>{
+ const main='/jitendex-lite.sqlite',stage='/jitendex-lite.tmp.sqlite',old=sqliteFile(true),wrong=sqliteFile(true);const files=new Map<string,Uint8Array>([[main,old]]);const dir=mkdtempSync(join(tmpdir(),'sub-vfs-'));
+ env.pool={getFileNames:()=>[...files.keys()],getCapacity:()=>4,addCapacity:async()=>4,unlink:(name:string)=>files.delete(name),exportFile:(name:string)=>files.get(name),importDb:async(name:string,read:any)=>{const chunks:Uint8Array[]=[];for(;;){const b=await read();if(!b)break;chunks.push(b)}files.set(name,new Uint8Array(Buffer.concat(chunks)));return files.get(name)!.length},OpfsSAHPoolDb:class{native:any;constructor(name:string){const path=join(dir,Math.random()+'.sqlite');writeFileSync(path,files.get(name)!);this.native=new DatabaseSync(path)}exec({sql,bind,rowMode}:any){if(rowMode)return this.native.prepare(sql).all(...(bind??[]));this.native.exec(sql)}close(){this.native.close()}}};
+
+ const replies:any[]=[];const worker:any={postMessage:(r:any)=>replies.push(r)};vi.stubGlobal('self',worker);let release!:(r:Response)=>void;const held=new Promise<Response>(r=>release=r);const fetcher=vi.fn(()=>held);vi.stubGlobal('fetch',fetcher);
+ await import('../pages/offscreen/dict.worker');await worker.onmessage({data:{id:1,op:'status'}});expect(replies.at(-1).data.state).toBe('ready');
+ try{
+ const install=worker.onmessage({data:{id:2,op:'install',url:'https://dict.test/update.sqlite',expectedSha256:createHash('sha256').update(wrong).digest('hex')}});
+ await vi.waitFor(()=>expect(fetcher).toHaveBeenCalled());await worker.onmessage({data:{id:3,op:'remove'}});expect(replies.at(-1).data.state).toBe('missing');expect(files.has(main)).toBe(false);console.log('Remove acknowledged:',replies.at(-1).data.state,'files:',[...files.keys()]);
+ release(new Response(wrong));await install;expect(replies.at(-1).ok).toBe(true);expect(replies.at(-1).data.state).toBe('ready');expect(files.has(main)).toBe(true);console.log('Held install released after successful Remove: state=',replies.at(-1).data.state,'files:',[...files.keys()]);
+ }finally{await worker.onmessage({data:{id:4,op:'remove'}});rmSync(dir,{recursive:true})}
+});
