@@ -15,3 +15,7 @@ Long-running tab tests: copy multitab-status.test.ts and dictionary-cache.test.t
 Disabled-input/remove-install tests: copy each to src/utils/audit-*.test.ts and run normal Vitest. The first uses the actual input handlers/settings with DOM/player stubs; the second uses the actual worker with controlled HTTP/OPFS and real SQLite under Node 26.9.
 
 Prototype cache key test: copy cache-prototype.test.ts into src/utils/audit-cache-prototype.test.ts and run normal Vitest. The actual cache/event graph is used; dictionary/translation effects are controlled and never invoked for the failing keys.
+
+## Caption-observer and capture ownership
+
+Copy `amazon-observer.test.ts` and `media-ownership.test.ts` into `src/utils/` with an `audit-` prefix, then run `pnpm exec vitest run src/utils/audit-amazon-observer.test.ts src/utils/audit-media-ownership.test.ts`. These tests use real adapter/capture implementations with controlled store/DOM/recorder doubles and fake clocks; they do not validate a signed-in streaming site or real recorded audio. Assertions describe defects, not fixes.
