@@ -13,3 +13,5 @@ Additional reproductions: copy slow-replay.test.ts and settings-hydration.test.t
 Long-running tab tests: copy multitab-status.test.ts and dictionary-cache.test.ts into src/utils/ as audit-*.test.ts and run the normal Vitest config. The multi-tab test loads two actual settings/store graphs with the real persistence wrapper, deferring storage-change notifications. The cache test uses the actual Effector lookup graph with controlled dictionary replies.
 
 Disabled-input/remove-install tests: copy each to src/utils/audit-*.test.ts and run normal Vitest. The first uses the actual input handlers/settings with DOM/player stubs; the second uses the actual worker with controlled HTTP/OPFS and real SQLite under Node 26.9.
+
+Prototype cache key test: copy cache-prototype.test.ts into src/utils/audit-cache-prototype.test.ts and run normal Vitest. The actual cache/event graph is used; dictionary/translation effects are controlled and never invoked for the failing keys.

@@ -1,0 +1,13 @@
+
+ RUN  v2.1.9 /private/tmp/himotoki-sub-audit-20260930
+
+stdout | src/utils/audit-cache-prototype.test.ts > ordinary object inherited keys suppress valid word/line requests before any cache entry exists
+constructor / toString / __proto__: word calls= 0 line calls= 0 despite empty caches
+
+ ✓ src/utils/audit-cache-prototype.test.ts (1 test) 3ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  14:00:05
+   Duration  257ms (transform 40ms, setup 0ms, collect 42ms, tests 3ms, environment 0ms, prepare 46ms)
+
