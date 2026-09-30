@@ -19,3 +19,7 @@ Prototype cache key test: copy cache-prototype.test.ts into src/utils/audit-cach
 ## Caption-observer and capture ownership
 
 Copy `amazon-observer.test.ts` and `media-ownership.test.ts` into `src/utils/` with an `audit-` prefix, then run `pnpm exec vitest run src/utils/audit-amazon-observer.test.ts src/utils/audit-media-ownership.test.ts`. These tests use real adapter/capture implementations with controlled store/DOM/recorder doubles and fake clocks; they do not validate a signed-in streaming site or real recorded audio. Assertions describe defects, not fixes.
+
+## Online headwords and known-word export
+
+Copy both `*-headwords.test.ts` files to `src/utils/` as `audit-*.test.ts`, and `kana-api-fixtures.json` to `.audit/`. Run `pnpm exec vitest run src/utils/audit-online-headwords.test.ts src/utils/audit-export-headwords.test.ts`. The six API fixtures were generated read-only from the full app API at a9de05ff using English senses; the online mapping test makes no live network requests. Export uses actual mapper/key/serializer functions and synthetic cat data.

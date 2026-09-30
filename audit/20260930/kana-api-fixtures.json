@@ -1,0 +1,575 @@
+[
+  {
+    "q": "いつ",
+    "row": {
+      "source": "jitendex",
+      "dict": "Jitendex",
+      "seq": 1188760,
+      "common": true,
+      "kanji": [
+        "何時"
+      ],
+      "readings": [
+        "いつ"
+      ],
+      "senses": [
+        {
+          "pos": [
+            "pn"
+          ],
+          "glosses": [
+            "when",
+            "at what time",
+            "how soon"
+          ],
+          "lang": "eng",
+          "examples": [
+            {
+              "jp": "いつ旅行においでになりますか。",
+              "en": "When will you go on a journey?",
+              "keyword": "いつ"
+            }
+          ]
+        },
+        {
+          "pos": [
+            "pn"
+          ],
+          "glosses": [
+            "normal times",
+            "ordinary days"
+          ],
+          "lang": "eng",
+          "misc": [
+            "dated"
+          ]
+        }
+      ],
+      "score": 200,
+      "usually_kana": true,
+      "forms": [
+        "∅何時《いつ》"
+      ],
+      "examples": [
+        {
+          "id": "1188760-0-0",
+          "jp": "いつ旅行においでになりますか。",
+          "en": "When will you go on a journey?",
+          "ex_text": "いつ",
+          "source": "jitendex"
+        }
+      ],
+      "jlpt": [
+        "n5"
+      ]
+    }
+  },
+  {
+    "q": "この",
+    "row": {
+      "source": "jitendex",
+      "dict": "Jitendex",
+      "seq": 1582920,
+      "common": true,
+      "kanji": [
+        "此の",
+        "斯の"
+      ],
+      "readings": [
+        "この",
+        "こん"
+      ],
+      "senses": [
+        {
+          "pos": [
+            "adj-pn"
+          ],
+          "glosses": [
+            "this"
+          ],
+          "lang": "eng",
+          "examples": [
+            {
+              "jp": "このコップをミルクで満たした。",
+              "en": "I filled this glass with milk.",
+              "keyword": "この"
+            }
+          ],
+          "refs": [
+            {
+              "type": "see",
+              "raw": "その",
+              "text": "その"
+            },
+            {
+              "type": "see",
+              "raw": "あの",
+              "text": "あの"
+            },
+            {
+              "type": "see",
+              "raw": "どの",
+              "text": "どの"
+            }
+          ],
+          "notes": [
+            "something or someone close to the speaker (including the speaker), or ideas expressed by the speaker"
+          ]
+        },
+        {
+          "pos": [
+            "adj-pn"
+          ],
+          "glosses": [
+            "last (couple of years, etc.)",
+            "these",
+            "past",
+            "this"
+          ],
+          "lang": "eng",
+          "examples": [
+            {
+              "jp": "この数年間に彼は不朽の名詩を書いた。",
+              "en": "During these years he wrote immortal poems.",
+              "keyword": "この"
+            }
+          ],
+          "notes": [
+            "in ref. to a stretch of time or date"
+          ]
+        },
+        {
+          "pos": [
+            "adj-pn"
+          ],
+          "glosses": [
+            "you (as in \"you liar\")"
+          ],
+          "lang": "eng",
+          "notes": [
+            "emphatic, accusatory, insulting"
+          ]
+        }
+      ],
+      "score": 200,
+      "usually_kana": true,
+      "forms": [
+        "∅此の斯のこのこん"
+      ],
+      "examples": [
+        {
+          "id": "1582920-0-0",
+          "jp": "このコップをミルクで満たした。",
+          "en": "I filled this glass with milk.",
+          "ex_text": "この",
+          "source": "jitendex"
+        },
+        {
+          "id": "1582920-1-0",
+          "jp": "この数年間に彼は不朽の名詩を書いた。",
+          "en": "During these years he wrote immortal poems.",
+          "ex_text": "この",
+          "source": "jitendex"
+        }
+      ]
+    }
+  },
+  {
+    "q": "どこ",
+    "row": {
+      "source": "jitendex",
+      "dict": "Jitendex",
+      "seq": 1577140,
+      "common": true,
+      "kanji": [
+        "何処",
+        "何所",
+        "何處"
+      ],
+      "readings": [
+        "どこ",
+        "いずこ",
+        "いずく",
+        "いづこ",
+        "いどこ"
+      ],
+      "senses": [
+        {
+          "pos": [
+            "pn"
+          ],
+          "glosses": [
+            "where",
+            "what place"
+          ],
+          "lang": "eng",
+          "examples": [
+            {
+              "jp": "あなたはどこでテレビを見ますか。",
+              "en": "Where do you watch television?",
+              "keyword": "どこ"
+            }
+          ],
+          "refs": [
+            {
+              "type": "see",
+              "raw": "ここ",
+              "text": "ここ"
+            },
+            {
+              "type": "see",
+              "raw": "そこ",
+              "text": "そこ"
+            },
+            {
+              "type": "see",
+              "raw": "あそこ",
+              "text": "あそこ"
+            }
+          ]
+        },
+        {
+          "pos": [
+            "pn"
+          ],
+          "glosses": [
+            "how much (long, far)",
+            "what extent"
+          ],
+          "lang": "eng"
+        }
+      ],
+      "score": 200,
+      "usually_kana": true,
+      "forms": [
+        "何処何所何處どこいずこいずくいづこいどこ"
+      ],
+      "examples": [
+        {
+          "id": "1577140-0-0",
+          "jp": "あなたはどこでテレビを見ますか。",
+          "en": "Where do you watch television?",
+          "ex_text": "どこ",
+          "source": "jitendex"
+        }
+      ],
+      "jlpt": [
+        "n5"
+      ]
+    }
+  },
+  {
+    "q": "まだ",
+    "row": {
+      "source": "jitendex",
+      "dict": "Jitendex",
+      "seq": 1527110,
+      "common": true,
+      "kanji": [
+        "未だ"
+      ],
+      "readings": [
+        "まだ",
+        "いまだ"
+      ],
+      "senses": [
+        {
+          "pos": [
+            "adv"
+          ],
+          "glosses": [
+            "still",
+            "as yet",
+            "only"
+          ],
+          "lang": "eng",
+          "examples": [
+            {
+              "jp": "まだ肉眼じゃ無理だよ。双眼鏡だと、ちょびっとだけ見えるかも・・・。",
+              "en": "It's still impossible with the naked eye. With binoculars you might be able to glimpse it....",
+              "keyword": "まだ"
+            }
+          ]
+        },
+        {
+          "pos": [
+            "adv"
+          ],
+          "glosses": [
+            "(not) yet"
+          ],
+          "lang": "eng",
+          "examples": [
+            {
+              "jp": "私はまだその問題が解けない。",
+              "en": "I haven't been able to solve the problem yet.",
+              "keyword": "まだ"
+            }
+          ],
+          "notes": [
+            "with verb in the negative"
+          ]
+        },
+        {
+          "pos": [
+            "adv"
+          ],
+          "glosses": [
+            "more",
+            "(more) still"
+          ],
+          "lang": "eng"
+        },
+        {
+          "pos": [
+            "adv"
+          ],
+          "glosses": [
+            "at least",
+            "comparatively",
+            "relatively"
+          ],
+          "lang": "eng",
+          "examples": [
+            {
+              "jp": "情報がないより悪い知らせでもあるほうがまだましだ。",
+              "en": "Bad news is preferable to an absence of information.",
+              "keyword": "まだ"
+            }
+          ]
+        },
+        {
+          "pos": [
+            "adj-na"
+          ],
+          "glosses": [
+            "unfinished",
+            "incomplete",
+            "not yet done"
+          ],
+          "lang": "eng"
+        }
+      ],
+      "score": 200,
+      "usually_kana": true,
+      "forms": [
+        "未だ＊まだ①②いまだ"
+      ],
+      "examples": [
+        {
+          "id": "1527110-0-0",
+          "jp": "まだ肉眼じゃ無理だよ。双眼鏡だと、ちょびっとだけ見えるかも・・・。",
+          "en": "It's still impossible with the naked eye. With binoculars you might be able to glimpse it....",
+          "ex_text": "まだ",
+          "source": "jitendex"
+        },
+        {
+          "id": "1527110-1-0",
+          "jp": "私はまだその問題が解けない。",
+          "en": "I haven't been able to solve the problem yet.",
+          "ex_text": "まだ",
+          "source": "jitendex"
+        },
+        {
+          "id": "1527110-3-0",
+          "jp": "情報がないより悪い知らせでもあるほうがまだましだ。",
+          "en": "Bad news is preferable to an absence of information.",
+          "ex_text": "まだ",
+          "source": "jitendex"
+        }
+      ],
+      "jlpt": [
+        "n1",
+        "n5"
+      ]
+    }
+  },
+  {
+    "q": "ある",
+    "row": {
+      "source": "jitendex",
+      "dict": "Jitendex",
+      "seq": 1296400,
+      "common": true,
+      "kanji": [
+        "有る",
+        "在る"
+      ],
+      "readings": [
+        "ある"
+      ],
+      "senses": [
+        {
+          "pos": [
+            "v5r-i",
+            "vi"
+          ],
+          "glosses": [
+            "to be",
+            "to exist",
+            "to live"
+          ],
+          "lang": "eng",
+          "examples": [
+            {
+              "jp": "失礼だが、上記の記事にある３つの誤りを指摘しておきたい。",
+              "en": "Excuse me; allow me to point out three errors in the above article.",
+              "keyword": "ある"
+            }
+          ],
+          "refs": [
+            {
+              "type": "see",
+              "raw": "居る",
+              "text": "居る"
+            }
+          ],
+          "notes": [
+            "usu. of inanimate objects"
+          ]
+        },
+        {
+          "pos": [
+            "v5r-i",
+            "vi"
+          ],
+          "glosses": [
+            "to have"
+          ],
+          "lang": "eng",
+          "examples": [
+            {
+              "jp": "悪いけどほかに用事があるの。",
+              "en": "I'm sorry, I have another engagement.",
+              "keyword": "ある"
+            }
+          ]
+        },
+        {
+          "pos": [
+            "v5r-i",
+            "vi"
+          ],
+          "glosses": [
+            "to be located"
+          ],
+          "lang": "eng"
+        },
+        {
+          "pos": [
+            "v5r-i",
+            "vi"
+          ],
+          "glosses": [
+            "to be equipped with"
+          ],
+          "lang": "eng"
+        },
+        {
+          "pos": [
+            "v5r-i",
+            "vi"
+          ],
+          "glosses": [
+            "to happen",
+            "to come about"
+          ],
+          "lang": "eng"
+        },
+        {
+          "pos": [
+            "aux-v",
+            "v5r-i"
+          ],
+          "glosses": [
+            "to exist (in a completed state)",
+            "to be (something unchanged in its current state)"
+          ],
+          "lang": "eng",
+          "notes": [
+            "after the ～て form of a transitive verb"
+          ]
+        }
+      ],
+      "score": 200,
+      "usually_kana": true,
+      "forms": [
+        "有る",
+        "在る"
+      ],
+      "examples": [
+        {
+          "id": "1296400-0-0",
+          "jp": "失礼だが、上記の記事にある３つの誤りを指摘しておきたい。",
+          "en": "Excuse me; allow me to point out three errors in the above article.",
+          "ex_text": "ある",
+          "source": "jitendex"
+        },
+        {
+          "id": "1296400-1-0",
+          "jp": "悪いけどほかに用事があるの。",
+          "en": "I'm sorry, I have another engagement.",
+          "ex_text": "ある",
+          "source": "jitendex"
+        }
+      ],
+      "jlpt": [
+        "n3",
+        "n5"
+      ]
+    }
+  },
+  {
+    "q": "コーヒー",
+    "row": {
+      "source": "jitendex",
+      "dict": "Jitendex",
+      "seq": 1049180,
+      "common": true,
+      "kanji": [
+        "珈琲"
+      ],
+      "readings": [
+        "コーヒー"
+      ],
+      "senses": [
+        {
+          "pos": [
+            "n"
+          ],
+          "glosses": [
+            "coffee"
+          ],
+          "lang": "eng",
+          "examples": [
+            {
+              "jp": "彼は熱いコーヒーをゆっくりすすった。",
+              "en": "He sipped the hot coffee slowly.",
+              "keyword": "コーヒー"
+            }
+          ]
+        }
+      ],
+      "score": 200,
+      "usually_kana": true,
+      "forms": [
+        "∅〈珈琲〉コーヒー"
+      ],
+      "etymology": [
+        "Language of origin: English: \"coffee\" & Dutch: \"koffie\""
+      ],
+      "examples": [
+        {
+          "id": "1049180-0-0",
+          "jp": "彼は熱いコーヒーをゆっくりすすった。",
+          "en": "He sipped the hot coffee slowly.",
+          "ex_text": "コーヒー",
+          "source": "jitendex"
+        }
+      ],
+      "jlpt": [
+        "n5"
+      ]
+    }
+  }
+]
