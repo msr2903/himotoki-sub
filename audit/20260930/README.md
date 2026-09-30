@@ -5,3 +5,5 @@ Repository: msr2903/himotoki-sub. Baseline: `0b58e73`. Tests assert the observed
 Copy account/captions/firefox.test.ts into src/utils/ as audit-*.test.ts, and config/stub into .audit/. Run pnpm exec vitest run src/utils/audit-account.test.ts src/utils/audit-captions.test.ts, then pnpm exec vitest run --config .audit/vitest.config.ts src/utils/audit-firefox.test.ts.
 
 Account tests exercise the actual client against controlled deferred HTTP/session stores, without real credentials or live cloud writes. UI controller tests use DOM/browser API stubs and the actual controller. Native/browser availability tests model missing APIs and do not claim a physical-device end-to-end result.
+
+Dictionary replacement: copy dictionary-update.test.ts into src/utils/audit-dictionary-update.test.ts and run pnpm exec vitest run src/utils/audit-dictionary-update.test.ts under Node 26.9.0. This runs the actual worker with a memory-backed OPFS adapter and real SQLite files/queries; the downloaded incompatible SQLite file passes its real SHA-256 check. It is not a real browser OPFS crash test.
