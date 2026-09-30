@@ -23,3 +23,5 @@ Copy `amazon-observer.test.ts` and `media-ownership.test.ts` into `src/utils/` w
 ## Online headwords and known-word export
 
 Copy both `*-headwords.test.ts` files to `src/utils/` as `audit-*.test.ts`, and `kana-api-fixtures.json` to `.audit/`. Run `pnpm exec vitest run src/utils/audit-online-headwords.test.ts src/utils/audit-export-headwords.test.ts`. The six API fixtures were generated read-only from the full app API at a9de05ff using English senses; the online mapping test makes no live network requests. Export uses actual mapper/key/serializer functions and synthetic cat data.
+
+Dictionary-panel teardown: copy dictionary-panel.test.ts into src/utils/audit-dictionary-panel.test.ts and vitest-panels.config.ts into .audit/. Use the same isolated renderer dependency as above, then run `pnpm exec vitest run --config .audit/vitest-panels.config.ts src/utils/audit-dictionary-panel.test.ts`. Actual React component with controlled Chrome messaging/fake timers; no browser timing claim.
