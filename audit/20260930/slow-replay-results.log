@@ -1,0 +1,37 @@
+
+ RUN  v2.1.9 /private/tmp/himotoki-sub-audit-20260930
+
+stdout | src/utils/audit-slow-replay.test.ts > audit: actual slow-replay timing > an old timer restores an obsolete playback preference after user changes speed
+[store] enabled [getState] true
+[store] translateLanguage [getState] en
+[store] learningService [getState] himotoki
+[store] translationService [getState] google
+[store] subsFontSize [getState] 100
+[store] subsBackground [getState] true
+[store] moveBySubsEnabled [getState] true
+[store] hoverAction [getState] both
+[store] clickAction [getState] popup
+
+stdout | src/utils/audit-slow-replay.test.ts > audit: actual slow-replay timing > an old timer restores an obsolete playback preference after user changes speed
+[store] 2 [getState] null
+[store] 19 [getState] false
+[store] 2 {
+  currentTime: 0,
+  playbackRate: 1,
+  play: [AsyncFunction: play],
+  pause: [Function: pause]
+}
+
+stdout | src/utils/audit-slow-replay.test.ts > audit: actual slow-replay timing > an old timer restores an obsolete playback preference after user changes speed
+Selected preference: 1.5 actual player after old timer: 1
+
+stdout | src/utils/audit-slow-replay.test.ts > audit: actual slow-replay timing > the first slow-replay timer cuts short a later slow replay
+Second replay rate at 3414ms (before its 5333ms duration): 1
+
+ ✓ src/utils/audit-slow-replay.test.ts (2 tests) 136ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  13:06:13
+   Duration  378ms (transform 92ms, setup 0ms, collect 22ms, tests 136ms, environment 0ms, prepare 62ms)
+

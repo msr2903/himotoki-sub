@@ -1,0 +1,11 @@
+import {afterEach,describe,expect,it,vi} from 'vitest';import React from 'react';import {act,create} from 'react-test-renderer';import {usePersistedSetting,useRawStringSetting} from '../pages/options/hooks';
+afterEach(()=>vi.unstubAllGlobals());
+describe('audit: real options hooks hydrate after local changes',()=>{
+ it('late initial persisted read overwrites a newer choice displayed by the hook',async()=>{
+ let release!:(v:any)=>void,listener:any,value:any,update:any;const writes:any[]=[];vi.stubGlobal('chrome',{storage:{local:{get:()=>new Promise(r=>release=r),set:async(v:any)=>{writes.push(v);listener({'persist:test':{newValue:v['persist:test']}},'local')}},onChanged:{addListener:(fn:any)=>listener=fn,removeListener(){}}}});
+ function Probe(){[value,update]=usePersistedSetting('test','default',(v):v is string=>typeof v==='string');return React.createElement('p',null,value)}let view:any;await act(async()=>{view=create(React.createElement(Probe))});await act(async()=>{update('new-choice')});expect(value).toBe('new-choice');await act(async()=>{release({'persist:test':JSON.stringify('old-choice')})});expect(value).toBe('old-choice');expect(JSON.parse(writes.at(-1)['persist:test'])).toBe('new-choice');console.log('Persisted hook UI:',value,'storage:',JSON.parse(writes.at(-1)['persist:test']));act(()=>view.unmount());
+ });
+ it('late initial endpoint read overwrites the newer value displayed by the hook',async()=>{
+ let release!:(v:any)=>void,listener:any,value:any,update:any;const writes:any[]=[];vi.stubGlobal('chrome',{storage:{local:{get:()=>new Promise(r=>release=r),set:async(v:any)=>{writes.push(v);listener({himotokiDictUrl:{newValue:v.himotokiDictUrl}},'local')},remove:async()=>{}},onChanged:{addListener:(fn:any)=>listener=fn,removeListener(){}}}});function Probe(){[value,update]=useRawStringSetting('himotokiDictUrl');return React.createElement('p',null,value)}let view:any;await act(async()=>{view=create(React.createElement(Probe))});await act(async()=>{update('https://new.example/dict.sqlite')});await act(async()=>{release({himotokiDictUrl:'https://old.example/dict.sqlite'})});expect(value).toBe('https://old.example/dict.sqlite');expect(writes.at(-1).himotokiDictUrl).toBe('https://new.example/dict.sqlite');console.log('Endpoint hook UI:',value,'storage:',writes.at(-1).himotokiDictUrl);act(()=>view.unmount());
+ });
+});

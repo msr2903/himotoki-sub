@@ -1,0 +1,16 @@
+
+ RUN  v2.1.9 /private/tmp/himotoki-sub-audit-20260930
+
+stdout | src/utils/audit-settings-hydration.test.ts > audit: real options hooks hydrate after local changes > late initial persisted read overwrites a newer choice displayed by the hook
+Persisted hook UI: old-choice storage: new-choice
+
+stdout | src/utils/audit-settings-hydration.test.ts > audit: real options hooks hydrate after local changes > late initial endpoint read overwrites the newer value displayed by the hook
+Endpoint hook UI: https://old.example/dict.sqlite storage: https://new.example/dict.sqlite
+
+ ✓ src/utils/audit-settings-hydration.test.ts (2 tests) 8ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  13:08:38
+   Duration  376ms (transform 32ms, setup 0ms, collect 59ms, tests 8ms, environment 1ms, prepare 41ms)
+
