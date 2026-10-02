@@ -1,0 +1,1 @@
+{"case":"changing selection while Save phrase waits on translation saves the replacement phrase","clickedSaveFor":"猫が","selectionAfterClick":"猫が好き","savedPhrase":"猫が好き","saveClicks":1,"saveCalls":1}

@@ -14,3 +14,7 @@ The progress probe bundles the actual React component and controls hooks, layout
 ## Lifecycle and Anki probes
 
 Run `node sub-lifecycle-probe.mjs` and `node sub-anki-highlight-probe.mjs` from the same pinned Sub checkout. They bundle the actual content entry point, CustomSubs handler, Anki service and note builder with controlled React/model/DOM/file and AnkiConnect boundaries. They are not browser screenshots or measurements. All assertions check the observed defect; the unconjugated Anki case is a working control. No actual video, account or Anki collection is changed.
+
+## Phrase snapshot reproduction
+
+Run `AUDIT_APP_DIR=/path/to/installed/app node /path/to/sub-phrase-snapshot-probe.mjs` from the pinned Sub checkout. It uses Sub's actual React 18 and a jsdom dependency from App. The private PhraseBar is exposed by adding an export to the bundled source; its behavior is unchanged. Controlled translation/service boundaries isolate pending-save ownership. One Save click for an old phrase is followed by changing the selection and a cached translation for the new phrase. The real hook/effect rerender submits the new phrase without another Save click. No account/Anki collection is touched. This is a DOM/component test, not a real streaming-page screenshot.
