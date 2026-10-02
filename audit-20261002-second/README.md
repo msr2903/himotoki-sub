@@ -18,3 +18,8 @@ Run `node sub-lifecycle-probe.mjs` and `node sub-anki-highlight-probe.mjs` from 
 ## Phrase snapshot reproduction
 
 Run `AUDIT_APP_DIR=/path/to/installed/app node /path/to/sub-phrase-snapshot-probe.mjs` from the pinned Sub checkout. It uses Sub's actual React 18 and a jsdom dependency from App. The private PhraseBar is exposed by adding an export to the bundled source; its behavior is unchanged. Controlled translation/service boundaries isolate pending-save ownership. One Save click for an old phrase is followed by changing the selection and a cached translation for the new phrase. The real hook/effect rerender submits the new phrase without another Save click. No account/Anki collection is touched. This is a DOM/component test, not a real streaming-page screenshot.
+
+## Adapter title precedence and caption markup (2026-10-02)
+Run `node /path/sub-title-detection-probe.mjs` from the pinned Sub checkout. Actual detector, adapter constructor doubles; title/host DOM fixture. Public Coursera course: https://www.coursera.org/learn/twitter-linkedin-youtube-marketing . No live authenticated course playback tested.
+
+Run `node /path/sub-caption-markup-build.mjs` from that checkout, then `python3 -m http.server 8899 --bind 127.0.0.1 --directory /tmp/himotoki-audit200-caption-markup`. Open loopback page in Chromium. Actual full converter, no implementation patch; wrapper exposes its exported fallback. A data-URL invalid image sets only a harmless boolean. Screenshot was inspected and shows that flag. No extension, real player, credentials or external network; fixture has no CSP. This proves unsafe markup evaluation in that environment, not a bypass of provider CSP or extension privileges.

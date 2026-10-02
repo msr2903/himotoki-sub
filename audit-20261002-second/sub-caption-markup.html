@@ -1,0 +1,5 @@
+<!doctype html><meta charset="utf-8"><style>html{background:#fff;color:#172033;font:18px system-ui;padding:24px}pre{background:#edf2f7;padding:20px;border-radius:8px}</style><title>Caption markup audit fixture</title><h1>Caption markup audit fixture</h1><p>Runs the real Sub cleaner on a detached div. No extension, real player, credentials or external network.</p><pre id="result"></pre><script src="probe.js"></script><script>
+window.auditResult={text:null,inlineHandlerExecuted:false};
+auditResult.text=auditConvertJapaneseSubsFallback([{start:0,end:2000,text:'猫<img src="data:image/png;base64,invalid" onerror="window.auditResult.inlineHandlerExecuted=true">です。'}])[0].cleanedText;
+setTimeout(()=>document.querySelector('#result').textContent=JSON.stringify(auditResult,null,2),500);
+</script>

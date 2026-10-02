@@ -1,0 +1,12 @@
+{
+  "source": "0b58e739ed8e3e6c84a9ee5ff453f75429885392",
+  "entryPoint": "convertJapaneseSubsFallback",
+  "result": {
+    "text": "猫です。",
+    "inlineHandlerExecuted": true
+  },
+  "csp": null,
+  "browser": "Chrome/152.0.7977.130 Electron/44.4.2",
+  "tool": "T3 collaborative browser",
+  "scope": "Actual caption conversion bundled into a CSP-free local fixture, not installed extension or live provider. Data-URL invalid image, no external requests."
+}
