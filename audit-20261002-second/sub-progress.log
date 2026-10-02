@@ -1,0 +1,3 @@
+{"case":"cue spans entire visible window","cue":[0,60000],"window":[15000,45000],"renderedMarkers":0}
+{"case":"click 20px inside a cue marker starting 333px into container","actualSeekMs":15600,"expectedSeekMs":25600}
+{"case":"paused video over 60 animation callbacks","cueCount":10000,"fullTranscriptRowVisits":600000,"ReactStateWrites":60}

@@ -1,0 +1,7 @@
+{"case":"advertised-site detection","host":"app.plex.tv","selectedAdapter":"stub"}
+{"case":"advertised-site detection","host":"www.udemy.com","selectedAdapter":"stub"}
+{"case":"advertised-site detection","host":"hd.kinopoisk.ru","selectedAdapter":"stub"}
+{"case":"advertised-site detection","host":"www.primevideo.com","selectedAdapter":"stub"}
+{"case":"advertised-site detection","host":"www.youtube.com","selectedAdapter":"youtube"}
+{"case":"advertised-site detection","host":"www.coursera.org","selectedAdapter":"coursera"}
+{"case":"Vidstack container supported for subtitles but rejected for settings","subtitleContainerFound":true,"settingsButtonFound":true,"settingsContentError":"Settings content container not found"}
