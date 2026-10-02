@@ -1,0 +1,3 @@
+{"case":"video replacement leaves old timeupdate listener","oldListeners":1,"newListeners":1,"obsoleteVideoEmittedClockTicks":1}
+{"case":"empty subtitle file replaces a valid track","validCueCount":1,"afterEmptyFileCueCount":0,"notificationCalls":0}
+{"case":"non-subtitle text accepted without valid timestamps","acceptedCueCount":1,"validTimedCues":0}

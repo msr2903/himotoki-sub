@@ -1,0 +1,2 @@
+{"case":"conjugated mined surface is not highlighted","surface":"食べた","headword":"食べる","sentenceField":"朝ご飯を食べた。","containsHighlight":false}
+{"case":"unconjugated control","sentenceField":"朝ご飯を<b>食べる</b>。","containsHighlight":true}
