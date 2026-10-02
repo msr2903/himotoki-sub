@@ -1,7 +1,14 @@
 # Third-party notices
 
-Himotoki Sub is MIT-licensed (see [LICENSE](./LICENSE)). It builds on other projects and ships or downloads
-data under their own licences, listed here.
+Himotoki Sub as a whole is licensed under **AGPL-3.0-or-later** (see [LICENSE](./LICENSE)).
+Third-party code, dictionary data, models and fonts retain their own licences, listed below.
+The original MIT licence and copyright notice inherited from the upstream build setup are preserved
+in [LICENSES/MIT-upstream.txt](./LICENSES/MIT-upstream.txt); this project licence does not remove those
+notices or relicense independently licensed upstream material.
+
+Source and build instructions: [SOURCE.md](./SOURCE.md). Previously published MIT versions retain their
+original licence. Future contributions to Himotoki Sub are accepted under AGPL-3.0-or-later unless
+explicitly identified as separately licensed third-party material.
 
 ## Code this project is derived from
 

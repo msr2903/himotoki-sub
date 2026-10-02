@@ -4,6 +4,13 @@ Thanks for helping. Himotoki Sub is a Japanese-learning extension: it splits Jap
 with a local model and shows an offline dictionary pop-up. Features that only make sense for other
 languages are out of scope; removing leftover multi-language EasySubs code is welcome.
 
+## Licence of contributions
+
+By submitting original code for inclusion in Himotoki Sub, you agree to license that contribution under
+AGPL-3.0-or-later, the [project licence](./LICENSE). Identify separately licensed third-party material
+and preserve its notices; see [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md). This does not transfer
+copyright ownership to the project.
+
 ## Setup
 
 1. Node 22.13+ and pnpm 11 (`corepack enable` picks up the pinned version).

@@ -117,6 +117,19 @@ Yomitan scans any text on the page, including this extension's subtitle overlay,
 
 Issues and pull requests are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, checks and conventions, and [ROADMAP.md](./ROADMAP.md) for planned work. Please open an issue to discuss larger features before implementing them.
 
+## Licence
+
+Himotoki Sub is licensed under **GNU Affero General Public License v3.0 or later**
+([AGPL-3.0-or-later](./LICENSE)), matching asbplayer's licence for the planned playback/mining work.
+Copies and forks are allowed, including commercial use, subject to the licence's source-sharing and
+notice requirements. This change does not revoke permissions granted for earlier MIT releases.
+
+Third-party code and dictionary data keep their own licences. The inherited MIT notice is preserved
+in [LICENSES/MIT-upstream.txt](./LICENSES/MIT-upstream.txt); see
+[THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for data, models, fonts and other dependencies.
+[Source and build information](./SOURCE.md) is included with the extension build. No asbplayer code is
+included by this licence change.
+
 ## Credits
 
 Built on [EasySubs](https://github.com/Nitrino/easysubs) by Nitrino — this project is a Japanese-only fork that removes its multi-language features (Google word translation, phrasal verbs, English dictionaries, LinguaLeo, Puzzle English) and builds Japanese learning around the Himotoki dictionary and a local word splitter. Dictionary data from [Jitendex](https://jitendex.org/) (CC BY-SA 4.0), built from JMdict (EDRDG) with Tatoeba examples; pitch accent from [Kanjium](https://github.com/mifunetoshiro/kanjium) (CC BY-SA 4.0); JLPT levels from [jlpt-word-list](https://github.com/elzup/jlpt-word-list) (based on the tanos.co.uk lists); frequency ranks from JPDB. Fonts: Newsreader and Zen Maru Gothic (SIL OFL 1.1). See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for every component and licence.
