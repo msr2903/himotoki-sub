@@ -1,0 +1,14 @@
+
+ RUN  v2.1.9 /private/tmp/himotoki-audit200-20261002/sub
+
+stdout | src/audit200-coverage-refresh.test.ts > install and remove readiness changes never refresh the unchanged captions coverage
+{"phase":"after installing and a successful real word lookup","dictionaryReady":true,"coverageStatus":"missing","stats":null,"extraCoverageRequests":0,"captionIdentityUnchanged":true}
+{"phase":"after removing and a successful status check","dictionaryReady":false,"coverageStatus":"ready","stats":{"total":1,"known":0,"percent":0,"i1":1},"extraCoverageRequests":0}
+
+ ✓ src/audit200-coverage-refresh.test.ts (1 test) 5ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  23:46:47
+   Duration  652ms (transform 72ms, setup 0ms, collect 115ms, tests 5ms, environment 0ms, prepare 88ms)
+
