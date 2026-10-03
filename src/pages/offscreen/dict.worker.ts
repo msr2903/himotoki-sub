@@ -7,6 +7,7 @@
 import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
 import { Dictionary, type LookupResult } from "@src/dict/lookup";
 import { Sha256 } from "@src/dict/sha256";
+import { classifyDictHeader, readStreamHeader, replayStream } from "@src/dict/download";
 
 type DictState = "booting" | "missing" | "downloading" | "importing" | "ready" | "error";
 
@@ -48,9 +49,21 @@ type PoolUtil = {
 let poolUtil: PoolUtil | null = null;
 let db: Sqlite3Db | null = null;
 let dict: Dictionary | null = null;
+/** Which slot the open `db` handle reads (DB_FILE normally; DB_TMP only after a failed promotion). */
+let liveFile: string | null = null;
 let vfsPromise: Promise<void> | null = null;
 let bootPromise: Promise<void> | null = null;
 let installing: Promise<void> | null = null;
+let removing: Promise<void> | null = null;
+/** Bumped by remove(): an install started under an older generation must not write anything back. */
+let generation = 0;
+let installAbort: AbortController | null = null;
+
+class InstallCancelled extends Error {
+  constructor() {
+    super("dictionary install was cancelled because the dictionary was removed");
+  }
+}
 
 const status: DictStatus = {
   state: "booting",
@@ -64,12 +77,12 @@ const status: DictStatus = {
   verified: "",
 };
 
-function query(sql: string, params: unknown[] = []): Array<Record<string, unknown>> {
-  if (!db) throw new Error("dictionary database is not open");
-  return db.exec({ sql, bind: params, rowMode: "object", returnValue: "resultRows" }) as Array<
-    Record<string, unknown>
-  >;
-}
+const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+const hasFile = (name: string) => Boolean(poolUtil?.getFileNames().includes(name));
+const unlinkIfPresent = (name: string) => {
+  if (poolUtil && hasFile(name)) poolUtil.unlink(name);
+};
 
 // Bring up the OPFS VFS. This is the part that install/remove genuinely require; it is kept separate
 // from opening an existing DB so a corrupt DB (below) cannot prevent re-downloading or deleting it.
@@ -93,7 +106,7 @@ async function ensureVfs(): Promise<void> {
     })().catch((error) => {
       vfsPromise = null;
       status.state = "error";
-      status.error = error instanceof Error ? error.message : String(error);
+      status.error = messageOf(error);
       throw error;
     });
   }
@@ -104,51 +117,87 @@ async function boot(): Promise<void> {
   if (!bootPromise) {
     bootPromise = (async () => {
       await ensureVfs();
-      if (poolUtil!.getFileNames().includes(DB_FILE)) {
-        try {
-          openDb();
-        } catch (error) {
-          // A corrupt or schema-incompatible DB file must NOT brick the worker: surface the error but
-          // leave the VFS ready so install (re-download) and remove (delete) can still recover it.
-          closeDb();
-          status.state = "error";
-          status.error = error instanceof Error ? error.message : String(error);
-        }
+      // A corrupt or schema-incompatible DB file must NOT brick the worker: surface the error but
+      // leave the VFS ready so install (re-download) and remove (delete) can still recover it.
+      const error = await openBestAvailable();
+      if (db) return;
+      if (error) {
+        status.state = "error";
+        status.error = messageOf(error);
       } else {
         status.state = "missing";
       }
     })().catch((error) => {
       bootPromise = null;
       status.state = "error";
-      status.error = error instanceof Error ? error.message : String(error);
+      status.error = messageOf(error);
       throw error;
     });
   }
   await bootPromise;
 }
 
-function openDb(): void {
+type OpenedDb = { file: string; db: Sqlite3Db; dict: Dictionary; revision: string; title: string; terms: number; bytes: number };
+
+/**
+ * Open `file` on a handle of its own and prove it is a usable dictionary (metadata, a non-empty
+ * term table and a representative lookup). Nothing global changes; on failure the handle is closed.
+ */
+function openValidated(file: string): OpenedDb {
   if (!poolUtil) throw new Error("VFS not ready");
-  db = new poolUtil.OpfsSAHPoolDb(DB_FILE);
-  db.exec({ sql: "PRAGMA case_sensitive_like = ON" });
-  db.exec({ sql: "PRAGMA temp_store = MEMORY" });
-  const meta = Object.fromEntries(
-    (query("SELECT key, value FROM meta") as Array<{ key: string; value: string }>).map((r) => [r.key, r.value]),
-  );
-  const count = query("SELECT COUNT(*) AS n FROM term")[0];
-  const pages = query("PRAGMA page_count")[0] as Record<string, unknown> | undefined;
-  const pageSize = query("PRAGMA page_size")[0] as Record<string, unknown> | undefined;
-  dict = new Dictionary(query);
-  status.revision = String(meta.revision ?? "");
-  status.title = String(meta.title ?? "Jitendex");
-  status.terms = Number(count?.n ?? 0);
-  status.bytes = Number(pages?.page_count ?? 0) * Number(pageSize?.page_size ?? 0);
+  const handle = new poolUtil.OpfsSAHPoolDb(file);
+  try {
+    const query = (sql: string, params: unknown[] = []) =>
+      handle.exec({ sql, bind: params, rowMode: "object", returnValue: "resultRows" }) as Array<Record<string, unknown>>;
+    handle.exec({ sql: "PRAGMA case_sensitive_like = ON" });
+    handle.exec({ sql: "PRAGMA temp_store = MEMORY" });
+    const meta = Object.fromEntries(
+      (query("SELECT key, value FROM meta") as Array<{ key: string; value: string }>).map((r) => [r.key, r.value]),
+    );
+    const terms = Number(query("SELECT COUNT(*) AS n FROM term")[0]?.n ?? 0);
+    if (!(terms > 0)) throw new Error("dictionary file has no entries");
+    const pages = query("PRAGMA page_count")[0] as Record<string, unknown> | undefined;
+    const pageSize = query("PRAGMA page_size")[0] as Record<string, unknown> | undefined;
+    const opened = new Dictionary(query);
+    // Exercises the lookup/deinflection queries, so a file missing their columns fails here.
+    opened.lookupSegment("猫");
+    opened.clearCaches();
+    return {
+      file,
+      db: handle,
+      dict: opened,
+      revision: String(meta.revision ?? ""),
+      title: String(meta.title ?? "Jitendex"),
+      terms,
+      bytes: Number(pages?.page_count ?? 0) * Number(pageSize?.page_size ?? 0),
+    };
+  } catch (error) {
+    try {
+      handle.close();
+    } catch {
+      /* ignore */
+    }
+    throw error;
+  }
+}
+
+/** Make a validated handle the live dictionary (closing the previous one). */
+function activate(opened: OpenedDb): void {
+  closeDb();
+  db = opened.db;
+  dict = opened.dict;
+  liveFile = opened.file;
+  status.revision = opened.revision;
+  status.title = opened.title;
+  status.terms = opened.terms;
+  status.bytes = opened.bytes;
   status.state = "ready";
   status.error = "";
 }
 
 function closeDb(): void {
   dict = null;
+  liveFile = null;
   if (db) {
     try {
       db.close();
@@ -157,6 +206,71 @@ function closeDb(): void {
     }
     db = null;
   }
+}
+
+function closeQuietly(opened: OpenedDb | null): void {
+  if (!opened || opened.db === db) return;
+  try {
+    opened.db.close();
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Copy the validated staging file into DB_FILE and serve from it; DB_TMP is dropped only afterwards. */
+async function promoteStaged(): Promise<void> {
+  const pool = poolUtil!;
+  // DB_TMP may stay open (and keep answering lookups) while its bytes are copied.
+  const bytes = pool.exportFile(DB_TMP);
+  if (liveFile === DB_FILE) closeDb();
+  unlinkIfPresent(DB_FILE);
+  await pool.importDb(DB_FILE, bufferSource(bytes));
+  activate(openValidated(DB_FILE));
+  unlinkIfPresent(DB_TMP);
+}
+
+/**
+ * Open whichever slot holds a working dictionary. DB_FILE wins; a DB_TMP next to a working DB_FILE
+ * is an interrupted download and is dropped. A DB_TMP without a working DB_FILE is a verified update
+ * whose swap was interrupted: promote it, or serve it directly if even that fails. Returns the
+ * first error when nothing usable remains.
+ */
+async function openBestAvailable(): Promise<unknown> {
+  let firstError: unknown = null;
+  if (hasFile(DB_FILE)) {
+    try {
+      activate(openValidated(DB_FILE));
+      unlinkIfPresent(DB_TMP);
+      return null;
+    } catch (error) {
+      firstError = error;
+    }
+  }
+  if (hasFile(DB_TMP)) {
+    let staged: OpenedDb | null = null;
+    try {
+      staged = openValidated(DB_TMP);
+    } catch {
+      unlinkIfPresent(DB_TMP);
+    }
+    if (staged) {
+      activate(staged);
+      try {
+        await promoteStaged();
+      } catch (error) {
+        console.warn("[himotoki-dict] could not promote the staged dictionary", error);
+        if (!db) {
+          try {
+            activate(openValidated(DB_TMP));
+          } catch (reopenError) {
+            firstError ??= reopenError;
+          }
+        }
+      }
+      if (db) return null;
+    }
+  }
+  return firstError;
 }
 
 /** Feed an already-in-memory buffer to importDb via its streaming callback (one chunk, then done). */
@@ -170,24 +284,30 @@ function bufferSource(bytes: Uint8Array): () => Promise<Uint8Array | undefined> 
 }
 
 async function install(url: string, expectedSha256?: string, expectedRevision?: string): Promise<void> {
+  // A Remove in progress owns the files; start a new install only once it has finished.
+  while (removing) await removing.catch(() => undefined);
   if (installing) return installing;
-  // Tracked outside the IIFE so the .catch below knows whether a prior dictionary existed.
-  let hadExisting = false;
+  const myGeneration = generation;
+  const abort = new AbortController();
+  installAbort = abort;
+  const checkCurrent = () => {
+    if (myGeneration !== generation) throw new InstallCancelled();
+  };
+  // The new download goes into the slot that is not serving lookups; the live dictionary stays open
+  // (and keeps answering) until the download is verified and its schema validated.
+  const stage = liveFile === DB_FILE ? DB_TMP : DB_FILE;
+  let staged: OpenedDb | null = null;
   installing = (async () => {
     if (!poolUtil) throw new Error("VFS not ready");
     const pool = poolUtil;
-    // If a dictionary is already installed, download the new one into a temp file and swap only after
-    // it verifies — the old DB stays intact and usable if anything fails. A fresh install has nothing
-    // to lose, so it imports straight to DB_FILE (unchanged behaviour).
-    hadExisting = pool.getFileNames().includes(DB_FILE);
-    const target = hadExisting ? DB_TMP : DB_FILE;
-    if (!hadExisting) closeDb();
-    if (pool.getFileNames().includes(DB_TMP)) pool.unlink(DB_TMP); // clear any stale temp
+    unlinkIfPresent(stage); // a stale partial download, or a DB_FILE that was already unusable
+    if (liveFile !== DB_TMP) unlinkIfPresent(DB_TMP);
     status.state = "downloading";
     status.received = 0;
     status.total = 0;
     status.error = "";
-    const resp = await fetch(url);
+    const resp = await fetch(url, { signal: abort.signal });
+    checkCurrent();
     if (!resp.ok || !resp.body) throw new Error(`dictionary download failed (${resp.status})`);
     status.total = Number(resp.headers.get("content-length") || 0);
     const counted = resp.body.pipeThrough(
@@ -201,49 +321,35 @@ async function install(url: string, expectedSha256?: string, expectedRevision?: 
     // Decide whether to inflate by inspecting the bytes, not the URL/headers: some servers send the
     // .gz file with `Content-Encoding: gzip`, so fetch already inflated the body — piping that through
     // DecompressionStream again throws "The compressed data was not valid: incorrect header check".
-    // Peek the first chunk for the gzip magic (0x1f 0x8b) and only decompress a still-compressed body.
+    // Chunk boundaries are arbitrary, so accumulate enough bytes for the header before deciding.
     const raw = counted.getReader();
-    const firstChunk = await raw.read();
-    const head = firstChunk.value;
-    const isGzip = !!head && head.length >= 2 && head[0] === 0x1f && head[1] === 0x8b;
+    const header = await readStreamHeader(raw);
+    checkCurrent();
+    const kind = classifyDictHeader(header.head);
+    if (kind === "empty") throw new Error("dictionary download was empty");
     // If it's not gzip, it must already be a raw SQLite database. Detect the common misconfiguration
     // where the URL serves something else (usually an SPA index.html because the file isn't deployed)
     // and fail with an actionable message instead of the cryptic "not an SQLite3 database header".
-    if (!isGzip && head && head.length) {
-      const looksSqlite =
-        head.length >= 16 && new TextDecoder().decode(head.subarray(0, 15)) === "SQLite format 3";
-      if (!looksSqlite) {
-        const contentType = resp.headers.get("content-type") || "unknown";
-        const looksHtml = head[0] === 0x3c; // '<'
-        throw new Error(
-          looksHtml
-            ? `The dictionary URL returned an HTML page (content-type: ${contentType}), not the dictionary file — it is probably not deployed at ${url}.`
-            : `The dictionary URL returned data that is neither gzip nor a SQLite database (content-type: ${contentType}) at ${url}.`,
-        );
-      }
+    if (kind === "html" || kind === "unknown") {
+      void raw.cancel();
+      const contentType = resp.headers.get("content-type") || "unknown";
+      throw new Error(
+        kind === "html"
+          ? `The dictionary URL returned an HTML page (content-type: ${contentType}), not the dictionary file — it is probably not deployed at ${url}.`
+          : `The dictionary URL returned data that is neither gzip nor a SQLite database (content-type: ${contentType}) at ${url}.`,
+      );
     }
-    const source = new ReadableStream<Uint8Array>({
-      start(controller) {
-        if (head && head.length) controller.enqueue(head);
-        if (firstChunk.done) controller.close();
-      },
-      async pull(controller) {
-        const { done, value } = await raw.read();
-        if (done) controller.close();
-        else if (value) controller.enqueue(value);
-      },
-      cancel(reason) {
-        void raw.cancel(reason);
-      },
-    });
-    const stream = isGzip ? source.pipeThrough(new DecompressionStream("gzip")) : source;
+    const source = replayStream(header.chunks, raw, header.done);
+    const stream = kind === "gzip" ? source.pipeThrough(new DecompressionStream("gzip")) : source;
     const reader = stream.getReader();
-    // Extra capacity for the temp file during an update (temp alongside the still-present old DB).
-    const wantCapacity = hadExisting ? 4 : 2;
+    // Extra capacity for the staged file during an update (alongside the still-present old DB).
+    const wantCapacity = stage === DB_TMP ? 4 : 2;
     if (pool.getCapacity() < wantCapacity) await pool.addCapacity(wantCapacity);
+    checkCurrent();
     let sawData = false;
     const hasher = new Sha256();
-    await pool.importDb(target, async () => {
+    await pool.importDb(stage, async () => {
+      checkCurrent();
       const { done, value } = await reader.read();
       if (done) {
         status.state = "importing";
@@ -253,27 +359,28 @@ async function install(url: string, expectedSha256?: string, expectedRevision?: 
       hasher.update(value);
       return value;
     });
+    checkCurrent();
     if (!sawData) throw new Error("dictionary download was empty");
-    if (expectedSha256) {
-      const digest = hasher.hex();
-      if (digest !== expectedSha256.toLowerCase()) {
-        throw new Error("downloaded dictionary is corrupt (checksum mismatch); please try again");
-      }
-      status.verified = "ok";
-    } else {
-      status.verified = "skipped";
+    if (expectedSha256 && hasher.hex() !== expectedSha256.toLowerCase()) {
+      throw new Error("downloaded dictionary is corrupt (checksum mismatch); please try again");
     }
-    if (hadExisting) {
-      // Verified: replace the old DB with the temp copy. The SAH pool has no rename, so copy the
-      // bytes across and drop the temp only after DB_FILE is rebuilt and opens cleanly.
-      closeDb();
-      const bytes = pool.exportFile(DB_TMP);
-      if (pool.getFileNames().includes(DB_FILE)) pool.unlink(DB_FILE);
-      await pool.importDb(DB_FILE, bufferSource(bytes));
-      openDb();
-      pool.unlink(DB_TMP);
+    // Validate the staged copy before anything happens to the installed one.
+    staged = openValidated(stage);
+    checkCurrent();
+    status.verified = expectedSha256 ? "ok" : "skipped";
+    activate(staged);
+    if (stage === DB_TMP) {
+      // The SAH pool has no rename: copy the verified bytes into DB_FILE. The staged copy is
+      // deleted only after DB_FILE has been rebuilt and validated, so a failure here leaves it to
+      // serve lookups (and to be promoted again on the next boot).
+      try {
+        await promoteStaged();
+      } catch (error) {
+        console.warn("[himotoki-dict] could not promote the updated dictionary; serving the staged copy", error);
+        if (!db) activate(openValidated(DB_TMP));
+      }
     } else {
-      openDb();
+      unlinkIfPresent(DB_TMP);
     }
     if (expectedRevision && status.revision && status.revision !== expectedRevision) {
       console.warn(
@@ -285,52 +392,68 @@ async function install(url: string, expectedSha256?: string, expectedRevision?: 
     }
   })()
     .catch(async (error) => {
-      status.state = "error";
-      status.error = error instanceof Error ? error.message : String(error);
-      // Never leave the user without a dictionary because an install failed.
-      const pool = poolUtil;
+      closeQuietly(staged);
+      // remove() is waiting for this install to settle and owns the files and status from here.
+      if (error instanceof InstallCancelled || myGeneration !== generation) throw new InstallCancelled();
+      // Never leave the user without a dictionary because an install failed: drop the failed
+      // download, keep (or reopen) whatever working dictionary remains, and report it accurately.
+      let recoveryError: unknown = null;
       try {
-        const files = pool?.getFileNames() ?? [];
-        if (!hadExisting) {
-          // A failed first install may leave a partial DB_FILE — clean it up (no prior data to lose).
-          closeDb();
-          if (pool && files.includes(DB_FILE)) pool.unlink(DB_FILE);
-        } else if (pool && !files.includes(DB_FILE) && files.includes(DB_TMP)) {
-          // The swap was interrupted after DB_FILE was removed but the verified temp survived —
-          // promote it so a working dictionary remains.
-          const bytes = pool.exportFile(DB_TMP);
-          await pool.importDb(DB_FILE, bufferSource(bytes));
-        }
-        if (pool?.getFileNames().includes(DB_TMP)) pool.unlink(DB_TMP);
-        // Reopen whatever valid DB remains so lookups keep working after a failed update.
-        if (!db && pool?.getFileNames().includes(DB_FILE)) openDb();
-        // A working dictionary survived; reflect that (the failed-update error is still delivered to
-        // the caller via the rejected promise / toast).
         if (db) {
-          status.state = "ready";
-          status.error = "";
+          if (stage !== liveFile) unlinkIfPresent(stage);
+        } else {
+          // Without a live handle, a failed DB_FILE stage is the failed download itself.
+          if (stage === DB_FILE) unlinkIfPresent(DB_FILE);
+          recoveryError = await openBestAvailable();
         }
-      } catch {
-        /* best-effort recovery */
+      } catch (e) {
+        recoveryError = e;
+      }
+      if (db) {
+        // A working dictionary survived; the failed-update error still reaches the caller via the
+        // rejected promise / toast.
+        status.state = "ready";
+        status.error = "";
+      } else {
+        status.state = "error";
+        status.error = messageOf(error);
+        if (recoveryError) console.warn("[himotoki-dict] recovery after failed install", recoveryError);
       }
       throw error;
     })
     .finally(() => {
       installing = null;
+      if (installAbort === abort) installAbort = null;
     });
   return installing;
 }
 
-function remove(): void {
-  closeDb();
-  if (poolUtil?.getFileNames().includes(DB_FILE)) poolUtil.unlink(DB_FILE);
-  if (poolUtil?.getFileNames().includes(DB_TMP)) poolUtil.unlink(DB_TMP);
-  status.state = "missing";
-  status.revision = "";
-  status.terms = 0;
-  status.bytes = 0;
-  status.verified = "";
-  status.error = "";
+/**
+ * Remove the dictionary. Cancels an in-flight install (from any extension page) and waits for it
+ * to settle first, so the install can never write the file back after Remove has reported Missing.
+ */
+async function remove(): Promise<void> {
+  generation += 1;
+  installAbort?.abort();
+  if (!removing) {
+    removing = (async () => {
+      while (installing) await installing.catch(() => undefined);
+      closeDb();
+      unlinkIfPresent(DB_FILE);
+      unlinkIfPresent(DB_TMP);
+      status.state = "missing";
+      status.received = 0;
+      status.total = 0;
+      status.revision = "";
+      status.terms = 0;
+      status.bytes = 0;
+      status.verified = "";
+      status.error = "";
+    })().finally(() => {
+      removing = null;
+    });
+  }
+  await removing;
 }
 
 type Request = { id: number; op: string; url?: string; expectedSha256?: string; expectedRevision?: string; surface?: string; surfaces?: string[]; cues?: string[][]; seq?: number };
@@ -352,7 +475,7 @@ self.onmessage = async (event: MessageEvent<Request>) => {
         reply(true, { ...status });
         return;
       case "remove":
-        remove();
+        await remove();
         reply(true, { ...status });
         return;
       case "conjTable": {
