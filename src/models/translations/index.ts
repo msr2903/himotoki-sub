@@ -17,6 +17,12 @@ import { ownEntry } from "@src/shared/ownEntry";
 export const $lookups = createStore<Record<string, TWordTranslation>>({});
 export const $lookupPendings = createStore<Record<string, boolean>>({});
 export const lookupRequested = createEvent<TSubItem | string>();
+/**
+ * The user hovered or clicked a word to see it (a hover/click action opened its label or pop-up).
+ * Recorded in Recent lookups even when the result is cached; passive lookups (always-on furigana,
+ * status colouring, coverage) never fire it.
+ */
+export const lookupVisited = createEvent<TSubItem | string>();
 
 export const lookupKeyOf = (payload: TSubItem | string): string =>
   typeof payload === "string" ? payload : payload.cleanedText || payload.text;

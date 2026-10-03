@@ -35,6 +35,7 @@ import {
   $lookups,
   lookupKeyOf,
   lookupRequested,
+  lookupVisited,
   $pinnedWord,
   subItemMouseEntered,
   subItemMouseLeft,
@@ -570,6 +571,13 @@ const SubItem: FC<TSubItemProps> = ({ subItem, hoverKey, contextSentence, furiga
   const pinned = isWord && pinnedWord === hoverKey;
   // The pinned click action wins over the transient hover action.
   const action: TTokenAction = pinned ? clickAction : hovered && !(noHoverLabel && hoverAction !== "popup") ? hoverAction : "none";
+  // Opening a word's label or pop-up by hover/click is a lookup for Recent lookups, cached or not.
+  const visitLookup = useUnit(lookupVisited);
+  const lookupShown = isWord && action !== "none";
+  useEffect(() => {
+    if (lookupShown) visitLookup(subItem);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lookupShown, hoverKey, visitLookup]);
   // Inline ruby over kanji tokens: always, or only while hovered.
   const showRuby = isWord && hasKanji(subItem.text) && (furigana === "always" || (furigana === "hover" && hovered));
   // showRuby is only the intent — ruby can still fall back to plain text (difficulty gate, pending
