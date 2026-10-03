@@ -1,17 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { onPersistedChange, readPersisted, writePersisted } from "@src/shared/persistedSettings";
+import { syncSetting } from "@src/shared/settingSync";
 
 /** A persisted setting shared live with the content script (see src/utils/withPersist.ts). */
 export function usePersistedSetting<T>(name: string, fallback: T, validate: (v: unknown) => v is T) {
   const [value, setValue] = useState<T>(fallback);
+  const sync = useRef<{ supersede(): void } | null>(null);
   useEffect(() => {
-    void readPersisted<unknown>(name, fallback).then((v) => setValue(validate(v) ? v : fallback));
-    return onPersistedChange<unknown>(name, (v) => {
-      if (validate(v)) setValue(v);
+    const s = syncSetting<T>({
+      read: () => readPersisted<unknown>(name, fallback).then((v) => (validate(v) ? v : fallback)),
+      subscribe: (callback) =>
+        onPersistedChange<unknown>(name, (v) => {
+          if (validate(v)) callback(v);
+        }),
+      apply: setValue,
     });
+    sync.current = s;
+    return () => s.stop();
   }, [name]);
   const update = (next: T) => {
+    sync.current?.supersede();
     setValue(next);
     void writePersisted(name, next);
   };
@@ -28,18 +37,27 @@ export const isString = (v: unknown): v is string => typeof v === "string";
  */
 export function useRawStringSetting(key: string): readonly [string, (next: string) => void] {
   const [value, setValue] = useState("");
+  const sync = useRef<{ supersede(): void } | null>(null);
   useEffect(() => {
-    void chrome.storage.local.get([key]).then((r) => setValue(typeof r[key] === "string" ? r[key] : ""));
-    const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
-      if (area === "local" && key in changes) {
-        const next = changes[key]?.newValue;
-        setValue(typeof next === "string" ? next : "");
-      }
-    };
-    chrome.storage.onChanged.addListener(listener);
-    return () => chrome.storage.onChanged.removeListener(listener);
+    const s = syncSetting<string>({
+      read: () => chrome.storage.local.get([key]).then((r) => (typeof r[key] === "string" ? r[key] : "")),
+      subscribe: (callback) => {
+        const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+          if (area === "local" && key in changes) {
+            const next = changes[key]?.newValue;
+            callback(typeof next === "string" ? next : "");
+          }
+        };
+        chrome.storage.onChanged.addListener(listener);
+        return () => chrome.storage.onChanged.removeListener(listener);
+      },
+      apply: setValue,
+    });
+    sync.current = s;
+    return () => s.stop();
   }, [key]);
   const update = (next: string) => {
+    sync.current?.supersede();
     setValue(next);
     const trimmed = next.trim();
     void (trimmed ? chrome.storage.local.set({ [key]: trimmed }) : chrome.storage.local.remove([key]));
