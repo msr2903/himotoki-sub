@@ -116,8 +116,9 @@ export const DictionaryPanel: FC<{ compact?: boolean }> = ({ compact }) => {
       {(dict?.state === "missing" || dict?.state === "error") && (
         <>
           <p className="es-popup-hint">
-            Download Jitendex ({downloadMb}) for instant lookups without the network. Until then, words are looked up
-            online.
+            {dict.state === "error"
+              ? `The dictionary could not be loaded. Download Jitendex again (${downloadMb}) to look up words.`
+              : `Download Jitendex (${downloadMb}) to look up words. Word meanings, readings and furigana need this dictionary; whole-line translation works without it.`}
           </p>
           <button className="es-popup-btn es-popup-btn-primary" onClick={handleInstall}>
             Download dictionary
