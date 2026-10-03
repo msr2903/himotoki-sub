@@ -18,7 +18,8 @@ import { DEFAULT_READING_LINE, READING_LINE_SETTING } from "@src/shared/furigana
 import { DEFAULT_FURIGANA_LEVEL, FURIGANA_LEVEL_SETTING } from "@src/shared/furiganaDifficulty";
 import { COLOR_BY_DIFFICULTY_SETTING, DEFAULT_COLOR_BY_DIFFICULTY } from "@src/shared/tokenColor";
 import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
-import { DEFAULT_WORD_STATUSES, TWordStatus, WORD_STATUSES_SETTING, setStatus } from "@src/shared/wordStatus";
+import { DEFAULT_WORD_STATUSES, TWordStatus, WORD_STATUSES_SETTING } from "@src/shared/wordStatus";
+import { TWordStatusOp, applyOpToKnown, applyOpToStatuses, sendWordStatusOp } from "@src/shared/wordStatusOps";
 import {
   ANKI_CARD_THEME_SETTING,
   ANKI_RICH_CARDS_SETTING,
@@ -193,32 +194,32 @@ export const $furiganaLevel = withPersist(createStore<TFuriganaLevel>(DEFAULT_FU
 export const furiganaLevelChanged = createEvent<TFuriganaLevel>();
 $furiganaLevel.on(furiganaLevelChanged, (_, value) => value);
 
-/** Words the user has marked as known (stable keys from knownKeyOf); persisted and synced across pages. */
-export const $knownWords = withPersist(createStore<string[]>([], { name: KNOWN_WORDS_SETTING }));
+/**
+ * Words the user has marked as known (stable keys from knownKeyOf) and per-word learning status
+ * (New / Learning / Known / Ignored, see src/shared/wordStatus.ts). Both update optimistically here,
+ * but storage is changed only through item-level operations applied by the background (see
+ * src/shared/wordStatusOps.ts), so concurrent edits in two tabs never drop each other's words.
+ */
+export const $knownWords = withPersist(createStore<string[]>([], { name: KNOWN_WORDS_SETTING }), { write: false });
 export const wordMarkedKnown = createEvent<string>();
 export const wordUnmarkedKnown = createEvent<string>();
-/** Per-word learning status: New / Learning / Known / Ignored (see src/shared/wordStatus.ts). */
 export const $wordStatuses = withPersist(
   createStore<Record<string, TWordStatus>>(DEFAULT_WORD_STATUSES, { name: WORD_STATUSES_SETTING }),
+  { write: false },
 );
 export const wordStatusSet = createEvent<{ key: string; status: TWordStatus }>();
 export const wordStatusCleared = createEvent<string>();
-$wordStatuses
-  .on(wordStatusSet, (map, { key, status }) => setStatus(map, key, status))
-  .on(wordStatusCleared, (map, key) => setStatus(map, key, "new"));
 
-// Keep the legacy known-words array (coverage stats, export) mirrored to the "known" status.
-$knownWords
-  .on(wordMarkedKnown, (list, key) => (list.includes(key) ? list : [...list, key]))
-  .on(wordUnmarkedKnown, (list, key) => list.filter((k) => k !== key))
-  .on(wordStatusSet, (list, { key, status }) =>
-    status === "known"
-      ? list.includes(key)
-        ? list
-        : [...list, key]
-      : list.filter((k) => k !== key),
-  )
-  .on(wordStatusCleared, (list, key) => list.filter((k) => k !== key));
+const wordStatusOp = createEvent<TWordStatusOp>();
+sample({ clock: wordStatusSet, fn: ({ key, status }): TWordStatusOp => ({ kind: "status", key, status }), target: wordStatusOp });
+sample({ clock: wordStatusCleared, fn: (key): TWordStatusOp => ({ kind: "status", key, status: "new" }), target: wordStatusOp });
+sample({ clock: wordMarkedKnown, fn: (key): TWordStatusOp => ({ kind: "known", key, known: true }), target: wordStatusOp });
+sample({ clock: wordUnmarkedKnown, fn: (key): TWordStatusOp => ({ kind: "known", key, known: false }), target: wordStatusOp });
+// The legacy known-words array (coverage stats, export) stays mirrored to the "known" status.
+$wordStatuses.on(wordStatusOp, applyOpToStatuses);
+$knownWords.on(wordStatusOp, applyOpToKnown);
+const persistWordStatusOpFx = createEffect(sendWordStatusOp);
+sample({ clock: wordStatusOp, target: persistWordStatusOpFx });
 
 /** Dim words already marked known (opt-in; requires resolving each visible token). */
 export const $dimKnownWords = withPersist(createStore<boolean>(DEFAULT_DIM_KNOWN, { name: DIM_KNOWN_SETTING }));
