@@ -15,6 +15,8 @@ import {
   createWordStatusMutator,
   isWordStatusOp,
 } from "@src/shared/wordStatusOps";
+import { dictCall } from "@src/pages/offscreen/dictBridge";
+import { detectDictHost, unsupportedDictReply } from "./dictHost";
 
 /** Firebase session for Save to Himotoki (see utils/himotokiAccount.ts). */
 const HIMOTOKI_SESSION_KEY = "himotokiSession";
@@ -80,6 +82,12 @@ const OFFSCREEN_PATH = "src/pages/offscreen/index.html";
 const OFFSCREEN_REASON = "WORKERS" as chrome.offscreen.Reason;
 const OFFSCREEN_JUSTIFICATION = "Run Himotoki ONNX Japanese subtitle segmentation";
 
+/** Chrome: offscreen document. Firefox (no chrome.offscreen): the worker runs in this background page. */
+const dictHost = detectDictHost({
+  offscreen: (chrome as { offscreen?: { createDocument?: unknown } }).offscreen,
+  Worker: (globalThis as { Worker?: unknown }).Worker,
+});
+
 async function hasOffscreenDocument(): Promise<boolean> {
   const contexts = await chrome.runtime.getContexts?.({
     contextTypes: ["OFFSCREEN_DOCUMENT" as chrome.runtime.ContextType],
@@ -97,6 +105,7 @@ let offscreenCreating: Promise<void> | null = null;
 
 /** Serialized: concurrent callers must not both call createDocument ("Only a single offscreen document"). */
 async function setupOffscreenDocument(): Promise<void> {
+  if (!chrome.offscreen?.createDocument) throw new Error("chrome.offscreen is not available in this browser");
   if (await hasOffscreenDocument()) return;
   if (!offscreenCreating) {
     offscreenCreating = chrome.offscreen
@@ -226,13 +235,20 @@ chrome.runtime.onMessage.addListener(function (message, _sender, sendResponse) {
       try {
         const op = DICT_OPS[message.type]!;
         const { type: _type, ...payload } = message as { type: string } & Record<string, unknown>;
+        if (dictHost === "unsupported") {
+          sendResponse(unsupportedDictReply(op, payload));
+          return;
+        }
         if (op === "install") {
           payload.url = await resolveDictUrl();
           const manifest = await fetchDictManifest();
           if (manifest?.sha256) payload.expectedSha256 = manifest.sha256;
           if (manifest?.revision) payload.expectedRevision = manifest.revision;
         }
-        const resp = await sendToOffscreen({ ...payload, type: "himotokiDict", op });
+        const resp =
+          dictHost === "offscreen"
+            ? await sendToOffscreen({ ...payload, type: "himotokiDict", op })
+            : { ok: true, data: await dictCall(op, payload) };
         sendResponse(resp);
       } catch (error) {
         sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });

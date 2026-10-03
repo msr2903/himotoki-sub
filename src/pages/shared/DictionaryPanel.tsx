@@ -144,6 +144,12 @@ export const DictionaryPanel: FC<{ compact?: boolean }> = ({ compact }) => {
           </div>
         </>
       )}
+      {dict?.state === "unsupported" && (
+        <p className="es-popup-hint">
+          The offline dictionary cannot run in this browser, so word meanings, readings and furigana are unavailable.
+          Whole-line translation still works.
+        </p>
+      )}
       {(error || statusError || dict?.error) && (
         <div className="es-popup-error">{error || statusError || dict?.error}</div>
       )}

@@ -90,7 +90,7 @@ HIMOTOKI_DICT_DIR=/tmp/himotoki-dict pnpm test:e2e   # YouTube with the offline 
 
 `tsc --noEmit`, `pnpm test:unit` and `pnpm build` also run in CI on every push and pull request.
 
-> Firefox note: the local word splitter relies on `chrome.offscreen`, which Firefox does not implement. On Firefox the extension currently falls back to `Intl.Segmenter`.
+> Firefox note (untested target): Firefox does not implement `chrome.offscreen`. The word splitter falls back to `Intl.Segmenter`, and the offline dictionary worker is started directly in the background page instead of an offscreen document; this path has not been verified in a real Firefox yet. If a browser can run neither, the dictionary panel reports that the dictionary is unavailable in this browser and word lookups are off (whole-line translation still works).
 
 ## Permissions
 
