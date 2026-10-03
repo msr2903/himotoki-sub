@@ -76,7 +76,7 @@ describe("dictionary readiness ordering (#141)", () => {
       values: [[$dictReady, true]],
       handlers: [
         [fetchWordTranslationFx, ({ source }: { source: string }) => new Promise<TWordTranslation>((resolve) => lookups.push({ source, resolve }))],
-        [checkDictReadyFx, async () => status.ready],
+        [checkDictReadyFx, async () => ({ ready: status.ready, revision: status.ready ? "r1" : "" })],
       ],
     });
     const check = async () => {

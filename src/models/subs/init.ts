@@ -43,7 +43,8 @@ import {
   loopCleared,
 } from "../videos";
 import { $autoPause, $secondarySubs, $translateLanguage } from "../settings";
-import type { Captions } from "../types";
+import { $dictGeneration, $dictReady } from "../translations";
+import type { Captions, TSub } from "../types";
 import { debug } from "patronum";
 import { cancelVideoClip } from "@src/utils/replayVideoClip";
 import { notifyError, notifyInfo } from "@src/pages/content/notify";
@@ -146,23 +147,49 @@ $rawSubs.reset(resetSubs);
 $sentenceOpen.reset(resetSubs);
 
 // Resolve every distinct word's key once the subtitles are ready, for coverage stats.
-sample({ clock: $subs, filter: (subs) => subs.length > 0, target: computeCoverageFx });
+sample({
+  clock: $subs,
+  source: $dictGeneration,
+  filter: (_, subs) => subs.length > 0,
+  fn: (generation, subs) => ({ subs, generation }),
+  target: computeCoverageFx,
+});
+// The dictionary became available or was replaced (captions unchanged): rescan the loaded captions.
+sample({
+  clock: $dictGeneration.updates,
+  source: { subs: $subs, ready: $dictReady },
+  filter: ({ subs, ready }) => ready && subs.length > 0,
+  fn: ({ subs }, generation) => ({ subs, generation }),
+  target: computeCoverageFx,
+});
+// The dictionary was removed: the resolved keys belong to a dictionary that no longer exists.
+const coverageDictRemoved = sample({
+  clock: $dictGeneration.updates,
+  source: { subs: $subs, ready: $dictReady },
+  filter: ({ subs, ready }) => !ready && subs.length > 0,
+});
+// Results count only for the current captions and the dictionary they were resolved against.
+const isCurrentCoverage = (
+  { subs, generation }: { subs: TSub[]; generation: number },
+  { params }: { params: { subs: TSub[]; generation: number } },
+) => subs === params.subs && generation === params.generation;
 const currentCoverageDone = sample({
   clock: computeCoverageFx.done,
-  source: $subs,
-  filter: (subs, { params }) => subs === params,
+  source: { subs: $subs, generation: $dictGeneration },
+  filter: isCurrentCoverage,
   fn: (_, { result }) => result,
 });
 const currentCoverageFailed = sample({
   clock: computeCoverageFx.fail,
-  source: $subs,
-  filter: (subs, { params }) => subs === params,
+  source: { subs: $subs, generation: $dictGeneration },
+  filter: isCurrentCoverage,
 });
-$coverageKeys.on(currentCoverageDone, (_, map) => map ?? {}).reset(resetSubs, $subs.updates);
+$coverageKeys.on(currentCoverageDone, (_, map) => map ?? {}).reset(resetSubs, $subs.updates, coverageDictRemoved);
 $coverageStatus
   .on(computeCoverageFx, () => "loading")
   .on(currentCoverageDone, (_, map) => map === null ? "missing" : "ready")
   .on(currentCoverageFailed, () => "error")
+  .on(coverageDictRemoved, () => "missing")
   .reset(resetSubs);
 
 sample({
