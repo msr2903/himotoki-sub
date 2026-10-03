@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path, { resolve } from "path";
 import makeManifest from "./utils/plugins/make-manifest";
+import copyLicenseFiles from "./utils/plugins/copy-license-files";
 import customDynamicImport from "./utils/plugins/custom-dynamic-import";
 import addHmr from "./utils/plugins/add-hmr";
 import watchRebuild from "./utils/plugins/watch-rebuild";
@@ -50,6 +51,7 @@ export default defineConfig({
     },
   },
   plugins: [
+    copyLicenseFiles(rootDir),
     makeManifest({
       getCacheInvalidationKey,
     }),
