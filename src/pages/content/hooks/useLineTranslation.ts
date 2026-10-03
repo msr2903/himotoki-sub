@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useStoreMap, useUnit } from "effector-react";
 
 import { $lineTranslationGeneration, $lineTranslationPendings, $lineTranslations, lineTranslationRequested } from "@src/models/translations";
+import { ownEntry } from "@src/shared/ownEntry";
 
 /** Request (once) and read the machine translation of a subtitle line. */
 export const useLineTranslation = (text: string): { translation: string | null; error: string | null; pending: boolean } => {
@@ -10,12 +11,12 @@ export const useLineTranslation = (text: string): { translation: string | null; 
   const entry = useStoreMap({
     store: $lineTranslations,
     keys: [key],
-    fn: (translations, [key]) => translations[key] ?? null,
+    fn: (translations, [key]) => ownEntry(translations, key) ?? null,
   });
   const pending = useStoreMap({
     store: $lineTranslationPendings,
     keys: [key],
-    fn: (pendings, [key]) => Boolean(pendings[key]),
+    fn: (pendings, [key]) => Boolean(ownEntry(pendings, key)),
   });
 
   useEffect(() => {

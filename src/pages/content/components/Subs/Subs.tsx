@@ -61,6 +61,7 @@ import { getLearningService } from "@src/utils/getLearningService";
 import { useLineTranslation } from "@src/pages/content/hooks/useLineTranslation";
 import { useRubySegments } from "@src/pages/content/hooks/useRubySegments";
 import { parseAnkiTags } from "@src/shared/ankiSettings";
+import { ownEntry } from "@src/shared/ownEntry";
 import {
   $ankiCardTheme,
   $ankiDeck,
@@ -358,7 +359,7 @@ const NewWordsGlossary: FC<{
   const seen = new Set<string>();
   const words: GlossaryEntry[] = [];
   for (const t of tokens) {
-    const tx = lookups[lookupKeyOf(t.item)];
+    const tx = ownEntry(lookups, lookupKeyOf(t.item));
     const gloss = tx && !tx.error ? glossaryGloss(tx.mainTranslation) : "";
     if (!tx || !gloss) continue;
     const key = knownKeyOf(tx);
