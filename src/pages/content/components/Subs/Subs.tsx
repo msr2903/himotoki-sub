@@ -6,7 +6,8 @@ import cn from "classnames";
 
 import { $currentSecondarySubs, $currentSubs, $sentenceOpen, $transcriptOpen } from "@src/models/subs";
 import { $video, $wasPaused, wasPausedChanged } from "@src/models/videos";
-import { TFuriganaMode, TSub, TSubItem, TTokenAction, TWordTranslation } from "@src/models/types";
+import { TFuriganaMode, TLearningService, TSub, TSubItem, TTokenAction, TWordTranslation } from "@src/models/types";
+import type { TAnkiCardTheme } from "@src/utils/ankiNote";
 import {
   $autoStopEnabled,
   $clickAction,
@@ -28,6 +29,7 @@ import {
   $newWordsLevel,
   $meaningSize,
   $learningService,
+  $translateLanguage,
 } from "@src/models/settings";
 import {
   $activeHoverWord,
@@ -41,6 +43,7 @@ import {
   subItemMouseLeft,
   tokenPinToggled,
   tokenUnpinned,
+  lineTranslationRequested,
 } from "@src/models/translations";
 import { addKeyboardEventsListeners, removeKeyboardEventsListeners } from "@src/utils/keyboardHandler";
 import { addMouseEventsListeners, removeMouseEventsListeners } from "@src/utils/mouseHandler";
@@ -58,6 +61,7 @@ import { jlptColorClass } from "@src/shared/tokenColor";
 import { GLOSSARY_HOLD_MS, SHOW_LINE_IDLE_MS, TNewWordsLevel, glossaryGloss, isJapaneseToken, isNewWord, pickGlossary } from "@src/shared/newWordsOnly";
 import { statusOf } from "@src/shared/wordStatus";
 import { PhraseRange, clampRange, isIndexSelected, joinItems, rangeLength } from "@src/shared/phraseSelection";
+import { pendingPhraseSaveStep, type TPendingPhraseSave } from "@src/shared/phraseSave";
 import { getLearningService } from "@src/utils/getLearningService";
 import { useLineTranslation } from "@src/pages/content/hooks/useLineTranslation";
 import { useRubySegments } from "@src/pages/content/hooks/useRubySegments";
@@ -470,30 +474,42 @@ const NewWordsGlossary: FC<{
   );
 };
 
+type TPhraseSavePayload = {
+  service: TLearningService;
+  contextSentence: string;
+  richCards: boolean;
+  cardTheme: TAnkiCardTheme;
+  deckName: string;
+  tags: string[];
+};
+
 /** Action bar for a selected multi-token phrase: translate it or save it, then clear. */
 const PhraseBar: FC<{ phrase: string; contextSentence?: string; onClose: () => void }> = ({ phrase, contextSentence, onClose }) => {
-  const [learningService, ankiDeck, ankiTags, ankiCardTheme, ankiRichCards] = useUnit([
+  const [learningService, ankiDeck, ankiTags, ankiCardTheme, ankiRichCards, translateLanguage, requestTranslation] = useUnit([
     $learningService,
     $ankiDeck,
     $ankiTags,
     $ankiCardTheme,
     $ankiRichCards,
+    $translateLanguage,
+    lineTranslationRequested,
   ]);
   const [showTranslation, setShowTranslation] = useState(false);
-  const [saveAfterTranslate, setSaveAfterTranslate] = useState(false);
-  const { translation, pending } = useLineTranslation(showTranslation ? phrase : "");
+  // A Save click waiting for the translation, with everything it will send captured at the click.
+  const [pendingSave, setPendingSave] = useState<TPendingPhraseSave<TPhraseSavePayload> | null>(null);
+  const { translation, error, pending } = useLineTranslation(showTranslation ? phrase : "");
 
-  const doSave = (meaning: string) => {
-    const service = getLearningService(learningService);
+  const doSave = (savedPhrase: string, meaning: string, payload: TPhraseSavePayload) => {
+    const service = getLearningService(payload.service);
     if (!service) return;
     service
-      .addWord(phrase, meaning, {
-        contextSentence: contextSentence || phrase,
-        context: contextSentence || phrase,
-        richCards: ankiRichCards,
-        cardTheme: ankiCardTheme,
-        deckName: ankiDeck,
-        tags: parseAnkiTags(ankiTags),
+      .addWord(savedPhrase, meaning, {
+        contextSentence: payload.contextSentence,
+        context: payload.contextSentence,
+        richCards: payload.richCards,
+        cardTheme: payload.cardTheme,
+        deckName: payload.deckName,
+        tags: payload.tags,
       })
       .then((value) => toast.success(value))
       .catch((error) => toast.error(typeof error === "string" ? error : error?.message || String(error)));
@@ -506,23 +522,35 @@ const PhraseBar: FC<{ phrase: string; contextSentence?: string; onClose: () => v
       toast.error("Phrase saving works with Anki — Himotoki favorites are for single dictionary words.");
       return;
     }
+    const payload: TPhraseSavePayload = {
+      service: learningService,
+      contextSentence: contextSentence || phrase,
+      richCards: ankiRichCards,
+      cardTheme: ankiCardTheme,
+      deckName: ankiDeck,
+      tags: parseAnkiTags(ankiTags),
+    };
     if (translation) {
-      doSave(translation);
+      doSave(phrase, translation, payload);
       return;
     }
     // Fetch the machine translation first so the card's meaning isn't the Japanese phrase itself.
+    // Requesting directly also retries a translation that failed earlier.
     setShowTranslation(true);
-    setSaveAfterTranslate(true);
+    requestTranslation(phrase);
+    setPendingSave({ phrase, language: translateLanguage, payload });
   };
 
+  // The pending save runs only with the translation of the phrase it was clicked for (#158).
+  const step = pendingPhraseSaveStep(pendingSave, { phrase, language: translateLanguage, pending, translation, error });
   useEffect(() => {
-    if (!saveAfterTranslate || pending) return;
-    if (translation) {
-      setSaveAfterTranslate(false);
-      doSave(translation);
-    }
+    if (step === "idle" || step === "wait") return;
+    const draft = pendingSave!;
+    setPendingSave(null);
+    if (step === "run") doSave(draft.phrase, translation!, draft.payload);
+    else if (error && draft.phrase === phrase) toast.error(`The phrase was not saved: ${error}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saveAfterTranslate, translation, pending]);
+  }, [step]);
 
   return (
     <div className="es-phrase-bar" onClick={(e) => e.stopPropagation()}>

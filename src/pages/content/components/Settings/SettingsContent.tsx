@@ -1,4 +1,4 @@
-import { FC, PropsWithChildren, useRef } from "react";
+import { FC, PropsWithChildren, useEffect, useRef } from "react";
 import cn from "classnames";
 import { EnableToggle } from "./EnableToggle";
 import { TranslateLanguage } from "./TranslateLanguage";
@@ -42,7 +42,6 @@ import { createPortal } from "react-dom";
 
 interface TabProps {
   isActive: boolean;
-  tabId: number;
   onClick: () => void;
 }
 
@@ -52,14 +51,16 @@ const Tab: FC<PropsWithChildren<TabProps>> = ({
   onClick,
 }) => {
   return (
-    <div
+    <button
+      type="button"
+      aria-pressed={isActive}
       className={cn("es-settings-content__menu__item", {
         "es-settings-content__menu__item--active": isActive,
       })}
       onClick={onClick}
     >
       {children}
-    </div>
+    </button>
   );
 };
 
@@ -73,22 +74,29 @@ export const SettingsContent: FC<{ onClose: () => void }> = ({ onClose }) => {
   const modalTarget = useOverlayPortalTarget();
 
   useClickOutside(contentRef, onClose);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
 
   // Three tabs: General (app/playback), Words (word behaviour), Subtitles (appearance).
   const tab = activeSettingsTab === 1 || activeSettingsTab === 2 ? activeSettingsTab : 0;
 
   return (
     <>
-      <div className="es-settings-content" ref={contentRef} style={{ zoom: uiScale / 100 } as React.CSSProperties}>
+      <div className="es-settings-content" ref={contentRef} role="dialog" aria-label="Himotoki settings" style={{ zoom: uiScale / 100 } as React.CSSProperties}>
         <div className="es-settings-content__menu">
-          <div className="es-settings-content__menu__items">
-            <Tab isActive={tab === 0} tabId={0} onClick={() => handleActiveSettingsTabChanged(0)}>
+          <div className="es-settings-content__menu__items" aria-label="Settings categories">
+            <Tab isActive={tab === 0} onClick={() => handleActiveSettingsTabChanged(0)}>
               General
             </Tab>
-            <Tab isActive={tab === 1} tabId={1} onClick={() => handleActiveSettingsTabChanged(1)}>
+            <Tab isActive={tab === 1} onClick={() => handleActiveSettingsTabChanged(1)}>
               Words
             </Tab>
-            <Tab isActive={tab === 2} tabId={2} onClick={() => handleActiveSettingsTabChanged(2)}>
+            <Tab isActive={tab === 2} onClick={() => handleActiveSettingsTabChanged(2)}>
               Subtitles
             </Tab>
           </div>
@@ -215,7 +223,7 @@ export const SettingsContent: FC<{ onClose: () => void }> = ({ onClose }) => {
             </>
           )}
         </div>
-        <div className="es-settings-content__close" onClick={() => onClose()} />
+        <button type="button" className="es-settings-content__close" aria-label="Close settings" onClick={onClose} />
       </div>
       {createPortal(<DeepLApiKeyModal />, modalTarget)}
     </>

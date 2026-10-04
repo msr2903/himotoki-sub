@@ -288,9 +288,11 @@ export const TextRow: FC<{
   placeholder?: string;
   onChange: (value: string) => void;
   onBlur?: (value: string) => void;
-}> = ({ id, title, hint, value, placeholder, onChange, onBlur }) => (
-  <div className="item stack-item">
-    <ItemText title={title} hint={hint} htmlFor={id} />
+  /** A control beside the field, e.g. an explicit Save. */
+  action?: ReactNode;
+  error?: string | null;
+}> = ({ id, title, hint, value, placeholder, onChange, onBlur, action, error }) => {
+  const input = (
     <input
       id={id}
       type="text"
@@ -298,11 +300,31 @@ export const TextRow: FC<{
       value={value}
       placeholder={placeholder}
       spellCheck={false}
+      aria-invalid={error ? true : undefined}
+      aria-describedby={error ? `${id}-error` : undefined}
       onChange={(e) => onChange(e.target.value)}
       onBlur={onBlur ? (e) => onBlur(e.target.value) : undefined}
     />
-  </div>
-);
+  );
+  return (
+    <div className="item stack-item">
+      <ItemText title={title} hint={hint} htmlFor={id} />
+      {action ? (
+        <div className="field-row">
+          {input}
+          {action}
+        </div>
+      ) : (
+        input
+      )}
+      {error && (
+        <span id={`${id}-error`} className="error" role="alert">
+          {error}
+        </span>
+      )}
+    </div>
+  );
+};
 
 export const SearchField: FC<{ value: string; onChange: (value: string) => void }> = ({ value, onChange }) => (
   <div className="search">

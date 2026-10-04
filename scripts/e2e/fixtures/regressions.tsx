@@ -8,6 +8,7 @@ import * as translations from "../../../src/models/translations";
 import { $videoStats } from "../../../src/models/stats";
 import { Subs } from "../../../src/pages/content/components/Subs/Subs";
 import { VideoStats } from "../../../src/pages/content/components/Settings/VideoStats";
+import { SettingsContent } from "../../../src/pages/content/components/Settings/SettingsContent";
 import { knownKeyOf } from "../../../src/shared/knownWords";
 import { replayVideoClip, cancelVideoClip } from "../../../src/utils/replayVideoClip";
 import { useLookup } from "../../../src/pages/content/hooks/useLookup";
@@ -39,5 +40,17 @@ Object.assign(window, {
   },
 });
 
+// The in-player settings panel, as Settings.tsx portals it; counts close requests.
+Object.assign(window, {
+  settingsPanelCloses: 0,
+  mountSettingsPanel: () => {
+    const host = document.createElement("div");
+    host.style.cssText = "position:relative;width:640px;height:720px";
+    document.body.append(host);
+    const root = createRoot(host);
+    root.render(<SettingsContent onClose={() => { (window as unknown as { settingsPanelCloses: number }).settingsPanelCloses += 1; }} />);
+    return () => { root.unmount(); host.remove(); };
+  },
+});
 Object.assign(window, { audit: { subs, settings, videos, translations, $videoStats, knownKeyOf, replayVideoClip, cancelVideoClip } });
 Object.assign(window, { renderAudit: () => createRoot(document.getElementById("root")!).render(<><Subs /><VideoStats /></>) });

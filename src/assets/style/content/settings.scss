@@ -156,11 +156,20 @@
 
 .es-settings-icon {
   margin: 0 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
   cursor: pointer;
   color: rgba(255, 255, 255, 0.8);
 
   &:hover {
     color: var(--hm-accent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--hm-accent);
+    outline-offset: 2px;
   }
 
   svg {
@@ -205,6 +214,15 @@
       padding: 0 16px;
       font-size: 15px;
       cursor: pointer;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font-family: inherit;
+
+      &:focus-visible {
+        outline: 2px solid var(--hm-accent);
+        outline-offset: -2px;
+      }
 
       &:first-child {
         border-radius: var(--hm-radius-md) 0 0 0;
@@ -275,9 +293,17 @@
     right: 12px;
     cursor: pointer;
     color: var(--hm-ink-muted);
+    border: 0;
+    background: transparent;
+    padding: 0;
 
     &:hover {
       color: var(--hm-accent);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--hm-accent);
+      outline-offset: 2px;
     }
 
     &:after {

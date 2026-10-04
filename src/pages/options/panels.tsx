@@ -1,8 +1,9 @@
 /** Drill-in panels of the settings page (`?panel=<id>`). */
-import { FC } from "react";
+import { FC, useState } from "react";
 
 import type { TFuriganaLevel, TMouseAction, TMouseButton, TReadingLineMode, TSecondarySubs, TTokenAction } from "@src/models/types";
-import { ENDPOINT_DEFAULTS, type EndpointKey, originMatchPattern } from "@src/shared/runtimeConfig";
+import { ENDPOINT_DEFAULTS } from "@src/shared/runtimeConfig";
+import { prepareEndpointUrl } from "@src/shared/endpointUrl";
 import {
   CLICK_ACTION_SETTING,
   DEFAULT_CLICK_ACTION,
@@ -303,14 +304,26 @@ export const AdvancedPanel: FC = () => {
   const [googleClientId, setGoogleClientId] = useRawStringSetting("himotokiGoogleClientId");
   // What Google redirects to after sign-in; the OAuth client must list it.
   const redirectUrl = chrome.identity?.getRedirectURL?.() ?? "https://<extension-id>.chromiumapp.org/";
-  // A custom URL on a new origin needs host permission, which needs a user gesture — a blur
-  // after typing qualifies.
-  const applyEndpointUrl = (key: EndpointKey, value: string, set: (v: string) => void) => {
-    set(value);
-    const trimmed = value.trim();
-    if (!trimmed) return;
-    const pattern = originMatchPattern(trimmed);
-    if (pattern) void chrome.permissions.request({ origins: [pattern] }).catch(() => undefined);
+  // The dictionary URL is a draft until Save: the click is the user gesture the host permission
+  // prompt needs, and a URL the extension can't fetch never becomes the active endpoint (#94).
+  const [dictDraft, setDictDraft] = useState<string | null>(null);
+  const [dictError, setDictError] = useState<string | null>(null);
+  const [savingDict, setSavingDict] = useState(false);
+  const dictField = dictDraft ?? dictUrl;
+  const editDict = (value: string) => {
+    setDictDraft(value);
+    setDictError(null);
+  };
+  const saveDict = async () => {
+    setSavingDict(true);
+    const result = await prepareEndpointUrl(dictField, (origins) => chrome.permissions.request({ origins }));
+    setSavingDict(false);
+    if ("error" in result) {
+      setDictError(result.error);
+      return;
+    }
+    setDictUrl(result.value);
+    setDictDraft(null);
   };
   const custom = Boolean(dictUrl || googleClientId);
 
@@ -321,10 +334,20 @@ export const AdvancedPanel: FC = () => {
         id="endpoint-dict"
         title="Dictionary URL"
         hint="Where the offline dictionary (.sqlite.gz and its .json manifest) is downloaded from."
-        value={dictUrl}
+        value={dictField}
         placeholder={ENDPOINT_DEFAULTS.himotokiDictUrl}
-        onChange={setDictUrl}
-        onBlur={(v) => applyEndpointUrl("himotokiDictUrl", v, setDictUrl)}
+        onChange={editDict}
+        error={dictError}
+        action={
+          <button
+            type="button"
+            className="pill"
+            disabled={savingDict || dictField.trim() === dictUrl}
+            onClick={() => void saveDict()}
+          >
+            Save
+          </button>
+        }
       />
       <TextRow
         id="endpoint-google"
@@ -341,6 +364,8 @@ export const AdvancedPanel: FC = () => {
             className="pill"
             onClick={() => {
               setDictUrl("");
+              setDictDraft(null);
+              setDictError(null);
               setGoogleClientId("");
             }}
           >
