@@ -34,13 +34,13 @@ JSON.stringify = function (response) {
 
 // We find the global variable of the Netflix player to subscribe to its events and control the player
 function getPlayer() {
-  const videoPlayer = window.netflix.appContext.state.playerApp.getAPI().videoPlayer;
-  const sessionId = videoPlayer.getAllPlayerSessionIds()[0];
-  return videoPlayer.getVideoPlayerBySessionId(sessionId);
+  const videoPlayer = window.netflix?.appContext?.state?.playerApp?.getAPI?.()?.videoPlayer;
+  const sessionId = videoPlayer?.getAllPlayerSessionIds?.()[0];
+  return sessionId ? videoPlayer.getVideoPlayerBySessionId(sessionId) : null;
 }
 
 function handleSeek(event) {
-  getPlayer().seek(event.detail);
+  getPlayer()?.seek(event.detail);
 }
 
 function getAdBreaks() {
@@ -108,8 +108,8 @@ const observer = new MutationObserver((mutations, obs) => {
   if (!adDiv && window.adShowed) {
     window.adShowed = false;
     document.body.classList.toggle("es-netflix-ad-showing");
-    const currentTime = document.querySelector("video").currentTime * 1000;
-    window.dispatchEvent(new CustomEvent("esNetflixAddHide", { detail: currentTime }));
+    const video = document.querySelector("video");
+    if (video) window.dispatchEvent(new CustomEvent("esNetflixAddHide", { detail: video.currentTime * 1000 }));
   }
 });
 

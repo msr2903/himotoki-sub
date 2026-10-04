@@ -3,16 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { convertJapaneseSubsFallback, convertJapaneseSubsWithLocalSplit } from "./convertRawSubs";
 import type { Captions, TSub } from "@src/models/types";
 
-// cleanCueText parses markup through a detached <div>; a tag-stripping double is enough here.
+// cleanCueText parses markup in an inert <template>; a tag-stripping double is enough here.
 const fakeDocument = {
   createElement: () => {
-    let text = "";
+    const content = { textContent: "", querySelectorAll: () => [] };
     return {
+      content,
       set innerHTML(html: string) {
-        text = html.replace(/<[^>]*>/g, "");
-      },
-      get textContent() {
-        return text;
+        content.textContent = html.replace(/<[^>]*>/g, "");
       },
     };
   },

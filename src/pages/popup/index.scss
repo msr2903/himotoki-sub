@@ -120,17 +120,26 @@ body {
 
     li {
       list-style: none;
-      line-height: 2;
-      padding: 0 20px;
-      cursor: pointer;
+      padding: 0 12px;
 
       &:hover {
         background: var(--hm-accent-muted);
       }
 
-      a {
+      .es-popup-menu-action {
+        display: block;
+        width: 100%;
+        border: 0;
+        border-radius: var(--hm-radius-sm);
+        background: transparent;
         color: var(--hm-ink);
-        text-decoration: none;
+        font: inherit;
+        font-weight: 600;
+        text-align: left;
+        padding: 8px;
+        cursor: pointer;
+
+        &:focus-visible { outline: 2px solid var(--hm-accent); }
 
         &.es-popup-kinopub {
           font-weight: 600;

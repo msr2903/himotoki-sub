@@ -1,5 +1,8 @@
 import { AccountPanel } from "@src/pages/shared/AccountPanel";
 import { DictionaryPanel } from "@src/pages/shared/DictionaryPanel";
+import { useEffect, useState } from "react";
+import { originMatchPattern } from "@src/shared/runtimeConfig";
+import { isKinopubPage } from "@src/shared/serviceHosts";
 
 async function getTab() {
   const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
@@ -7,12 +10,28 @@ async function getTab() {
 }
 
 const Popup = () => {
+  const [kinopubUrl, setKinopubUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    void getTab().then((tab) => {
+      // activeTab exposes the tab's URL and title while the popup is open, so a mirror on an unlisted
+      // host is recognised by its title. The action is pointless once the origin is granted.
+      if (!tab?.url || !isKinopubPage(tab.url, tab.title)) return;
+      const origin = originMatchPattern(tab.url);
+      if (!origin) return;
+      void chrome.permissions.contains({ origins: [origin] }).then((granted) => {
+        if (!granted) setKinopubUrl(tab.url!);
+      });
+    });
+  }, []);
+
   const handleRequestPermissions = async () => {
     const tab = await getTab();
-    if (!tab?.url || tab.id == null) return;
+    if (!tab?.url || tab.id == null || !kinopubUrl) return;
+    const origin = originMatchPattern(tab.url);
+    if (!origin) return;
     const isGranted = await chrome.permissions.request({
-      permissions: ["scripting", "storage", "activeTab"],
-      origins: [tab.url],
+      origins: [origin],
     });
     if (isGranted) {
       chrome.tabs.reload(tab.id);
@@ -37,12 +56,18 @@ const Popup = () => {
       </section>
 
       <menu>
-        <li onClick={() => void chrome.runtime.openOptionsPage()}>
-          <a className="es-popup-settings">Settings (hover, click, dictionary)</a>
+        <li>
+          <button type="button" className="es-popup-menu-action" onClick={() => void chrome.runtime.openOptionsPage()}>
+            Open settings
+          </button>
         </li>
-        <li onClick={handleRequestPermissions}>
-          <a className="es-popup-kinopub">Enable on Kinopub</a>
-        </li>
+        {kinopubUrl && (
+          <li>
+            <button type="button" className="es-popup-menu-action es-popup-kinopub" onClick={handleRequestPermissions}>
+              Enable on Kinopub
+            </button>
+          </li>
+        )}
       </menu>
     </div>
   );

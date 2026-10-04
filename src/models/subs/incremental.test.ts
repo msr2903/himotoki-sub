@@ -32,7 +32,10 @@ describe("captions that arrive one cue at a time (#144)", () => {
     const splitBatches: number[] = [];
     const lookedUp: string[] = [];
     vi.stubGlobal("document", {
-      createElement: () => ({ innerHTML: "", get textContent() { return this.innerHTML; } }),
+      createElement: () => {
+        const content = { textContent: "", querySelectorAll: () => [] };
+        return { content, set innerHTML(html: string) { content.textContent = html; } };
+      },
     });
     vi.stubGlobal("chrome", {
       runtime: {
