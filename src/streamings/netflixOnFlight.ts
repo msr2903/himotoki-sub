@@ -2,6 +2,7 @@ import { esRenderSetings } from "@src/models/settings";
 import Service from "./service";
 import { parse } from "subtitle";
 import { esSubsChanged, rawSubsAdded } from "@src/models/subs";
+import { readCaptionParts, waitForElement, watchCaptionSource } from "./captionObserver";
 
 class NetflixOnFlight implements Service {
   name = "netflix";
@@ -18,24 +19,16 @@ class NetflixOnFlight implements Service {
   }
 
   public init(): void {
-    waitForElement(() => {
+    waitForElement(".player-timedtext", (subtitleSource) => {
       esSubsChanged("en");
-      const subtitleSource = document.querySelector(".player-timedtext");
       const videoElement = document.querySelector("video");
-      const subtitleObserver = new MutationObserver(() => {
-        const subtitleParts = subtitleSource.getElementsByClassName("player-timedtext-text-container");
-        const subtitleContent = [...subtitleParts].map((el) => getText(el)).join("\n");
-        const startTime = videoElement.currentTime;
-        const captions = [
-          {
-            start: startTime * 1000,
-            end: (startTime + 100) * 1000,
-            text: subtitleContent,
-          },
-        ];
-        rawSubsAdded(captions);
+      if (!videoElement) return;
+      watchCaptionSource({
+        source: subtitleSource,
+        read: () => readCaptionParts(subtitleSource, ".player-timedtext-text-container"),
+        currentTime: () => videoElement.currentTime,
+        emit: rawSubsAdded,
       });
-      subtitleObserver.observe(subtitleSource, { childList: true, subtree: true });
     });
   }
 
@@ -67,28 +60,6 @@ class NetflixOnFlight implements Service {
   public isOnFlight() {
     return true;
   }
-}
-
-function getText(node: ChildNode) {
-  if (node.nodeType === Node.TEXT_NODE) {
-    return node.textContent;
-  }
-  if (node.nodeName === "BR") {
-    return "\n";
-  }
-
-  const result = [...node.childNodes].map((el) => getText(el)).join("");
-  return result;
-}
-
-function waitForElement(callBack) {
-  window.setTimeout(function () {
-    if (document.querySelector(".player-timedtext")) {
-      callBack();
-    } else {
-      waitForElement(callBack);
-    }
-  }, 300);
 }
 
 export default NetflixOnFlight;

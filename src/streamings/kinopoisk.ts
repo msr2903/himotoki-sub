@@ -3,9 +3,14 @@ import Service from "./service";
 import { parse } from "subtitle";
 import { esSubsChanged, rawSubsAdded } from "@src/models/subs";
 import { $video } from "@src/models/videos";
+import { readCaptionParts, waitForElement, watchCaptionSource } from "./captionObserver";
 
 class Kinopoisk implements Service {
   name = "kinopoisk";
+
+  /** Bumped per video; a wait or observer started for an earlier video is no longer current. */
+  private generation = 0;
+  private stopCaptions: (() => void) | null = null;
 
   constructor() {
     waitForElement('[data-tid="SettingPopupButton"]', () => {
@@ -15,32 +20,23 @@ class Kinopoisk implements Service {
 
   public init(): void {
     $video.watch((video) => {
-      if (video) {
-        esSubsChanged("en");
-
-        waitForElement('div[data-tid="SubtitlesPortalRoot"]', () => {
-          const subtitleSource = document.querySelector('div[data-tid="SubtitlesPortalRoot"]');
-          const videoElement = document.querySelector("video");
-          const subtitleObserver = new MutationObserver(() => {
-            const subtitleParts = subtitleSource.querySelectorAll("div[class*='Subtitles_text']");
-            console.log("subtitleSource", subtitleSource);
-            console.log("subtitleParts", subtitleParts);
-
-            const subtitleContent = [...subtitleParts].map((el) => getText(el)).join("\n");
-            console.log("subtitleContent", subtitleContent);
-            const startTime = videoElement.currentTime;
-            const captions = [
-              {
-                start: startTime * 1000,
-                end: (startTime + 100) * 1000,
-                text: subtitleContent,
-              },
-            ];
-            rawSubsAdded(captions);
+      this.stopCaptions?.();
+      this.stopCaptions = null;
+      const generation = ++this.generation;
+      if (!video) return;
+      esSubsChanged("en");
+      waitForElement(
+        'div[data-tid="SubtitlesPortalRoot"]',
+        (subtitleSource) => {
+          this.stopCaptions = watchCaptionSource({
+            source: subtitleSource,
+            read: () => readCaptionParts(subtitleSource, "div[class*='Subtitles_text']"),
+            currentTime: () => video.currentTime,
+            emit: rawSubsAdded,
           });
-          subtitleObserver.observe(subtitleSource, { childList: true, subtree: true });
-        });
-      }
+        },
+        () => generation === this.generation,
+      );
     });
   }
 
@@ -69,28 +65,6 @@ class Kinopoisk implements Service {
   public isOnFlight() {
     return true;
   }
-}
-
-function getText(node: ChildNode) {
-  if (node.nodeType === Node.TEXT_NODE) {
-    return node.textContent;
-  }
-  if (node.nodeName === "BR") {
-    return "\n";
-  }
-
-  const result = [...node.childNodes].map((el) => getText(el)).join("");
-  return result;
-}
-
-function waitForElement(selector, callBack) {
-  window.setTimeout(function () {
-    if (document.querySelector(selector)) {
-      callBack();
-    } else {
-      waitForElement(selector, callBack);
-    }
-  }, 300);
 }
 
 export default Kinopoisk;

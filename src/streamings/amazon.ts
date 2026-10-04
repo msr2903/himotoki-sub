@@ -3,45 +3,43 @@ import Service from "./service";
 import { parse } from "subtitle";
 import { esSubsChanged, rawSubsAdded } from "@src/models/subs";
 import { $video } from "@src/models/videos";
+import { readCaptionParts, waitForElement, watchCaptionSource } from "./captionObserver";
 
 class Amazon implements Service {
   name = "amazon";
 
+  /** Bumped per video; a wait or observer started for an earlier video is no longer current. */
+  private generation = 0;
+  private stopCaptions: (() => void) | null = null;
+
   constructor() {
-    waitForElement("#dv-web-player video", () => {
-      esRenderSetings();
-    });
+    waitForElement("#dv-web-player video", () => esRenderSetings(), undefined, hasSource);
   }
 
   public init(): void {
     $video.watch((video) => {
+      // Each video owns one caption observer; the previous video's stops before anything else runs.
+      this.stopCaptions?.();
+      this.stopCaptions = null;
+      const generation = ++this.generation;
       if (!video) return;
-      waitForElement("#dv-web-player video, .tst-video-overlay-player-html5", () => {
-        esSubsChanged("en");
-        const subtitleSource = document.querySelector(".atvwebplayersdk-captions-overlay");
-        const videoElement = document.querySelector("video");
-        if (!subtitleSource || !videoElement) return;
-        // The observer fires on every DOM mutation; only emit when the caption text actually changes,
-        // otherwise every mutation appended another overlapping cue for the same line. A cleared
-        // caption still emits (empty text, zero length) so the previous cue's end is clamped and a
-        // repeated line after a gap is not swallowed by the de-dup.
-        let lastContent = "";
-        const subtitleObserver = new MutationObserver(() => {
-          const subtitleParts = subtitleSource.querySelectorAll(".atvwebplayersdk-captions-text");
-          const subtitleContent = [...subtitleParts].map((el) => getText(el)).join("\n").trim();
-          if (subtitleContent === lastContent) return;
-          lastContent = subtitleContent;
-          const startTime = videoElement.currentTime;
-          rawSubsAdded([
-            {
-              start: startTime * 1000,
-              end: subtitleContent ? (startTime + 100) * 1000 : startTime * 1000,
-              text: subtitleContent,
-            },
-          ]);
-        });
-        subtitleObserver.observe(subtitleSource, { childList: true, subtree: true });
-      });
+      const isCurrent = () => generation === this.generation;
+      waitForElement(
+        "#dv-web-player video, .tst-video-overlay-player-html5",
+        () => {
+          esSubsChanged("en");
+          const subtitleSource = document.querySelector(".atvwebplayersdk-captions-overlay");
+          if (!subtitleSource) return;
+          this.stopCaptions = watchCaptionSource({
+            source: subtitleSource,
+            read: () => readCaptionParts(subtitleSource, ".atvwebplayersdk-captions-text"),
+            currentTime: () => video.currentTime,
+            emit: rawSubsAdded,
+          });
+        },
+        isCurrent,
+        hasSource,
+      );
     });
   }
 
@@ -72,27 +70,6 @@ class Amazon implements Service {
   }
 }
 
-function getText(node: ChildNode) {
-  if (node.nodeType === Node.TEXT_NODE) {
-    return node.textContent;
-  }
-  if (node.nodeName === "BR") {
-    return "\n";
-  }
-
-  const result = [...node.childNodes].map((el) => getText(el)).join("");
-  return result;
-}
-
-function waitForElement(selector, callBack) {
-  window.setTimeout(function () {
-    const element = document.querySelector(selector);
-    if (element && element.src !== "") {
-      callBack();
-    } else {
-      waitForElement(selector, callBack);
-    }
-  }, 300);
-}
+const hasSource = (element: Element) => (element as HTMLMediaElement).src !== "";
 
 export default Amazon;
