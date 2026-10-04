@@ -2,14 +2,20 @@ import { Captions, TSub, TSubItem } from "@src/models/types";
 import { isPunctuationSurface } from "./himotokiTypes";
 import type { SplitResult } from "@src/split";
 
-/** Strip caption markup but keep line breaks (YouTube puts a kana reading line under the kanji line). */
+/**
+ * Strip caption markup but keep line breaks (YouTube puts a kana reading line under the kanji line)
+ * and decode entities. Captions are untrusted, so they are parsed into a <template>: its content
+ * belongs to an inert document, where <img onerror> and the like load nothing and run nothing (a
+ * detached <div> would). Script and style bodies are not caption text.
+ */
 const cleanCueText = (text: string): string => {
-  const tmpDiv = document.createElement("div");
-  tmpDiv.innerHTML = text
+  const template = document.createElement("template");
+  template.innerHTML = text
     .replace(/<\d+:\d+:\d+.\d+><c>/g, "")
     .replace(/<\/c>/g, "")
     .replace(/<br\s*\/?>/gi, "\n");
-  return (tmpDiv.textContent || "").replace(/\r\n?/g, "\n");
+  template.content.querySelectorAll("script, style").forEach((node) => node.remove());
+  return (template.content.textContent || "").replace(/\r\n?/g, "\n");
 };
 
 const KANJI_RE = /[一-鿿々〆ヶ]/;

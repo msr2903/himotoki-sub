@@ -27,6 +27,7 @@ try {
   // Let settings rehydrate before changing them.
   await page.waitForTimeout(200);
   await checkTranslationPerformance(page);
+  await checkCaptionMarkupIsInert();
   const checks = await page.evaluate(async () => {
     const { subs: s, settings: st, videos: v, translations: tr, $videoStats, knownKeyOf, replayVideoClip, cancelVideoClip } = window.audit;
     const check = (condition, label) => { if (!condition) throw new Error(label); passed.push(label); };
@@ -327,4 +328,43 @@ try {
 } finally {
   await ctx.close();
   fs.rmSync(temp, { recursive: true, force: true });
+}
+
+/**
+ * Caption markup is untrusted (#160): stripping it must not create live elements that load
+ * resources or run handlers. Runs the real converter on a plain, CSP-free page, since the
+ * extension page's CSP would block inline handlers whatever the converter does.
+ */
+async function checkCaptionMarkupIsInert() {
+  const bundle = await build({
+    stdin: {
+      contents: 'import { convertJapaneseSubsFallback } from "@src/utils/convertRawSubs"; window.convert = convertJapaneseSubsFallback;',
+      resolveDir: root,
+      loader: "ts",
+    },
+    bundle: true, write: false, format: "iife", platform: "browser", alias: { "@src": path.join(root, "src") },
+  });
+  const page = await ctx.newPage();
+  const probes = [];
+  await page.route("http://markup.test/**", (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === "/") return route.fulfill({ contentType: "text/html", body: '<meta charset="utf-8"><script src="/convert.js"></script>' });
+    if (url.pathname === "/convert.js") return route.fulfill({ contentType: "text/javascript", body: bundle.outputFiles[0].text });
+    probes.push(url.pathname);
+    return route.fulfill({ status: 404, body: "" });
+  });
+  await page.goto("http://markup.test/");
+  const result = await page.evaluate(async () => {
+    const handler = "window.markupHandlerRan = true";
+    const [cue] = window.convert([
+      { start: 0, end: 1000, text: `猫<img src="/probe.png" onerror="${handler}">です。<br>はい &amp; <i>いいえ</i><script>${handler}</script>` },
+    ]);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return { text: cue.items.map((item) => item.text).join(""), handlerRan: Boolean(window.markupHandlerRan) };
+  });
+  await page.close();
+  assert.deepEqual(probes, [], "Caption markup must not load resources");
+  assert.equal(result.handlerRan, false, "Caption markup must not run handlers");
+  assert.equal(result.text, "猫です。\nはい & いいえ", "Markup stripping keeps text, entities and line breaks");
+  console.log("PASS Caption markup is stripped without loading resources or running handlers");
 }
