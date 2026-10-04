@@ -256,6 +256,24 @@ try {
   assert.equal(await page.evaluate(() => window.settingsPanelCloses), 1, "Escape closes the settings panel");
   await page.evaluate(() => { window.audit.settings.activeSettingsTabChanged(0); window.unmountSettingsPanel(); });
   console.log("PASS In-player settings controls are keyboard buttons and Escape closes the panel");
+  // Custom subtitle uploads (#145, #156): the real file input, Blob reads and parser.
+  await page.evaluate(() => { window.audit.subs.resetSubs(""); window.unmountSettingsPanel = window.mountSettingsPanel(); });
+  await settingsDialog.getByRole("button", { name: "Subtitles", exact: true }).click();
+  const subsFile = settingsDialog.locator("input#file");
+  const upload = (name, text) => subsFile.setInputFiles({ name, mimeType: "text/plain", buffer: Buffer.from(text) });
+  const rawTexts = () => page.evaluate(() => window.audit.subs.$rawSubs.getState().map((cue) => cue.text).join(" | "));
+  await upload("good.srt", "1\n00:00:01,000 --> 00:00:02,000\n猫です\n\n2\n00:00:03,000 --> 00:00:04,000\nはい\n");
+  await page.waitForFunction(() => window.audit.subs.$rawSubs.getState().length === 2);
+  for (const [name, text] of [["empty.srt", ""], ["notes.txt", "hello\nno timestamps here"]]) {
+    await upload(name, text);
+    await page.waitForTimeout(200);
+    assert.equal(await rawTexts(), "猫です | はい", `${name} keeps the working track`);
+  }
+  await upload("good.srt", "1\n00:00:01,000 --> 00:00:02,000\n直した\n");
+  await page.waitForFunction(() => window.audit.subs.$rawSubs.getState()[0]?.text === "直した");
+  assert.equal(await rawTexts(), "直した", "The same file name can be selected again");
+  await page.evaluate(() => { window.audit.subs.resetSubs(""); window.audit.settings.activeSettingsTabChanged(0); window.unmountSettingsPanel(); });
+  console.log("PASS Custom subtitle uploads reject empty and non-subtitle files and keep the working track");
   // Exercise the shipped options page (hub + drill-in panels) with real extension storage and two open pages.
   const options = await ctx.newPage();
   options.on("pageerror", (e) => errors.push(String(e)));

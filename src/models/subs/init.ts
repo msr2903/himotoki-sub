@@ -1,4 +1,5 @@
 import { createStore, sample, split } from "effector";
+import { resync } from "subtitle";
 import {
   $currentSubs,
   $rawSubs,
@@ -172,14 +173,26 @@ sample({
 // NOT in this list: it carries a single incremental cue and is handled by the
 // append reducer below. (It used to be here too, and — running first — clobbered
 // $rawSubs with the lone cue, so the append handler never accumulated anything.)
-$rawSubs.on(
-  [currentSubsFetched.map(({ result }) => result), subsResyncFx.doneData, updateCustomSubsFx.doneData],
-  (oldSubs, subs) => (sameCaptions(oldSubs, subs) ? oldSubs : subs)
-);
+//
+// $rawSubs holds the delayed timeline, so captions that arrive while a delay is set get it too
+// (#122). Otherwise a reload or upload kept the delay label but dropped its offset, the next
+// adjustment applied only its difference, and secondary subtitles (which subtract the delay at
+// render time) drifted away from the primary ones.
+const withDelay = (subs: Captions, delaySeconds: number): Captions =>
+  delaySeconds ? resync(subs, delaySeconds * 1000) : subs;
+const freshTrack = sample({
+  clock: [currentSubsFetched.map(({ result }) => result), updateCustomSubsFx.doneData],
+  source: $subsDelay,
+  fn: (delay, subs) => withDelay(subs, delay),
+});
+$rawSubs.on([freshTrack, subsResyncFx.doneData], (oldSubs, subs) => (sameCaptions(oldSubs, subs) ? oldSubs : subs));
 
 // Services that surface captions one cue at a time (MutationObserver-driven:
 // Amazon/Plex/Kinopoisk/Udemy/in-flight Netflix) emit rawSubsAdded per cue; append them.
-$rawSubs.on(rawSubsAdded, appendRawSubs);
+$rawSubs.on(
+  sample({ clock: rawSubsAdded, source: $subsDelay, fn: (delay, subs) => withDelay(subs, delay) }),
+  appendRawSubs,
+);
 
 $rawSubs.reset(resetSubs);
 $sentenceOpen.reset(resetSubs);
@@ -326,7 +339,9 @@ $currentSubs.on([updateCurrentSubsFx.doneData, autoPauseFx.doneData], (oldSubs, 
   JSON.stringify(oldSubs) === JSON.stringify(subs) ? oldSubs : subs
 );
 
-$subsDelay.on(subsDelayChangeFx.doneData, (_, newSubsDelay) => newSubsDelay);
+// The delay syncs one video's captions: it carries over reloads and uploads, but clearing the
+// subtitles or a new video element starts again from 0, as media players reset it per file.
+$subsDelay.on(subsDelayChangeFx.doneData, (_, newSubsDelay) => newSubsDelay).reset(resetSubs, $video.updates);
 $subsTitle.on(esSubsChanged, (_, value) => value);
 $subsTitle.on(updateCustomSubsFx.doneData, () => ES_CUSTOM_SUB_LABEL);
 
