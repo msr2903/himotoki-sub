@@ -422,6 +422,7 @@ const NewWordsGlossary: FC<{
     <button
       type="button"
       className={cn("es-glossary__toggle", { "es-glossary__toggle--visible": controlsVisible })}
+      data-pointer-hold
       aria-pressed={lineShown}
       onClick={(event) => {
         event.stopPropagation();
