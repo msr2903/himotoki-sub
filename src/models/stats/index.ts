@@ -1,6 +1,7 @@
 import { combine } from "effector";
 import { $coverageKeys, $subs } from "../subs";
 import { $knownWords } from "../settings";
+import { ownEntry } from "@src/shared/ownEntry";
 
 /** Live coverage stats for the loaded video, derived from resolved keys + the known-word set. */
 export const $videoStats = combine(
@@ -22,7 +23,7 @@ export const $videoStats = combine(
       let unresolved = false;
       for (const item of sub.items) {
         if (item.type !== "word") continue;
-        const key = keys[item.cleanedText || item.text];
+        const key = ownEntry(keys, item.cleanedText || item.text);
         if (key) cueKeys.add(key);
         else unresolved = true;
       }

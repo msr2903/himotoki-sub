@@ -1,12 +1,56 @@
-import { sample } from "effector";
+import { createStore, sample } from "effector";
 
-import { fetchWordTranslationFx } from "@src/models/translations";
+import { $lookups, fetchWordTranslationFx, lookupKeyOf, lookupVisited } from "@src/models/translations";
+import type { TWordTranslation } from "@src/models/types";
 import { $video } from "@src/models/videos";
+import { ownEntry } from "@src/shared/ownEntry";
 import { TLookupHistoryItem, historyItemFromTranslation, lookupRecorded } from ".";
 
-// Record every resolved lookup, remembering the video position so the panel can jump back to it.
-const lookupHistoryCandidate = sample({
+const usable = (tx: TWordTranslation | undefined): tx is TWordTranslation =>
+  Boolean(tx && !tx.error && tx.lookupSource !== "none");
+
+// A visit is recorded as soon as its result is known: immediately on a cache hit, otherwise when the
+// lookup it is waiting for resolves. Keys visited before their result arrived wait here.
+const $awaitingVisit = createStore<Record<string, true>>({});
+
+const visit = sample({
+  clock: lookupVisited,
+  source: $lookups,
+  fn: (lookups, payload) => {
+    const key = lookupKeyOf(payload);
+    const cached = ownEntry(lookups, key);
+    return { key, cached: usable(cached) ? cached : null };
+  },
+});
+const cachedVisit = sample({
+  clock: visit,
+  filter: (v): v is { key: string; cached: TWordTranslation } => Boolean(v.key) && v.cached !== null,
+  fn: (v) => v.cached,
+});
+const awaitedVisitSettled = sample({
   clock: fetchWordTranslationFx.doneData,
+  source: $awaitingVisit,
+  filter: (awaiting, tx) => Boolean(ownEntry(awaiting, tx.source)),
+  fn: (_, tx) => tx,
+});
+// Only a usable result is recorded, as for a cache hit; a word with no entry is not a lookup to return to.
+const awaitedVisitResolved = sample({ clock: awaitedVisitSettled, filter: (tx) => usable(tx) });
+const stopWaiting = (awaiting: Record<string, true>, key: string) => {
+  if (!ownEntry(awaiting, key)) return awaiting;
+  const copy = { ...awaiting };
+  delete copy[key];
+  return copy;
+};
+// Every settled lookup ends its wait, failures included, so a later passive lookup of the same word
+// (furigana, colouring) is not taken for the visit.
+$awaitingVisit
+  .on(visit, (awaiting, { key, cached }) => (!key || cached ? awaiting : { ...awaiting, [key]: true }))
+  .on(awaitedVisitSettled, (awaiting, tx) => stopWaiting(awaiting, tx.source))
+  .on(fetchWordTranslationFx.fail, (awaiting, { params }) => stopWaiting(awaiting, params.source));
+
+// Record the visit with the current page and video position so the panel can jump back to it.
+const lookupHistoryCandidate = sample({
+  clock: [cachedVisit, awaitedVisitResolved],
   source: $video,
   fn: (video, translation) =>
     historyItemFromTranslation(

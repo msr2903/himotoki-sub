@@ -109,7 +109,8 @@ export const computeCoverageFx = createEffect<TSub[], Record<string, string | nu
   }
   const list = [...surfaces];
   if (!list.length) return {};
-  const map: Record<string, string | null> = {};
+  // Prototype-free: a surface like "__proto__" or "constructor" is an ordinary key here.
+  const map: Record<string, string | null> = Object.create(null);
   // Yield between batches so large videos do not monopolize the dictionary worker.
   for (let offset = 0; offset < list.length; offset += 64) {
     const batch = list.slice(offset, offset + 64);

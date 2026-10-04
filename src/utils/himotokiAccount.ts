@@ -83,6 +83,38 @@ export class SignInRequiredError extends Error {
   }
 }
 
+/** The account signed in or out while an operation was running; its work was discarded. */
+export class AccountChangedError extends Error {
+  constructor(message = "Your Himotoki account changed while saving. Try again.") {
+    super(message);
+    this.name = "AccountChangedError";
+  }
+}
+
+/** Token-refresh error codes that mean the session itself is no longer valid. */
+const INVALID_SESSION_CODES = new Set([
+  "TOKEN_EXPIRED",
+  "USER_DISABLED",
+  "USER_NOT_FOUND",
+  "INVALID_REFRESH_TOKEN",
+  "MISSING_REFRESH_TOKEN",
+  "INVALID_GRANT_TYPE",
+  "invalid_grant",
+]);
+
+/**
+ * True only for refresh failures that revoke the session (revoked/expired token, disabled or
+ * deleted user). Rate limits (429), server errors and configuration problems (bad API key,
+ * project mismatch) keep the session so a later refresh can succeed without signing in again.
+ */
+export function isInvalidSessionError(error: unknown): boolean {
+  if (!(error instanceof HimotokiApiError)) return false;
+  if (error.status !== 400 && error.status !== 401) return false;
+  // Firebase messages look like "TOKEN_EXPIRED" or "USER_DISABLED : details".
+  const code = error.message.split(/[\s:]/, 1)[0];
+  return INVALID_SESSION_CODES.has(code) || INVALID_SESSION_CODES.has(error.statusText);
+}
+
 function isSession(value: unknown): value is HimotokiSession {
   if (typeof value !== "object" || value === null) return false;
   const { uid, idToken, refreshToken, expiresAt } = value as Record<string, unknown>;
@@ -103,9 +135,14 @@ export function sessionUser(session: HimotokiSession): HimotokiUser {
   };
 }
 
+/** The account an operation started under; every later step must still match it. */
+type Binding = { uid: string; generation: number };
+
 export function createHimotokiAccount(deps: HimotokiAccountDeps) {
   const now = deps.now ?? (() => Date.now());
-  let refreshing: Promise<HimotokiSession> | null = null;
+  /** Bumped on every sign-in/sign-out so in-flight work from the old session is discarded. */
+  let generation = 0;
+  let refreshing: { refreshToken: string; generation: number; promise: Promise<HimotokiSession> } | null = null;
 
   async function callGoogleApi<T>(url: string, init: RequestInit): Promise<T> {
     const response = await deps.fetch(url, { ...init, cache: "no-store", credentials: "omit" });
@@ -141,7 +178,24 @@ export function createHimotokiAccount(deps: HimotokiAccountDeps) {
     return isSession(value) ? value : null;
   }
 
-  async function refresh(session: HimotokiSession): Promise<HimotokiSession> {
+  /** The stored session, if it still belongs to `binding`; otherwise the operation is stale. */
+  async function currentSession(binding: Binding): Promise<HimotokiSession> {
+    if (binding.generation !== generation) throw new AccountChangedError();
+    const session = await storedSession();
+    if (binding.generation !== generation) throw new AccountChangedError();
+    if (!session) throw new SignInRequiredError();
+    if (session.uid !== binding.uid) throw new AccountChangedError();
+    return session;
+  }
+
+  /** True while `session` (same refresh token) is still the stored, current one. */
+  async function isStillStored(session: HimotokiSession, gen: number): Promise<boolean> {
+    if (gen !== generation) return false;
+    const stored = await storedSession();
+    return gen === generation && stored?.uid === session.uid && stored.refreshToken === session.refreshToken;
+  }
+
+  async function refresh(session: HimotokiSession, gen: number): Promise<HimotokiSession> {
     let response: { id_token: string; refresh_token: string; expires_in: string };
     try {
       response = await callGoogleApi(`https://securetoken.googleapis.com/v1/token?key=${deps.apiKey}`, {
@@ -150,61 +204,78 @@ export function createHimotokiAccount(deps: HimotokiAccountDeps) {
         body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: session.refreshToken }).toString(),
       });
     } catch (error) {
-      if (error instanceof HimotokiApiError && error.status >= 400 && error.status < 500) {
+      // A newer sign-in/out happened meanwhile: never touch the session that replaced this one.
+      if (!(await isStillStored(session, gen))) throw new AccountChangedError();
+      if (isInvalidSessionError(error)) {
         // Revoked or expired: drop the session so the popup offers sign-in again.
+        generation += 1;
         await deps.storage.remove();
         throw new SignInRequiredError("Your Himotoki sign-in expired. Sign in again from the extension popup.");
       }
+      if (error instanceof HimotokiApiError && error.status === 429) {
+        throw new Error("Himotoki sign-in is busy right now. Try again in a moment.");
+      }
       throw error;
     }
+    if (!(await isStillStored(session, gen))) throw new AccountChangedError();
     const next: HimotokiSession = {
       ...session,
       idToken: response.id_token,
       refreshToken: response.refresh_token,
       expiresAt: now() + Number(response.expires_in) * 1000,
     };
+    // Re-check synchronously: a sign-in/out may have run while isStillStored resolved.
+    if (gen !== generation) throw new AccountChangedError();
     await deps.storage.set(next);
     return next;
   }
 
-  /** A session with an unexpired ID token; concurrent callers share one refresh. */
-  async function activeSession(): Promise<HimotokiSession> {
-    const session = await storedSession();
-    if (!session) throw new SignInRequiredError();
+  /** A session of `binding`'s account with an unexpired ID token; concurrent callers share one refresh. */
+  async function activeSession(binding: Binding): Promise<HimotokiSession> {
+    const session = await currentSession(binding);
     if (session.expiresAt - now() > TOKEN_REFRESH_MARGIN_MS) return session;
-    if (!refreshing) {
-      refreshing = refresh(session).finally(() => {
-        refreshing = null;
-      });
+    if (!refreshing || refreshing.refreshToken !== session.refreshToken || refreshing.generation !== generation) {
+      const entry = {
+        refreshToken: session.refreshToken,
+        generation,
+        promise: refresh(session, generation).finally(() => {
+          if (refreshing === entry) refreshing = null;
+        }),
+      };
+      refreshing = entry;
     }
-    return refreshing;
+    const next = await refreshing.promise;
+    if (binding.generation !== generation || next.uid !== binding.uid) throw new AccountChangedError();
+    return next;
   }
 
   function documentUrl(uid: string): string {
     return `https://firestore.googleapis.com/v1/projects/${deps.projectId}/databases/(default)/documents/saved/${encodeURIComponent(uid)}`;
   }
 
-  async function readSaved(): Promise<{ blob: SavedBlob; updateTime: string | null }> {
-    const { uid, idToken } = await activeSession();
+  async function readSaved(binding: Binding): Promise<{ blob: SavedBlob; updateTime: string | null }> {
+    const { uid, idToken } = await activeSession(binding);
+    let result: { blob: SavedBlob; updateTime: string | null };
     try {
       const document = await callGoogleApi<{ fields?: FirestoreFields; updateTime?: string }>(documentUrl(uid), {
         headers: { Authorization: `Bearer ${idToken}` },
       });
-      return {
+      result = {
         blob: toSavedBlob(decodeFirestoreFields(document.fields ?? {}), now()),
         updateTime: document.updateTime ?? null,
       };
     } catch (error) {
-      if (error instanceof HimotokiApiError && error.status === 404) {
-        return { blob: createEmptySavedBlob(now()), updateTime: null };
-      }
-      throw error;
+      if (!(error instanceof HimotokiApiError && error.status === 404)) throw error;
+      result = { blob: createEmptySavedBlob(now()), updateTime: null };
     }
+    // The account may have changed while the read was in flight.
+    await currentSession(binding);
+    return result;
   }
 
   /** Replaces the document only if it is unchanged since `updateTime` (or still absent). */
-  async function writeSaved(blob: SavedBlob, updateTime: string | null): Promise<void> {
-    const { uid, idToken } = await activeSession();
+  async function writeSaved(binding: Binding, blob: SavedBlob, updateTime: string | null): Promise<void> {
+    const { uid, idToken } = await activeSession(binding);
     const url = new URL(documentUrl(uid));
     if (updateTime === null) url.searchParams.set("currentDocument.exists", "false");
     else url.searchParams.set("currentDocument.updateTime", updateTime);
@@ -283,11 +354,13 @@ export function createHimotokiAccount(deps: HimotokiAccountDeps) {
         refreshToken: response.refreshToken,
         expiresAt: now() + Number(response.expiresIn) * 1000,
       };
+      generation += 1;
       await deps.storage.set(session);
       return sessionUser(session);
     },
 
     async signOut(): Promise<void> {
+      generation += 1;
       await deps.storage.remove();
     },
 
@@ -297,11 +370,17 @@ export function createHimotokiAccount(deps: HimotokiAccountDeps) {
      * word saved at the same moment on the website is never overwritten.
      */
     async addFavorite(input: FavoriteInput): Promise<{ added: boolean }> {
+      // Bind the whole operation, retries included, to the account that was signed in when it began.
+      const gen = generation;
+      const origin = await storedSession();
+      if (gen !== generation) throw new AccountChangedError();
+      if (!origin) throw new SignInRequiredError();
+      const binding: Binding = { uid: origin.uid, generation: gen };
       for (let attempt = 1; ; attempt += 1) {
-        const { blob, updateTime } = await readSaved();
+        const { blob, updateTime } = await readSaved(binding);
         const result = upsertFavorite(blob, input, now());
         try {
-          await writeSaved(result.blob, updateTime);
+          await writeSaved(binding, result.blob, updateTime);
           return { added: result.added };
         } catch (error) {
           if (error instanceof ConflictError && attempt < MAX_WRITE_ATTEMPTS) continue;

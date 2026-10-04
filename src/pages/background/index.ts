@@ -9,6 +9,12 @@ import {
   HIMOTOKI_FIREBASE_PROJECT_ID,
 } from "@src/shared/himotokiConfig";
 import { resolveEndpoint } from "@src/shared/runtimeConfig";
+import {
+  WORD_STATUS_OP_MESSAGE,
+  chromeWordStatusStorage,
+  createWordStatusMutator,
+  isWordStatusOp,
+} from "@src/shared/wordStatusOps";
 
 /** Firebase session for Save to Himotoki (see utils/himotokiAccount.ts). */
 const HIMOTOKI_SESSION_KEY = "himotokiSession";
@@ -33,6 +39,9 @@ const himotokiAccount = createHimotokiAccount({
   launchAuthFlow: (url) => chrome.identity.launchWebAuthFlow({ url, interactive: true }),
   redirectUrl: chrome.identity?.getRedirectURL?.() ?? "",
 });
+
+/** Single owner of word-status writes, so edits from every tab are applied one at a time. */
+const applyWordStatusOp = createWordStatusMutator(chromeWordStatusStorage);
 
 export type DictManifest = { name?: string; revision?: string; sha256?: string; bytes?: number; gzipBytes?: number; title?: string };
 
@@ -162,6 +171,7 @@ const HANDLED_MESSAGE_TYPES = new Set([
   "himotokiSignOut",
   "himotokiGetSession",
   "himotokiAddFavorite",
+  WORD_STATUS_OP_MESSAGE,
   "post",
 ]);
 
@@ -277,6 +287,17 @@ chrome.runtime.onMessage.addListener(function (message, _sender, sendResponse) {
         });
       }
     })();
+  }
+
+  if (message.type === WORD_STATUS_OP_MESSAGE) {
+    if (!isWordStatusOp(message.op)) {
+      sendResponse({ ok: false, error: "Invalid word status operation" });
+    } else {
+      applyWordStatusOp(message.op).then(
+        () => sendResponse({ ok: true }),
+        (error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) }),
+      );
+    }
   }
 
   // Generic JSON POST used by the Anki (AnkiConnect) learning service.

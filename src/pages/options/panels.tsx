@@ -24,6 +24,7 @@ import {
 } from "@src/shared/labelSettings";
 import { DEFAULT_DIM_KNOWN, DIM_KNOWN_SETTING, KNOWN_WORDS_SETTING } from "@src/shared/knownWords";
 import { WORD_STATUSES_SETTING } from "@src/shared/wordStatus";
+import { sendWordStatusOp } from "@src/shared/wordStatusOps";
 import {
   ANKI_CARD_THEME_OPTIONS,
   ANKI_CARD_THEME_SETTING,
@@ -227,8 +228,8 @@ export const DictionaryView: FC = () => (
 );
 
 export const DataPanel: FC = () => {
-  const [knownWords, setKnownWords] = usePersistedSetting<string[]>(KNOWN_WORDS_SETTING, [], isStringArray);
-  const [statuses, setStatuses] = usePersistedSetting<Record<string, string>>(WORD_STATUSES_SETTING, {}, isStringRecord);
+  const [knownWords] = usePersistedSetting<string[]>(KNOWN_WORDS_SETTING, [], isStringArray);
+  const [statuses] = usePersistedSetting<Record<string, string>>(WORD_STATUSES_SETTING, {}, isStringRecord);
   const [history, setHistory] = usePersistedSetting<unknown[]>(LOOKUP_HISTORY_SETTING, [], Array.isArray);
 
   const knownCount = countKnown(knownWords, statuses);
@@ -247,12 +248,9 @@ export const DataPanel: FC = () => {
           <ConfirmButton
             label="Forget all"
             disabled={knownCount === 0}
-            onConfirm={() => {
-              setKnownWords([]);
-              // "known" entries in the status map win over the legacy array, so they must be
-              // cleared too — otherwise forgotten words stay Known.
-              setStatuses(Object.fromEntries(Object.entries(statuses).filter(([, s]) => s !== "known")));
-            }}
+            // Clears the legacy array and "known" statuses together, applied to the latest stored
+            // value by the background so a word marked in a video tab meanwhile is not lost.
+            onConfirm={() => void sendWordStatusOp({ kind: "forgetKnown" })}
           />
         </Item>
         <Item

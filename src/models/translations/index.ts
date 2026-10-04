@@ -9,6 +9,7 @@ import {
   himotokiTokenToWordTranslation,
   type HimotokiToken,
 } from "@src/utils/himotokiTypes";
+import { ownEntry } from "@src/shared/ownEntry";
 
 /* ---------- Word lookup cache (Himotoki dictionary) ---------- */
 
@@ -16,6 +17,12 @@ import {
 export const $lookups = createStore<Record<string, TWordTranslation>>({});
 export const $lookupPendings = createStore<Record<string, boolean>>({});
 export const lookupRequested = createEvent<TSubItem | string>();
+/**
+ * The user hovered or clicked a word to see it (a hover/click action opened its label or pop-up).
+ * Recorded in Recent lookups even when the result is cached; passive lookups (always-on furigana,
+ * status colouring, coverage) never fire it.
+ */
+export const lookupVisited = createEvent<TSubItem | string>();
 
 export const lookupKeyOf = (payload: TSubItem | string): string =>
   typeof payload === "string" ? payload : payload.cleanedText || payload.text;
@@ -36,6 +43,12 @@ export const checkDictReadyFx = createEffect<void, boolean>(async () => {
 });
 
 $dictReady.on(checkDictReadyFx.doneData, (_, ready) => ready);
+
+/**
+ * Bumped by every dictionary status reply. A word lookup started before the latest reply must not
+ * infer readiness from its (older) result, e.g. restore "ready" after a newer reply said "missing".
+ */
+export const $dictStatusEpoch = createStore(0).on(checkDictReadyFx.doneData, (epoch) => epoch + 1);
 
 /* ---------- Token interaction state ---------- */
 
@@ -99,7 +112,11 @@ const lookupLocal = async (source: string): Promise<TWordTranslation | null> => 
   return translation;
 };
 
-export const fetchWordTranslationFx = createEffect<{ source: string }, TWordTranslation>(async ({ source }) => {
+export const fetchWordTranslationFx = createEffect<
+  /** `dictEpoch`: $dictStatusEpoch when the lookup started (see the readiness inference below). */
+  { source: string; dictEpoch?: number },
+  TWordTranslation
+>(async ({ source }) => {
   try {
     const local = await lookupLocal(source);
     if (local) return { ...local, source };
@@ -114,16 +131,16 @@ export const fetchWordTranslationFx = createEffect<{ source: string }, TWordTran
 
 sample({
   clock: lookupRequested,
-  source: { lookups: $lookups, pendings: $lookupPendings },
+  source: { lookups: $lookups, pendings: $lookupPendings, dictEpoch: $dictStatusEpoch },
   filter: ({ lookups, pendings }, payload) => {
     const key = lookupKeyOf(payload);
-    if (!key || pendings[key]) return false;
-    const cached = lookups[key];
+    if (!key || ownEntry(pendings, key)) return false;
+    const cached = ownEntry(lookups, key);
     // A "none" result means the dictionary was not installed at lookup time — retry on the
     // next request instead of caching the install hint forever.
     return !cached || Boolean(cached.error) || cached.lookupSource === "none";
   },
-  fn: (_, payload) => ({ source: lookupKeyOf(payload) }),
+  fn: ({ dictEpoch }, payload) => ({ source: lookupKeyOf(payload), dictEpoch }),
   target: fetchWordTranslationFx,
 });
 
@@ -131,8 +148,15 @@ $lookups.on(fetchWordTranslationFx.doneData, (all, translation) => ({ ...all, [t
 // Dictionary installs/updates/removals flip $dictReady; cached entries resolved under the
 // old availability (install hints, or entries from a removed dictionary) are invalidated.
 $lookups.reset($dictReady.updates);
-// Any resolved lookup tells us for free whether the local dictionary is currently serving.
-$dictReady.on(fetchWordTranslationFx.doneData, (ready, translation) =>
+// Any resolved lookup tells us for free whether the local dictionary is currently serving — unless
+// a newer status reply arrived while it was in flight.
+const currentLookupDone = sample({
+  clock: fetchWordTranslationFx.done,
+  source: $dictStatusEpoch,
+  filter: (epoch, { params }) => params.dictEpoch === undefined || params.dictEpoch === epoch,
+  fn: (_, { result }) => result,
+});
+$dictReady.on(currentLookupDone, (ready, translation) =>
   translation.lookupSource === "local" ? true : translation.lookupSource === "none" ? false : ready,
 );
 $lookupPendings.on(fetchWordTranslationFx, (pendings, { source }) => ({ ...pendings, [source]: true }));
@@ -189,8 +213,8 @@ sample({
   },
   filter: ({ translations, pendings }, source) => {
     const key = source.trim();
-    if (!key || pendings[key]) return false;
-    const cached = translations[key];
+    if (!key || ownEntry(pendings, key)) return false;
+    const cached = ownEntry(translations, key);
     return !cached || Boolean(cached.error);
   },
   fn: ({ language, translationService, deeplApiKey, generation }, source) => ({
