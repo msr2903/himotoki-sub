@@ -1,5 +1,7 @@
 import { AccountPanel } from "@src/pages/shared/AccountPanel";
 import { DictionaryPanel } from "@src/pages/shared/DictionaryPanel";
+import { useEffect, useState } from "react";
+import { originMatchPattern } from "@src/shared/runtimeConfig";
 
 async function getTab() {
   const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
@@ -7,12 +9,27 @@ async function getTab() {
 }
 
 const Popup = () => {
+  const [kinopubUrl, setKinopubUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    void getTab().then((tab) => {
+      if (!tab?.url) return;
+      try {
+        const host = new URL(tab.url).hostname;
+        if (["kinopub.net", "kino.pub", "kinopub.cc"].includes(host)) setKinopubUrl(tab.url);
+      } catch {
+        // Browser internal tabs do not have a supported site URL.
+      }
+    });
+  }, []);
+
   const handleRequestPermissions = async () => {
     const tab = await getTab();
-    if (!tab?.url || tab.id == null) return;
+    if (!tab?.url || tab.id == null || !kinopubUrl) return;
+    const origin = originMatchPattern(tab.url);
+    if (!origin) return;
     const isGranted = await chrome.permissions.request({
-      permissions: ["scripting", "storage", "activeTab"],
-      origins: [tab.url],
+      origins: [origin],
     });
     if (isGranted) {
       chrome.tabs.reload(tab.id);
@@ -37,12 +54,18 @@ const Popup = () => {
       </section>
 
       <menu>
-        <li onClick={() => void chrome.runtime.openOptionsPage()}>
-          <a className="es-popup-settings">Settings (hover, click, dictionary)</a>
+        <li>
+          <button type="button" className="es-popup-menu-action" onClick={() => void chrome.runtime.openOptionsPage()}>
+            Open settings
+          </button>
         </li>
-        <li onClick={handleRequestPermissions}>
-          <a className="es-popup-kinopub">Enable on Kinopub</a>
-        </li>
+        {kinopubUrl && (
+          <li>
+            <button type="button" className="es-popup-menu-action es-popup-kinopub" onClick={handleRequestPermissions}>
+              Enable on Kinopub
+            </button>
+          </li>
+        )}
       </menu>
     </div>
   );

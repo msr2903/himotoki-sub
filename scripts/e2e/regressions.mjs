@@ -314,6 +314,9 @@ try {
   const popup = await ctx.newPage();
   popup.on("pageerror", (e) => errors.push(String(e)));
   await popup.goto(`chrome-extension://${new URL(sw.url()).host}/src/pages/popup/index.html`);
+  await popup.getByRole("button", { name: "Open settings" }).waitFor();
+  assert.equal(await popup.getByRole("button", { name: "Enable on Kinopub" }).count(), 0);
+  console.log("PASS Popup menu uses keyboard buttons and hides unrelated site permissions");
   await popup.waitForFunction(() => document.documentElement.dataset.hmTheme === "light");
   await options.locator("#theme").getByRole("radio", { name: "Dark" }).click();
   await popup.waitForFunction(() => document.documentElement.dataset.hmTheme === "dark");
