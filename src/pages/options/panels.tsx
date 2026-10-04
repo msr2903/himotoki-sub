@@ -42,7 +42,7 @@ import { DEFAULT_MOUSE_ACTION, MOUSE_ACTIONS, MOUSE_BUTTONS, isMouseAction } fro
 import { DEFAULT_PITCH_DISPLAY, PITCH_DISPLAY_OPTIONS, PITCH_DISPLAY_SETTING, isPitchDisplay, type TPitchDisplay } from "@src/shared/pitchSettings";
 import { DEFAULT_NEW_WORDS_LEVEL, NEW_WORDS_LEVEL_OPTIONS, NEW_WORDS_LEVEL_SETTING, isNewWordsLevel, type TNewWordsLevel } from "@src/shared/newWordsOnly";
 import { LOOKUP_HISTORY_SETTING } from "@src/shared/lookupHistory";
-import { buildRows, toCsv, toJson } from "@src/shared/exportWords";
+import { buildRows, headwordsBySeqKey, headwordsFromHistory, seqsToResolve, toCsv, toJson } from "@src/shared/exportWords";
 import { DictionaryPanel } from "@src/pages/shared/DictionaryPanel";
 import { Card, ChipsRow, ConfirmButton, Item, SelectRow, StepperRow, TextRow, ToggleRow } from "./controls";
 import { isBool, isFiniteNumber, isString, usePersistedSetting, useRawStringSetting } from "./hooks";
@@ -234,8 +234,21 @@ export const DataPanel: FC = () => {
 
   const knownCount = countKnown(knownWords, statuses);
   const exportCount = new Set([...knownWords, ...Object.keys(statuses)]).size;
-  const exportWords = (format: "json" | "csv") => {
-    const rows = buildRows(knownWords, statuses);
+  const exportWords = async (format: "json" | "csv") => {
+    // Dictionary words are stored by sequence ID; resolve their headwords from the lookup history,
+    // then from the offline dictionary. Rows it cannot resolve carry an explanatory note.
+    const keys = [...new Set([...knownWords, ...Object.keys(statuses)])];
+    const headwords = headwordsFromHistory(history);
+    const seqs = seqsToResolve(keys, headwords);
+    if (seqs.length) {
+      try {
+        const resp = await chrome.runtime.sendMessage({ type: "himotokiHeadwords", seqs });
+        if (resp?.ok && resp.data?.available) Object.assign(headwords, headwordsBySeqKey(resp.data.headwords));
+      } catch {
+        // Dictionary unavailable: export what is known.
+      }
+    }
+    const rows = buildRows(knownWords, statuses, headwords);
     const today = new Date().toISOString().slice(0, 10);
     if (format === "json") downloadText(`himotoki-words-${today}.json`, toJson(rows), "application/json");
     else downloadText(`himotoki-words-${today}.csv`, toCsv(rows), "text/csv");
@@ -272,10 +285,10 @@ export const DataPanel: FC = () => {
           }
         >
           <span className="pills">
-            <button type="button" className="pill" disabled={exportCount === 0} onClick={() => exportWords("json")}>
+            <button type="button" className="pill" disabled={exportCount === 0} onClick={() => void exportWords("json")}>
               JSON
             </button>
-            <button type="button" className="pill" disabled={exportCount === 0} onClick={() => exportWords("csv")}>
+            <button type="button" className="pill" disabled={exportCount === 0} onClick={() => void exportWords("csv")}>
               CSV
             </button>
           </span>

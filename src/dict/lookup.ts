@@ -45,6 +45,8 @@ export type DictEntry = {
   freq?: number;
   jlpt?: string[];
   examples?: Array<Record<string, unknown>>;
+  /** The dictionary's main (top-scored) spelling is kana, e.g. コーヒー over 珈琲: show and save the kana. */
+  usually_kana?: boolean;
   _vs_compound?: boolean;
   _vs_lemma?: string;
 };
@@ -275,6 +277,10 @@ function groupTermsToEntry(rows: TermRow[], entryKeyNum: number): DictEntry | nu
     score: maxScore,
   };
   if (forms.length) entry.forms = forms;
+  // Same contract as the Himotoki API's usually_kana: when the entry's top-scored spelling is kana
+  // (コーヒー 200 vs 珈琲 99), the kana is the headword and the kanji are other forms.
+  const topRow = rows.reduce((a, b) => (Number(b.score || 0) > Number(a.score || 0) ? b : a));
+  if (expressions.length && !KANJI_RE.test(String(topRow.expression))) entry.usually_kana = true;
   if (pitch.length) {
     entry.pitch = pitch;
     entry.pitch_display = pitch.map(String).join("/");

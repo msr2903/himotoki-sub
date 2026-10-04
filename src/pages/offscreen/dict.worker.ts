@@ -8,6 +8,7 @@ import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
 import { Dictionary, type LookupResult } from "@src/dict/lookup";
 import { Sha256 } from "@src/dict/sha256";
 import { classifyDictHeader, readStreamHeader, replayStream } from "@src/dict/download";
+import { entryHeadword } from "@src/utils/himotokiTypes";
 
 type DictState = "booting" | "missing" | "downloading" | "importing" | "ready" | "error";
 
@@ -456,7 +457,7 @@ async function remove(): Promise<void> {
   await removing;
 }
 
-type Request = { id: number; op: string; url?: string; expectedSha256?: string; expectedRevision?: string; surface?: string; surfaces?: string[]; cues?: string[][]; seq?: number };
+type Request = { id: number; op: string; url?: string; expectedSha256?: string; expectedRevision?: string; surface?: string; surfaces?: string[]; cues?: string[][]; seq?: number; seqs?: number[] };
 
 self.onmessage = async (event: MessageEvent<Request>) => {
   const msg = event.data;
@@ -484,6 +485,20 @@ self.onmessage = async (event: MessageEvent<Request>) => {
           return;
         }
         reply(true, { available: true, forms: dict.getEntryConjugations(Number(msg.seq)) });
+        return;
+      }
+      case "headwords": {
+        // Headwords for stored sequence keys (saved-word export).
+        if (!dict) {
+          reply(true, { available: false });
+          return;
+        }
+        const headwords: Record<string, string> = {};
+        for (const seq of msg.seqs ?? []) {
+          const headword = entryHeadword(dict.getEntry(Number(seq)));
+          if (headword) headwords[String(seq)] = headword;
+        }
+        reply(true, { available: true, headwords });
         return;
       }
       case "lookup": {
