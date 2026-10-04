@@ -177,6 +177,9 @@ try {
   await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-sub").length === 1);
   await page.getByRole("button", { name: "Hide line" }).click();
   await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-sub").length === 0);
+  // The chip stays under a resting pointer instead of vanishing (and dropping clicks) after the idle time.
+  await page.waitForTimeout(2600);
+  assert.equal(await chipShown(), true, "Show line stays up while the pointer rests on it");
   // A word the glossary missed: show the line, mark the word Learning, and it joins the glossary.
   await page.getByRole("button", { name: "Show line" }).click();
   await page.waitForFunction(() => document.querySelectorAll("#es-subs .es-sub").length === 1);
