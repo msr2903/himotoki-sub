@@ -38,10 +38,18 @@ const isSubsequence = (sub: string, full: string): boolean => {
  * so the kanji line's own kana must appear, in order, within the reading line, and the reading line
  * must add kana (the kanji readings) on top. This rejects unrelated two-line dialogue that merely
  * happens to have a kana-only second line.
+ *
+ * A kanji line with no kana of its own (何？) gives no such evidence: any kana line would pass, so a
+ * second speaker (何？\nはい。) would be hidden. Such a line counts only with `trustKanjiOnly` (the
+ * track has verified reading lines elsewhere), and then still needs at least one kana per kanji.
  */
-const isPlausibleReadingOf = (kanjiLine: string, kanaLine: string): boolean => {
+const isPlausibleReadingOf = (kanjiLine: string, kanaLine: string, trustKanjiOnly: boolean): boolean => {
   const bodyKana = kanaOnly(kanjiLine);
   const readingKana = kanaOnly(kanaLine);
+  if (!bodyKana) {
+    const kanjiCount = [...kanjiLine].filter((ch) => KANJI_RE.test(ch)).length;
+    return trustKanjiOnly && readingKana.length >= kanjiCount;
+  }
   if (readingKana.length <= bodyKana.length) return false;
   return isSubsequence(bodyKana, readingKana);
 };
@@ -54,15 +62,28 @@ const isPlausibleReadingOf = (kanjiLine: string, kanaLine: string): boolean => {
  * kanji body and the kana line separately so the reading line never reaches the segmenter and can
  * be hidden or shown per the readingLine setting.
  */
-export const splitReadingLine = (cleaned: string): { body: string; readingLine: string | null } => {
+export const splitReadingLine = (
+  cleaned: string,
+  trustKanjiOnly = false,
+): { body: string; readingLine: string | null } => {
   const lines = cleaned.split(/\n+/).map((l) => l.trim()).filter(Boolean);
   if (lines.length !== 2) return { body: cleaned, readingLine: null };
   const [first, second] = lines as [string, string];
   const secondIsKana = !NON_KANA_RE.test(second) && /[぀-ヿ]/.test(second);
-  if (KANJI_RE.test(first) && secondIsKana && isPlausibleReadingOf(first, second)) {
+  if (KANJI_RE.test(first) && secondIsKana && isPlausibleReadingOf(first, second, trustKanjiOnly)) {
     return { body: first, readingLine: second };
   }
   return { body: cleaned, readingLine: null };
+};
+
+/**
+ * `splitReadingLine` for a whole track: kanji-only lines are trusted to carry a reading line only
+ * when another cue of the same track has a verified one (a reading-line channel).
+ */
+export const splitReadingLines = (cleaned: string[]): Array<{ body: string; readingLine: string | null }> => {
+  const verified = cleaned.map((text) => splitReadingLine(text));
+  if (!verified.some((split) => split.readingLine)) return verified;
+  return cleaned.map((text, i) => (verified[i]!.readingLine ? verified[i]! : splitReadingLine(text, true)));
 };
 
 type Chunk = { kind: "text"; text: string } | { kind: "space" } | { kind: "newline" };
@@ -148,8 +169,9 @@ const buildSub = (
 
 /** Sync immediate paint (Intl.Segmenter). Also the fallback if the ONNX split fails. */
 export const convertJapaneseSubsFallback = (rawSubs: Captions): TSub[] => {
+  const split = splitReadingLines(rawSubs.map((sub) => cleanCueText(sub.text)));
   return rawSubs.map((sub, index) => {
-    const { body, readingLine } = splitReadingLine(cleanCueText(sub.text));
+    const { body, readingLine } = split[index]!;
     const items = chunksToItems(chunkCue(body), intlSegments);
     return buildSub(sub, index, body, items, false, readingLine);
   });
@@ -189,7 +211,7 @@ async function repairSegmentsViaDictionary(runs: string[][]): Promise<string[][]
 /** Pre-segment all cues via the in-extension ONNX split (offscreen document). */
 export const convertJapaneseSubsWithLocalSplit = async (rawSubs: Captions): Promise<TSub[]> => {
   const fallback = convertJapaneseSubsFallback(rawSubs);
-  const split = rawSubs.map((sub) => splitReadingLine(cleanCueText(sub.text)));
+  const split = splitReadingLines(rawSubs.map((sub) => cleanCueText(sub.text)));
   const perCue = split.map((s) => chunkCue(s.body));
   // Repeated captions/text runs need only one inference and dictionary repair per
   // batch. Keep timing and layout per cue, and avoid a long-lived dictionary cache.
