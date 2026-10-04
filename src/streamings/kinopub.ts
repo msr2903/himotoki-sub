@@ -35,42 +35,27 @@ class KinoPub implements Service {
     if (!label) return parse("");
     if (!this.videoPlaylistUrl) return parse("");
 
-    const cdnHostName =
-      new URL(this.videoPlaylistUrl)?.hostname ?? "cdn-azure.net";
-    const resp = await fetch(this.videoPlaylistUrl);
-    const data = await resp.text();
-    const parser = new Parser();
-    parser.push(data);
-    parser.end();
-    const subsSegments = parser.manifest.mediaGroups.SUBTITLES.sub;
+    const masterUrl = this.videoPlaylistUrl;
+    const master = parsePlaylist(await fetchText(masterUrl));
+    const track = findSubtitleTrack(master, label);
+    if (!track?.uri) throw new Error(`No subtitle track "${label}" in the KinoPub playlist`);
 
-    const uri = isValidHttpsUrl(subsSegments[label].uri)
-      ? subsSegments[label].uri
-      : `https://${cdnHostName}${subsSegments[label].uri}`;
-    const subsSegmentsResp = await fetch(uri);
-    const subsSegmentsData = await subsSegmentsResp.text();
+    // HLS URIs may be relative to the playlist that contains them (RFC 8216 §4.1).
+    const subsPlaylistUrl = new URL(track.uri, masterUrl).href;
+    const subsPlaylist = parsePlaylist(await fetchText(subsPlaylistUrl));
+    const segmentUri = subsPlaylist.segments?.[0]?.uri;
+    if (!segmentUri) throw new Error(`Subtitle track "${label}" has no segments`);
+    const segmentUrl = new URL(segmentUri, subsPlaylistUrl);
 
-    const subsSegmentsParser = new Parser();
-    subsSegmentsParser.push(subsSegmentsData);
-    subsSegmentsParser.end();
+    // KinoPub serves a track's segments under /hls/<track>/seg… and the whole file under /pd/<track>.
+    const subPath = segmentUrl.pathname.match(/.*\/hls\/(.*)\/seg.*/)?.[1];
+    const subUrl = subPath ? `${segmentUrl.origin}/pd/${subPath}` : segmentUrl.href;
 
-    const segmentUri = subsSegmentsParser.manifest.segments[0].uri;
-    const subPath = segmentUri.match(/.*\/hls\/(.*)\/seg.*/)?.[1];
-    const subUri = `${new URL(segmentUri).origin}/pd/${subPath}`;
-
-    const subsResp = await fetch(subUri);
-    const subsData = await subsResp.text();
-
-    const subs = parse(subsData);
-
-    return subs;
+    return parse(await fetchText(subUrl));
   }
 
   public getSubsContainer() {
-    // Try Vidstack player first, then fallback to old #player selector
-    const selector =
-      document.querySelector("media-player") ||
-      document.querySelector("#player");
+    const selector = activePlayer();
     if (selector === null) throw new Error("Subtitles container not found");
     return selector as HTMLElement;
   }
@@ -86,7 +71,7 @@ class KinoPub implements Service {
   }
 
   public getSettingsContentContainer() {
-    const selector = document.querySelector("#player");
+    const selector = activePlayer();
     if (selector === null)
       throw new Error("Settings content container not found");
     return selector as HTMLElement;
@@ -118,13 +103,40 @@ class KinoPub implements Service {
   }
 }
 
-function isValidHttpsUrl(urlString: string): boolean {
-  try {
-    const url = new URL(urlString);
-    return url.protocol === "https:";
-  } catch (error) {
-    return false;
+/** The Vidstack player, or the old layout's #player. */
+const activePlayer = () => document.querySelector("media-player") || document.querySelector("#player");
+
+type Playlist = Parser["manifest"];
+
+async function fetchText(url: string): Promise<string> {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`KinoPub request failed (${resp.status}): ${url}`);
+  return resp.text();
+}
+
+function parsePlaylist(text: string): Playlist {
+  const parser = new Parser();
+  parser.push(text);
+  parser.end();
+  return parser.manifest;
+}
+
+/**
+ * The subtitle track named `label`, from the group the variants reference. GROUP-ID is chosen by
+ * the manifest (RFC 8216 §4.3.4.1), so it is looked up rather than assumed; groups no variant
+ * references are tried last.
+ */
+function findSubtitleTrack(master: Playlist, label: string): { uri?: string } | undefined {
+  const groups = (master.mediaGroups?.SUBTITLES ?? {}) as Record<string, Record<string, { uri?: string }>>;
+  const referenced = (master.playlists ?? [])
+    .map((playlist: { attributes?: { SUBTITLES?: string } }) => playlist.attributes?.SUBTITLES)
+    .filter((id: string | undefined): id is string => Boolean(id));
+  const groupIds = [...new Set([...referenced, ...Object.keys(groups)])];
+  for (const id of groupIds) {
+    const track = groups[id]?.[label];
+    if (track) return track;
   }
+  return undefined;
 }
 
 export default KinoPub;
