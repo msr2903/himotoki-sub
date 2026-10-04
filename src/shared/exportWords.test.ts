@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseKey, buildRows, toCsv, toJson } from "./exportWords";
+import { parseKey, buildRows, toCsv, toJson, UNRESOLVED_HEADWORD_NOTE } from "./exportWords";
 
 describe("parseKey", () => {
   it("parses an hw: key", () => {
@@ -22,8 +22,15 @@ describe("buildRows", () => {
 
   it("marks known keys and applies the status map", () => {
     const rows = buildRows(["hw:顔"], { "seq:jitendex:1": "learning" });
-    expect(rows).toContainEqual({ key: "hw:顔", headword: "顔", source: "", seq: "", status: "known" });
-    expect(rows).toContainEqual({ key: "seq:jitendex:1", headword: "", source: "jitendex", seq: "1", status: "learning" });
+    expect(rows).toContainEqual({ key: "hw:顔", headword: "顔", source: "", seq: "", status: "known", note: "" });
+    expect(rows).toContainEqual({
+      key: "seq:jitendex:1",
+      headword: "",
+      source: "jitendex",
+      seq: "1",
+      status: "learning",
+      note: UNRESOLVED_HEADWORD_NOTE,
+    });
   });
 
   it("dedupes a key present in both inputs, status wins", () => {
@@ -35,10 +42,10 @@ describe("buildRows", () => {
 
 describe("toCsv", () => {
   it("emits a header and escapes commas/quotes", () => {
-    const csv = toCsv([{ key: "hw:a,b", headword: 'x"y', source: "", seq: "", status: "known" }]);
+    const csv = toCsv([{ key: "hw:a,b", headword: 'x"y', source: "", seq: "", status: "known", note: "" }]);
     const [header, row] = csv.split("\n");
-    expect(header).toBe("key,headword,source,seq,status");
-    expect(row).toBe('"hw:a,b","x""y",,,known');
+    expect(header).toBe("key,headword,source,seq,status,note");
+    expect(row).toBe('"hw:a,b","x""y",,,known,');
   });
 });
 

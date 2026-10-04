@@ -132,6 +132,9 @@ const ROWS: Row[] = [
   T("良い", "よい", "adj-i", 200, 56, "good", 139),
   T("下", "した", "n", 200, 57, "below", 308),
   T("三田", "みた", "n", 100, 58, "Mita (name)"),
+  // #116: the top-scored spelling is kana (コーヒー 200, ateji 珈琲 99): a usually-kana entry.
+  T("コーヒー", "コーヒー", "n", 200, 1049180, "coffee", 1500),
+  T("珈琲", "コーヒー", "n", 99, 1049180, "coffee", 1500),
 ];
 
 const dict = new Dictionary(makeQuery(ROWS));
@@ -294,5 +297,20 @@ describe("getEntryConjugations", () => {
     expect(labels).not.toContain("Passive");
     expect(labels).not.toContain("Imperative");
     expect(rows.find((r) => r.label === "Past")?.form).toBe("高かった");
+  });
+});
+
+describe("usually-kana entries (#116)", () => {
+  it("flags an entry whose top-scored spelling is kana, keeping the kanji as other forms", () => {
+    const entry = dict.getEntry(1049180)!;
+    expect(entry.usually_kana).toBe(true);
+    expect(entry.kanji).toEqual(["珈琲"]);
+    expect(entry.readings[0]).toBe("コーヒー");
+  });
+
+  it("does not flag entries whose top spelling is kanji", () => {
+    expect(dict.getEntry(54)!.usually_kana).toBeUndefined(); // 食べる
+    // する: its only kanji spelling (為る) is a rare negative-score row, so there is nothing to flag.
+    expect(dict.getEntry(9)!.usually_kana).toBeUndefined();
   });
 });

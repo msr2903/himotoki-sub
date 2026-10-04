@@ -19,6 +19,8 @@ export type HimotokiEntry = {
   pitch?: number[];
   pitch_display?: string;
   freq?: number;
+  /** The API's headword contract: the word is usually written in kana (どこ, not 何処). */
+  usually_kana?: boolean;
 };
 
 export type HimotokiConjugation = {
@@ -81,12 +83,24 @@ export const entryReading = (entry?: HimotokiEntry | null): string => {
   return entry?.readings?.[0] ?? "";
 };
 
+/**
+ * Headword to display, speak and save: the kana spelling for a usually-kana entry (コーヒー, どこ),
+ * else the first kanji spelling, else the first reading. Kanji spellings stay in `entry.kanji`.
+ */
+export const entryHeadword = (entry?: HimotokiEntry | null): string =>
+  (entry?.usually_kana ? entry.readings?.[0] : undefined) || entry?.kanji?.[0] || entry?.readings?.[0] || "";
+
+/** A kanji spelling of a usually-kana entry becomes its kana reading (有る → ある). */
+const kanaIfUsual = (form: string | null | undefined, entry?: HimotokiEntry | null, reading?: string): string => {
+  if (!form || !entry?.usually_kana || !entry.kanji?.includes(form)) return form || "";
+  return reading || entry.readings?.[0] || form;
+};
+
 export const entryLemma = (token: HimotokiToken): string => {
   return (
-    token.conjugation?.root_text ||
-    token.source_text ||
-    token.best?.kanji?.[0] ||
-    token.best?.readings?.[0] ||
+    kanaIfUsual(token.conjugation?.root_text, token.best, token.conjugation?.root_reading) ||
+    kanaIfUsual(token.source_text, token.best) ||
+    entryHeadword(token.best) ||
     token.surface
   );
 };
@@ -112,8 +126,7 @@ export const himotokiEntryToWordTranslation = (
   const main = firstGloss(entry) || translations[0]?.word || "";
   const transcription = entryReading(entry);
 
-  const headword =
-    entry.kanji?.[0] || entry.readings?.[0] || source;
+  const headword = entryHeadword(entry) || source;
   const reading = entryReading(entry);
   const himotokiSave =
     entry.seq !== undefined && entry.seq !== null
