@@ -5,7 +5,9 @@ import { isPointInRect } from "@src/shared/mouseActions";
 /**
  * True while the pointer is moving over the video (or the subtitle overlay), and for `idleMs` after it
  * stops, like a player's own controls. Used to show on-screen controls only when the user reaches for
- * the mouse.
+ * the mouse. It stays true while the pointer rests on a control marked `data-pointer-hold`, as a
+ * player keeps its controls up under the cursor; otherwise the control would vanish (and stop taking
+ * clicks) beneath a still pointer.
  */
 export function usePointerActivity(video: HTMLVideoElement | null, idleMs: number): boolean {
   const [active, setActive] = useState(false);
@@ -13,7 +15,13 @@ export function usePointerActivity(video: HTMLVideoElement | null, idleMs: numbe
     if (!video) return;
     let timer: number | undefined;
     let lastHit = -Infinity;
+    let lastTarget: Element | null = null;
+    const idle = () => {
+      if (lastTarget?.isConnected && lastTarget.closest?.("[data-pointer-hold]")) timer = window.setTimeout(idle, idleMs);
+      else setActive(false);
+    };
     const onMove = (event: MouseEvent) => {
+      lastTarget = event.target as Element | null;
       // mousemove fires at display rate; once the pointer is known to be over the video, refreshing
       // the idle timer a few times a second is enough. Moves outside never count toward the throttle,
       // so the first move into the video is always seen.
@@ -23,7 +31,7 @@ export function usePointerActivity(video: HTMLVideoElement | null, idleMs: numbe
       lastHit = event.timeStamp;
       setActive(true);
       window.clearTimeout(timer);
-      timer = window.setTimeout(() => setActive(false), idleMs);
+      timer = window.setTimeout(idle, idleMs);
     };
     document.addEventListener("mousemove", onMove, { capture: true, passive: true });
     return () => {
