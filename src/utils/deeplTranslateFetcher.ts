@@ -57,6 +57,10 @@ class DeepLTranslateFetcher {
   async getFullTextTranslation({ text, lang }: TRequest): Promise<string> {
     // Settings use Google-style codes (zh-CN, zh-TW, en, ...); DeepL expects its own codes.
     const targetLang = this.getDeepLLanguageCode(lang);
+    // Never fall back to English: the learner picked this language.
+    if (!targetLang) {
+      throw new Error("DeepL can't translate into this language. Choose another language, or switch to Google Translate.");
+    }
     // Only the official API: the keyless web endpoint that used to back "DeepL" is not a public API.
     if (!this.#apiKey || !this.#apiKey.length) {
       throw new Error("DeepL needs an API key (free at deepl.com/pro-api). Add it in the settings, or switch to Google Translate.");
@@ -95,7 +99,8 @@ class DeepLTranslateFetcher {
     }
   }
 
-  private getDeepLLanguageCode(googleLangCode: string): string {
+  /** DeepL's target code for a selector (Google-style) code, or null when DeepL can't target it. */
+  private getDeepLLanguageCode(googleLangCode: string): string | null {
     const langMap: Record<string, string> = {
       zh: "ZH",
       "zh-cn": "ZH-HANS",
@@ -128,9 +133,14 @@ class DeepLTranslateFetcher {
       tr: "TR",
       uk: "UK",
       nb: "NB",
+      no: "NB",
       ar: "AR",
+      he: "HE",
+      th: "TH",
+      vi: "VI",
     };
-    return langMap[googleLangCode.toLowerCase()] || "EN-US";
+    const code = googleLangCode.toLowerCase();
+    return Object.hasOwn(langMap, code) ? langMap[code]! : null;
   }
 }
 

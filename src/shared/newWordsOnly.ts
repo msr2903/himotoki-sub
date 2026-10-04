@@ -26,7 +26,8 @@ export const isNewWordsLevel = (value: unknown): value is TNewWordsLevel =>
  */
 export const RARE_RANK: Record<Exclude<TNewWordsLevel, "off">, number> = { n3: 6000, n2: 10000, n1: 18000 };
 
-const JAPANESE = /[\u3040-\u30ff\u3400-\u9fff]/;
+/** Kana or kanji by Unicode script, so kanji outside the BMP (𩸽, 𠮟) count; ー and ・ alone do not. */
+const JAPANESE = /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u;
 
 /** Tokens with no kana or kanji (English asides, numbers, punctuation) are never "new Japanese words". */
 export const isJapaneseToken = (text: string): boolean => JAPANESE.test(text);

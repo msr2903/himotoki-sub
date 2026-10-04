@@ -80,3 +80,17 @@ describe("glossaryGloss", () => {
     expect(glossaryGloss("")).toBe("");
   });
 });
+
+describe("isJapaneseToken (#138)", () => {
+  it("accepts kanji outside the Basic Multilingual Plane", () => {
+    expect(isJapaneseToken("𩸽")).toBe(true); // ほっけ, U+29E3D
+    expect(isJapaneseToken("𠮟る")).toBe(true);
+    expect(isJapaneseToken("猫")).toBe(true);
+    expect(isJapaneseToken("ねこ")).toBe(true);
+    expect(isJapaneseToken("ネコ")).toBe(true);
+  });
+
+  it("still rejects punctuation, numbers and English", () => {
+    for (const text of ["。", "、", "！？", "…", "123", "cat", "ー", "・"]) expect(isJapaneseToken(text)).toBe(false);
+  });
+});
