@@ -11,57 +11,54 @@ import Kinopoisk from "@src/streamings/kinopoisk";
 import Amazon from "@src/streamings/amazon";
 import Inoriginal from "@src/streamings/inoriginal";
 
+const KINOPUB_HOSTS = ["kinopub.net", "kino.pub", "kinopub.cc", "moviesjoy.is"];
+const isAmazonVideoHost = (host: string) => host === "www.primevideo.com" || /^www\.amazon\.[a-z.]+$/.test(host);
+
+const markPage = (id: string) => document.querySelector("html")?.setAttribute("id", id);
+
+const youtube = () => {
+  markPage("youtube");
+  if (document.querySelector(".ytp-delhi-modern")) {
+    // Add class for new youtube delphi design
+    document.body.classList.add("es-youtube-delphi");
+  }
+  return new Youtube();
+};
+const netflix = () => {
+  markPage("netflix");
+  return document.body.classList.contains("es-netflix-on-flight") ? new NetflixOnFlight() : new Netflix();
+};
+const kinopub = () => {
+  markPage("kinopub");
+  return new KinoPub();
+};
+const coursera = () => {
+  markPage("coursera");
+  return new Coursera();
+};
+
+/**
+ * Pick the adapter by the page's host first: a page title names its content (a Coursera course
+ * about YouTube), not its player. Only players that run on hosts we can't list fall back to page
+ * markers: KinoPub mirrors (granted from the popup) and self-hosted Plex servers.
+ */
 export const getCurrentService = (): Service => {
+  const host = window.location.host;
+  if (host === "www.youtube.com") return youtube();
+  if (host === "www.netflix.com") return netflix();
+  if (host === "www.coursera.org") return coursera();
+  if (KINOPUB_HOSTS.includes(host)) return kinopub();
+  if (host === "app.plex.tv") return new Plex();
+  if (host === "www.udemy.com") return new Udemy();
+  if (host === "hd.kinopoisk.ru") return new Kinopoisk();
+  if (isAmazonVideoHost(host)) return new Amazon();
+  if (host === "inoriginal.online") return new Inoriginal();
+
   const titleContent = document.querySelector("title")?.textContent;
-  if (titleContent?.includes("YouTube") || window.location.host === "www.youtube.com") {
-    document.querySelector("html")?.setAttribute("id", "youtube");
-    if (document.querySelector(".ytp-delhi-modern")) {
-      // Add class for new youtube delphi design
-      document.body.classList.add("es-youtube-delphi");
-    }
-    return new Youtube();
+  if (titleContent?.includes("Кинопаб") || document.querySelector('meta[content="Кинопаб"]') != null) {
+    return kinopub();
   }
-  if (titleContent?.includes("Netflix") || window.location.host === "www.netflix.com") {
-    document.querySelector("html")?.setAttribute("id", "netflix");
-    if (document.body.classList.contains("es-netflix-on-flight")) {
-      return new NetflixOnFlight();
-    } else {
-      return new Netflix();
-    }
-  }
-  // if (window.location.host === "app.plex.tv" || document.querySelector("body div")?.id === "plex") {
-  //   return new Plex();
-  // }
-
-  // if (window.location.host === "www.udemy.com" || titleContent?.includes("Udemy")) {
-  //   return new Udemy();
-  // }
-  // if (window.location.host === "hd.kinopoisk.ru") {
-  //   return new Kinopoisk();
-  // }
-  if (
-    titleContent?.includes("Кинопаб") ||
-    document.querySelector('meta[content="Кинопаб"]') != null ||
-    window.location.host === "moviesjoy.is"
-  ) {
-    document.querySelector("html")?.setAttribute("id", "kinopub");
-    return new KinoPub();
-  }
-  if (titleContent?.includes("Coursera") || window.location.host === "www.coursera.org") {
-    document.querySelector("html")?.setAttribute("id", "coursera");
-    return new Coursera();
-  }
-
-  if (window.location.host === "inoriginal.online") {
-    return new Inoriginal();
-  }
-  // if (
-  //   titleContent?.includes("Prime Video") ||
-  //   window.location.host.includes("amazon") ||
-  //   window.location.host.includes("primevideo")
-  // ) {
-  //   return new Amazon();
-  // }
+  if (document.querySelector("body div")?.id === "plex") return new Plex();
 
   return new ServiceStub();
 };
