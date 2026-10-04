@@ -18,15 +18,15 @@ export const Settings: FC<TSettingsProps> = () => {
   const streaming = useUnit($streaming);
   const toastTarget = useOverlayPortalTarget();
 
-  const handleClick = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     e.stopPropagation();
     setShowSettings(!showSettings);
   };
   return (
     <>
-      <div className="es-settings-icon" onClick={handleClick}>
+      <button type="button" className="es-settings-icon" aria-label="Open Himotoki settings" aria-expanded={showSettings} onClick={handleClick}>
         <MonoLogo />
-      </div>
+      </button>
       {showSettings &&
         createPortal(
           <SettingsContent onClose={() => setShowSettings(false)} />,

@@ -237,6 +237,22 @@ try {
   assert.deepEqual(await page.evaluate(() => window.auditMessages), ["himotokiLookupBatch"]);
   assert.equal(before.length, 0, "Sentence breakdown must not use HTTP fallback");
   console.log("PASS Editable hotkey guard and offline-only sentence breakdown");
+  // In-player settings (#91): real buttons with names, keyboard operation, Escape closes.
+  await page.evaluate(() => { window.unmountSettingsPanel = window.mountSettingsPanel(); });
+  const settingsDialog = page.getByRole("dialog", { name: "Himotoki settings" });
+  await settingsDialog.waitFor();
+  const wordsTab = settingsDialog.getByRole("button", { name: "Words", exact: true });
+  await settingsDialog.getByRole("button", { name: "General", exact: true }).focus();
+  await page.keyboard.press("Tab");
+  assert.equal(await wordsTab.evaluate((el) => el === document.activeElement), true, "Settings tabs are in the tab order");
+  await page.keyboard.press("Enter");
+  assert.equal(await wordsTab.getAttribute("aria-pressed"), "true", "Enter selects a settings tab");
+  await settingsDialog.screenshot({ path: "/tmp/himotoki-settings-panel-focus.png" });
+  assert.equal(await settingsDialog.getByRole("button", { name: "Close settings" }).count(), 1);
+  await page.keyboard.press("Escape");
+  assert.equal(await page.evaluate(() => window.settingsPanelCloses), 1, "Escape closes the settings panel");
+  await page.evaluate(() => { window.audit.settings.activeSettingsTabChanged(0); window.unmountSettingsPanel(); });
+  console.log("PASS In-player settings controls are keyboard buttons and Escape closes the panel");
   // Exercise the shipped options page (hub + drill-in panels) with real extension storage and two open pages.
   const options = await ctx.newPage();
   options.on("pageerror", (e) => errors.push(String(e)));
