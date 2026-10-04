@@ -46,13 +46,12 @@ const starts = (scope: ReturnType<typeof setup>) => scope.getState($rawSubs).map
 const cue = (start: number, text = "猫") => ({ text, start, end: start + 1000 });
 
 describe("a subtitle delay survives new captions (#122)", () => {
-  it("a fresh upload after a reset is shifted by the delay the label shows", async () => {
+  it("a new upload is shifted by the delay the label shows", async () => {
     const scope = setup();
     await allSettled(updateCustomSubsFx, { scope, params: [cue(10_000)] });
     await allSettled(subsDelayButtonPressed, { scope, params: 1 });
     expect(starts(scope)).toEqual([11_000]);
 
-    await allSettled(resetSubs, { scope, params: "" });
     await allSettled(updateCustomSubsFx, { scope, params: [cue(20_000)] });
     expect(scope.getState($subsDelay)).toBe(1);
     expect(starts(scope)).toEqual([21_000]);
@@ -61,6 +60,18 @@ describe("a subtitle delay survives new captions (#122)", () => {
     expect(starts(scope)).toEqual([21_500]);
     await allSettled(subsDelayButtonPressed, { scope, params: 0 });
     expect(starts(scope)).toEqual([20_000]);
+  });
+
+  it("clearing the subtitles starts the next track without a delay", async () => {
+    const scope = setup();
+    await allSettled(updateCustomSubsFx, { scope, params: [cue(10_000)] });
+    await allSettled(subsDelayButtonPressed, { scope, params: 1 });
+    await allSettled(resetSubs, { scope, params: "" });
+    expect(scope.getState($subsDelay)).toBe(0);
+    await allSettled(updateCustomSubsFx, { scope, params: [cue(20_000)] });
+    expect(starts(scope)).toEqual([20_000]);
+    await allSettled(subsDelayButtonPressed, { scope, params: 1.5 });
+    expect(starts(scope)).toEqual([21_500]);
   });
 
   it("a reloaded track is shifted, and an identical reload keeps the same list", async () => {

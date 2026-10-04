@@ -339,7 +339,9 @@ $currentSubs.on([updateCurrentSubsFx.doneData, autoPauseFx.doneData], (oldSubs, 
   JSON.stringify(oldSubs) === JSON.stringify(subs) ? oldSubs : subs
 );
 
-$subsDelay.on(subsDelayChangeFx.doneData, (_, newSubsDelay) => newSubsDelay);
+// The delay syncs one video's captions: it carries over reloads and uploads, but clearing the
+// subtitles or a new video element starts again from 0, as media players reset it per file.
+$subsDelay.on(subsDelayChangeFx.doneData, (_, newSubsDelay) => newSubsDelay).reset(resetSubs, $video.updates);
 $subsTitle.on(esSubsChanged, (_, value) => value);
 $subsTitle.on(updateCustomSubsFx.doneData, () => ES_CUSTOM_SUB_LABEL);
 
