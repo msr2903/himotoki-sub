@@ -51,8 +51,11 @@ class Youtube implements Service {
   };
   private captionTracks: CaptionTrack[] = [];
   private lastVideoId = "";
-  /** Resolvers waiting for the player to fetch a given language's timedtext URL. */
-  private captionsDataWaiters = new Map<string, Array<(url: string) => void>>();
+  /**
+   * Resolvers waiting for the player to fetch a given language's timedtext URL. A waiter removes
+   * itself when it times out; a video change settles the rest with null.
+   */
+  private captionsDataWaiters = new Map<string, Array<(url: string | null) => void>>();
   /** Last (videoId, label) handed to esSubsChanged; repeats would rebuild the whole subtitle UI. */
   private lastEmitted: { videoId: string; label: string } | null = null;
 
@@ -202,28 +205,34 @@ class Youtube implements Service {
     if (existing && hasPoToken(existing)) return Promise.resolve(existing);
 
     return new Promise<string | null>((resolve) => {
-      const waiters = this.captionsDataWaiters.get(languageCode) ?? [];
-      let settled = false;
       const select = () =>
         window.dispatchEvent(new CustomEvent("esYoutubeSelectTrack", { detail: languageCode }));
       // The player ignores setOption until it has started; keep asking until the URL shows up.
       const retry = window.setInterval(select, 1000);
-      const timer = window.setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        window.clearInterval(retry);
-        resolve(null);
-      }, timeoutMs);
-      waiters.push((url) => {
-        if (settled) return;
-        settled = true;
+      const timer = window.setTimeout(() => settle(null), timeoutMs);
+      const settle = (url: string | null) => {
         window.clearInterval(retry);
         window.clearTimeout(timer);
+        const waiters = this.captionsDataWaiters.get(languageCode);
+        const index = waiters?.indexOf(settle) ?? -1;
+        if (index !== -1) {
+          waiters!.splice(index, 1);
+          if (!waiters!.length) this.captionsDataWaiters.delete(languageCode);
+        }
         resolve(url);
-      });
+      };
+      const waiters = this.captionsDataWaiters.get(languageCode) ?? [];
+      waiters.push(settle);
       this.captionsDataWaiters.set(languageCode, waiters);
       select();
     });
+  }
+
+  /** Settle every pending track request with null (they belonged to the previous video). */
+  private dropCaptionsDataWaiters() {
+    const waiters = [...this.captionsDataWaiters.values()].flat();
+    this.captionsDataWaiters.clear();
+    waiters.forEach((settle) => settle(null));
   }
 
   private ensureVideoCache(videoId: string) {
@@ -232,6 +241,7 @@ class Youtube implements Service {
       this.lastVideoId = videoId;
       this.captionTracks = [];
       this.lastEmitted = null;
+      this.dropCaptionsDataWaiters();
       this.subCache[videoId] = this.subCache[videoId] || {};
     }
   }
@@ -369,11 +379,8 @@ class Youtube implements Service {
         this.subCache[videoId][lang] = urlObject.href;
       }
       if (hasPoToken(urlObject.href)) {
-        const waiters = this.captionsDataWaiters.get(lang);
-        if (waiters?.length) {
-          this.captionsDataWaiters.delete(lang);
-          waiters.forEach((resolve) => resolve(urlObject.href));
-        }
+        // Each waiter removes itself as it settles; iterate over a copy.
+        [...(this.captionsDataWaiters.get(lang) ?? [])].forEach((settle) => settle(urlObject.href));
       }
     } catch (error) {
       console.warn("[himotoki] failed to cache caption url", error);
@@ -405,6 +412,7 @@ class Youtube implements Service {
     if (this.lastVideoId && this.lastVideoId !== videoId) {
       this.captionTracks = [];
       this.lastEmitted = null;
+      this.dropCaptionsDataWaiters();
     }
     this.lastVideoId = videoId;
     this.subCache[videoId] = this.subCache[videoId] || {};
