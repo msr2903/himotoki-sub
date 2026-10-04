@@ -114,6 +114,32 @@ try {
   assert.equal(await page.locator(".es-sub-item-pinned").count(), 1);
   assert.ok(await page.evaluate(() => window.audit.settings.$knownWords.getState().includes("seq:jitendex:2")));
   console.log("PASS Entry switching and mark-known keep the popup pinned and select the correct entry");
+  // Hover auto-pause owns only its own pause (#142): a newer manual pause survives leaving the line.
+  await page.keyboard.press("Escape");
+  await page.mouse.move(5, 5);
+  await page.evaluate(() => {
+    const video = document.querySelector("video");
+    let paused = false;
+    Object.defineProperty(video, "paused", { configurable: true, get: () => paused });
+    video.play = () => { paused = false; video.dispatchEvent(new Event("play")); return Promise.resolve(); };
+    video.pause = () => { paused = true; video.dispatchEvent(new Event("pause")); };
+    window.audit.settings.autoStopEnabledChanged(true);
+    // Headless/background windows do not report :hover; mirror real pointer presence for Subs' check.
+    const subsRoot = document.querySelector("#es-subs");
+    let over = false;
+    window.addEventListener("mouseover", (e) => { over = subsRoot.contains(e.target); }, true);
+    subsRoot.matches = (selector) => (selector === ":hover" ? over : Element.prototype.matches.call(subsRoot, selector));
+  });
+  const videoPaused = () => page.evaluate(() => document.querySelector("video").paused);
+  await page.locator("#es-subs").hover();
+  assert.equal(await videoPaused(), true, "Hovering the subtitles pauses playback");
+  await page.mouse.move(5, 5);
+  assert.equal(await videoPaused(), false, "Leaving after a hover pause resumes playback");
+  await page.locator("#es-subs").hover();
+  await page.evaluate(() => { const v = document.querySelector("video"); v.play(); v.pause(); });
+  await page.mouse.move(5, 5);
+  assert.equal(await videoPaused(), true, "A manual pause made over the subtitles survives leaving them");
+  console.log("PASS Hover pause resumes on leave but never overrides a newer manual pause");
   // New words only (beta): the line becomes a glossary of words above the learner's level.
   await page.keyboard.press("Escape");
   await page.evaluate(async () => {

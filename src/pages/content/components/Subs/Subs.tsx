@@ -162,6 +162,17 @@ export const Subs: FC<TSubsProps> = () => {
     };
   }, [unpin]);
 
+  // Hover auto-pause owns only the pause it made: once playback starts again by any other means
+  // (player controls, replay), a later pause is the user's, and leaving the subtitles must keep it.
+  useEffect(() => {
+    if (!video) return;
+    const onPlay = () => {
+      if ($wasPaused.getState()) handleWasPausedChanged(false);
+    };
+    video.addEventListener("play", onPlay);
+    return () => video.removeEventListener("play", onPlay);
+  }, [video, handleWasPausedChanged]);
+
   // While something is pinned the video stays paused even if the pointer leaves; resume on unpin.
   useEffect(() => {
     if (pinnedWord || !wasPaused || !video) return;

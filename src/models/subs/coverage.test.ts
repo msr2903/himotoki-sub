@@ -9,6 +9,7 @@ vi.mock("../settings", async () => {
   const { createStore } = await import("effector");
   return {
     $autoPause: createStore(false),
+    $enabled: createStore(true),
     $secondarySubs: createStore("off"),
     $translateLanguage: createStore("en"),
     $translationService: createStore("google"),
