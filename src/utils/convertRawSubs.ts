@@ -167,11 +167,31 @@ const buildSub = (
   readingLine: readingLine ?? undefined,
 });
 
-/** Sync immediate paint (Intl.Segmenter). Also the fallback if the ONNX split fails. */
-export const convertJapaneseSubsFallback = (rawSubs: Captions): TSub[] => {
+/**
+ * Captions that arrive one cue at a time are converted again as the list grows. A cue already
+ * converted (same start, text and reading-line split) keeps its items, so only new or revised cues
+ * are segmented and analysed.
+ */
+const reusableItems = (previous: TSub[]) => {
+  const byCue = new Map(previous.map((sub) => [`${sub.start}\u0000${sub.text}`, sub]));
+  return (sub: Captions[number], body: string, readingLine: string | null): TSub | undefined => {
+    const prior = byCue.get(`${Number(sub.start)}\u0000${sub.text}`);
+    if (!prior || prior.cleanedText !== body.replace(/\n+/g, " ") || (prior.readingLine ?? null) !== readingLine) return;
+    return prior;
+  };
+};
+
+/**
+ * Sync immediate paint (Intl.Segmenter). Also the fallback if the ONNX split fails. Cues already
+ * converted in `previous` keep their items, analysed or not.
+ */
+export const convertJapaneseSubsFallback = (rawSubs: Captions, previous: TSub[] = []): TSub[] => {
   const split = splitReadingLines(rawSubs.map((sub) => cleanCueText(sub.text)));
+  const reuse = reusableItems(previous);
   return rawSubs.map((sub, index) => {
     const { body, readingLine } = split[index]!;
+    const prior = reuse(sub, body, readingLine);
+    if (prior) return buildSub(sub, index, body, prior.items, Boolean(prior.analyzed), readingLine);
     const items = chunksToItems(chunkCue(body), intlSegments);
     return buildSub(sub, index, body, items, false, readingLine);
   });
@@ -208,23 +228,27 @@ async function repairSegmentsViaDictionary(runs: string[][]): Promise<string[][]
   }
 }
 
-/** Pre-segment all cues via the in-extension ONNX split (offscreen document). */
-export const convertJapaneseSubsWithLocalSplit = async (rawSubs: Captions): Promise<TSub[]> => {
-  const fallback = convertJapaneseSubsFallback(rawSubs);
+/**
+ * Pre-segment the cues via the in-extension ONNX split (offscreen document). Cues already analysed
+ * in `previous` are reused, so incremental captions analyse each new cue once.
+ */
+export const convertJapaneseSubsWithLocalSplit = async (rawSubs: Captions, previous: TSub[] = []): Promise<TSub[]> => {
+  const fallback = convertJapaneseSubsFallback(rawSubs, previous);
   const split = splitReadingLines(rawSubs.map((sub) => cleanCueText(sub.text)));
   const perCue = split.map((s) => chunkCue(s.body));
   // Repeated captions/text runs need only one inference and dictionary repair per
   // batch. Keep timing and layout per cue, and avoid a long-lived dictionary cache.
   const texts: string[] = [];
   const textIndexes = new Map<string, number>();
-  for (const chunks of perCue) {
+  perCue.forEach((chunks, index) => {
+    if (fallback[index]!.analyzed) return;
     for (const chunk of chunks) {
       if (chunk.kind === "text" && !textIndexes.has(chunk.text)) {
         textIndexes.set(chunk.text, texts.length);
         texts.push(chunk.text);
       }
     }
-  }
+  });
   if (!texts.length) return fallback;
 
   try {
@@ -235,6 +259,7 @@ export const convertJapaneseSubsWithLocalSplit = async (rawSubs: Captions): Prom
     const results = await repairSegmentsViaDictionary(splitResults.map((r) => r.segments ?? []));
 
     return rawSubs.map((sub, index) => {
+      if (fallback[index]!.analyzed) return fallback[index]!;
       const items = chunksToItems(perCue[index]!, (text) => results[textIndexes.get(text)!]!);
       if (!items.some((item) => item.type === "word")) return fallback[index]!;
       return buildSub(sub, index, split[index]!.body, items, true, split[index]!.readingLine);

@@ -184,12 +184,19 @@ $rawSubs.on(rawSubsAdded, appendRawSubs);
 $rawSubs.reset(resetSubs);
 $sentenceOpen.reset(resetSubs);
 
+// Keys already resolved against a dictionary generation, so captions that grow one cue at a time
+// look up only their new words. Filled further below, once the removal signal exists.
+type TCoverageResolved = { generation: number; keys: Map<string, string | null> } | null;
+const $coverageResolved = createStore<TCoverageResolved>(null);
+const knownCoverage = (resolved: TCoverageResolved, generation: number) =>
+  resolved?.generation === generation ? resolved.keys : undefined;
+
 // Resolve every distinct word's key once the subtitles are ready, for coverage stats.
 sample({
   clock: $subs,
-  source: $dictGeneration,
+  source: { generation: $dictGeneration, resolved: $coverageResolved },
   filter: (_, subs) => subs.length > 0,
-  fn: (generation, subs) => ({ subs, generation }),
+  fn: ({ generation, resolved }, subs) => ({ subs, generation, known: knownCoverage(resolved, generation) }),
   target: computeCoverageFx,
 });
 // The dictionary became available or was replaced (captions unchanged): rescan the loaded captions.
@@ -222,6 +229,14 @@ const currentCoverageFailed = sample({
   source: { subs: $subs, generation: $dictGeneration },
   filter: isCurrentCoverage,
 });
+$coverageResolved
+  .on(computeCoverageFx.done, (resolved, { params, result }) => {
+    if (!result) return resolved;
+    const keys = new Map(knownCoverage(resolved, params.generation));
+    for (const surface of Object.keys(result)) keys.set(surface, result[surface]!);
+    return { generation: params.generation, keys };
+  })
+  .reset(resetSubs, coverageDictRemoved);
 $coverageKeys.on(currentCoverageDone, (_, map) => map ?? {}).reset(resetSubs, $subs.updates, coverageDictRemoved);
 $coverageStatus
   .on(computeCoverageFx, () => "loading")
@@ -230,8 +245,11 @@ $coverageStatus
   .on(coverageDictRemoved, () => "missing")
   .reset(resetSubs);
 
+// Pass the current list along so cues it already holds unchanged are not converted again (#144).
 sample({
   clock: $rawSubs,
+  source: $subs,
+  fn: (previous, rawSubs) => ({ rawSubs, previous }),
   target: processRawSubsFx,
 });
 
@@ -242,24 +260,25 @@ sample({
 sample({
   clock: processRawSubsFx.done,
   source: $rawSubs,
-  filter: (rawSubs, done) => !("error" in done) && rawSubs === done.params,
+  filter: (rawSubs, done) => !("error" in done) && rawSubs === done.params.rawSubs,
   fn: (_, done) => ("result" in done ? done.result : []),
   target: $subs,
 });
 sample({
   clock: processJapaneseSubsFx.done,
   source: $rawSubs,
-  filter: (rawSubs, done) => !("error" in done) && rawSubs === done.params,
+  filter: (rawSubs, done) => !("error" in done) && rawSubs === done.params.rawSubs,
   fn: (_, done) => ("result" in done ? done.result : []),
   target: $subs,
 });
 $subs.reset(resetSubs);
 
-// After the Segmenter paint, upgrade all cues via the local ONNX split.
+// After the Segmenter paint, upgrade the cues it has not already analysed via the local ONNX split.
 sample({
-  clock: processRawSubsFx.doneData,
+  clock: processRawSubsFx.done,
   source: $rawSubs,
-  filter: (rawSubs) => Boolean(rawSubs?.length),
+  filter: (rawSubs, { params }) => Boolean(rawSubs?.length) && rawSubs === params.rawSubs,
+  fn: (rawSubs, { result }) => ({ rawSubs, previous: result }),
   target: processJapaneseSubsFx,
 });
 

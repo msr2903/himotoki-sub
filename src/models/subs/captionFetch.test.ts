@@ -51,7 +51,7 @@ const setup = () =>
       [processJapaneseSubsFx, async () => []],
     ],
   });
-const texts = (cues: Cue[]) => cues.map((c) => c.text);
+const texts = (cues: Array<{ text: string }>) => cues.map((c) => c.text);
 const cue = (text: string): Cue => ({ text, start: 0, end: 1000 });
 
 describe("caption fetches belong to the request that started them (#105)", () => {

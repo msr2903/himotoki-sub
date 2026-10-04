@@ -37,7 +37,7 @@ try {
     // Deferred dictionary responses expose races between caption changes and reset.
     const requests = [];
     s.computeCoverageFx.use((captions) => new Promise((resolve) => requests.push({ captions, resolve })));
-    s.processRawSubsFx.use(async (captions) => captions);
+    s.processRawSubsFx.use(async ({ rawSubs }) => rawSubs);
     // Drive captions through $rawSubs (like the real fetch path) so the stale-result guard on
     // $subs accepts them — calling processRawSubsFx directly is rejected as out-of-date.
     const load = async (captions) => { s.fetchSubsFx.use(async () => captions); s.subsRequested("ja"); await tick(); };
