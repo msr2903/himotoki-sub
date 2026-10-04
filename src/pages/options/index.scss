@@ -360,6 +360,20 @@ html[data-hm-theme="light"] .card {
   }
 }
 
+.field-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+
+  .field {
+    flex: 1;
+  }
+
+  .pill {
+    flex-shrink: 0;
+  }
+}
+
 select.field {
   cursor: pointer;
 }

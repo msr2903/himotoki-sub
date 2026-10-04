@@ -318,6 +318,27 @@ try {
   await options.waitForSelector("#furigana");
   await options.setViewportSize({ width: 1280, height: 800 });
   await options.screenshot({ path: "/tmp/himotoki-audit-options-desktop.png", fullPage: true });
+  // Custom dictionary URL (#94): a draft until Save, validated, and saved only with host permission.
+  await options.goto(`${optionsUrl}?panel=advanced`);
+  const storedDictUrl = () => options.evaluate(() => chrome.storage.local.get(["himotokiDictUrl"]).then((r) => r.himotokiDictUrl ?? null));
+  const dictField = options.locator("#endpoint-dict");
+  const saveDict = options.getByRole("button", { name: "Save", exact: true });
+  await dictField.fill("not a url");
+  assert.equal(await storedDictUrl(), null, "Typing does not save the endpoint");
+  await saveDict.click();
+  await options.getByRole("alert").filter({ hasText: "Enter a valid HTTP or HTTPS URL." }).waitFor();
+  assert.equal(await storedDictUrl(), null, "An invalid URL is never saved");
+  await options.locator(".card").filter({ has: dictField }).screenshot({ path: "/tmp/himotoki-endpoint-error.png" });
+  assert.equal(await dictField.getAttribute("aria-invalid"), "true");
+  await dictField.fill("https://github.com/example/dict/jitendex.sqlite.gz");
+  assert.equal(await options.getByRole("alert").count(), 0, "Editing clears the error");
+  await saveDict.click();
+  await options.waitForFunction(() => chrome.storage.local.get(["himotokiDictUrl"]).then((r) => r.himotokiDictUrl === "https://github.com/example/dict/jitendex.sqlite.gz"));
+  assert.equal(await saveDict.isDisabled(), true, "Save is idle once the field matches the saved URL");
+  await options.getByRole("button", { name: "Reset", exact: true }).click();
+  await options.waitForFunction(() => chrome.storage.local.get(["himotokiDictUrl"]).then((r) => !("himotokiDictUrl" in r)));
+  assert.equal(await dictField.inputValue(), "");
+  console.log("PASS Custom dictionary URL saves only on Save, after validation and host permission");
   for (const url of [optionsUrl, `${optionsUrl}?panel=words`, `${optionsUrl}?panel=advanced`]) {
     await options.goto(url);
     for (const width of [720, 360, 320]) {
