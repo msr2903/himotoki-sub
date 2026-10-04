@@ -86,6 +86,34 @@ describe("Recent lookups (#140)", () => {
     expect(scope.getState($lookupHistory)).toEqual([expect.objectContaining({ source: "猫", videoTimeMs: 3000 })]);
   });
 
+  it("a visited word with no entry is not recorded, and its wait ends", async () => {
+    const missing: TWordTranslation = { ...cat, source: "未知語", headword: "", mainTranslation: "", lookupSource: "none", himotokiSave: undefined };
+    const lookup = vi.fn(async ({ source }: { source: string }) => (source === "未知語" ? missing : cat));
+    const scope = fork({ handlers: [[fetchWordTranslationFx, lookup]], values: [[$dictReady, true]] });
+    await allSettled(lookupVisited, { scope, params: "未知語" });
+    await allSettled(lookupRequested, { scope, params: "未知語" });
+    expect(scope.getState($lookupHistory)).toEqual([]);
+    await allSettled(lookupVisited, { scope, params: "猫" });
+    await allSettled(lookupRequested, { scope, params: "猫" });
+    expect(scope.getState($lookupHistory).map((h) => h.source)).toEqual(["猫"]);
+  });
+
+  it("a failed lookup ends its wait, so a later passive lookup of the word is not recorded", async () => {
+    let fail = true;
+    const lookup = vi.fn(async () => {
+      if (fail) throw new Error("offline");
+      return cat;
+    });
+    const scope = fork({ handlers: [[fetchWordTranslationFx, lookup]], values: [[$dictReady, true]] });
+    await allSettled(lookupVisited, { scope, params: "猫" });
+    await allSettled(lookupRequested, { scope, params: "猫" });
+    expect(lookup).toHaveBeenCalledTimes(1);
+    fail = false;
+    await allSettled(lookupRequested, { scope, params: "猫" });
+    expect(lookup).toHaveBeenCalledTimes(2);
+    expect(scope.getState($lookupHistory)).toEqual([]);
+  });
+
   it("passive lookups (furigana, colouring) are not recorded", async () => {
     const scope = fork({ handlers: [[fetchWordTranslationFx, async () => cat]], values: [[$dictReady, true]] });
     await allSettled(lookupRequested, { scope, params: "猫" });
