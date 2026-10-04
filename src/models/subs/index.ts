@@ -100,7 +100,11 @@ export const loopedCueSet = createEvent<TSub | null>();
  */
 export const $coverageKeys = createStore<Record<string, string | null>>({});
 export const $coverageStatus = createStore<"idle" | "loading" | "ready" | "missing" | "error">("idle");
-export const computeCoverageFx = createEffect<TSub[], Record<string, string | null> | null>(async (subs) => {
+/** `generation` is the dictionary generation the job started under (see $dictGeneration). */
+export const computeCoverageFx = createEffect<
+  { subs: TSub[]; generation: number },
+  Record<string, string | null> | null
+>(async ({ subs }) => {
   const surfaces = new Set<string>();
   for (const sub of subs) {
     for (const item of sub.items) {

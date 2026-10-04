@@ -31,18 +31,42 @@ export const lookupKeyOf = (payload: TSubItem | string): string =>
 
 /**
  * Whether the offline dictionary is installed and ready. Used to gate always-on furigana: without
- * the local dictionary every kanji token would fall back to the Himotoki HTTP API, so "always"
- * behaves like "hover" until the dictionary is ready (see Subs.tsx).
+ * the local dictionary no kanji token can be resolved, so "always" behaves like "hover" until the
+ * dictionary is ready (see Subs.tsx).
  */
 export const $dictReady = createStore<boolean>(false);
 
-/** Ask the offscreen worker (via the background) whether the dictionary is ready. */
-export const checkDictReadyFx = createEffect<void, boolean>(async () => {
+export type DictAvailability = { ready: boolean; revision: string };
+
+/** Ask the offscreen worker (via the background) whether the dictionary is ready, and which revision. */
+export const checkDictReadyFx = createEffect<void, DictAvailability>(async () => {
   const resp = await chrome.runtime.sendMessage({ type: "himotokiDictStatus" });
-  return Boolean(resp?.ok) && (resp.data as { state?: string } | undefined)?.state === "ready";
+  const data = resp?.ok ? (resp.data as { state?: string; revision?: string } | undefined) : undefined;
+  const ready = data?.state === "ready";
+  return { ready, revision: ready ? String(data?.revision ?? "") : "" };
 });
 
-$dictReady.on(checkDictReadyFx.doneData, (_, ready) => ready);
+$dictReady.on(checkDictReadyFx.doneData, (_, { ready }) => ready);
+
+/**
+ * Installed revision as last reported by a status check ("" when unknown or not ready) and how many
+ * times it was replaced by a different revision while ready (an update installed from another page).
+ */
+const $dictRevision = createStore<{ revision: string; replacements: number }>({ revision: "", replacements: 0 })
+  .on(checkDictReadyFx.doneData, (current, { ready, revision }) => {
+    const next = ready ? revision : "";
+    if (next === current.revision || (ready && !next)) return current;
+    return { revision: next, replacements: current.replacements + (current.revision && next ? 1 : 0) };
+  })
+  .on($dictReady.updates, (current, ready) => (ready || !current.revision ? current : { ...current, revision: "" }));
+
+/**
+ * Bumped whenever the dictionary serving lookups changes: it became available, was removed, or was
+ * replaced by another revision. Results resolved under an older generation are stale.
+ */
+export const $dictGeneration = createStore(0)
+  .on($dictReady.updates, (generation) => generation + 1)
+  .on($dictRevision.map(({ replacements }) => replacements).updates, (generation) => generation + 1);
 
 /**
  * Bumped by every dictionary status reply. A word lookup started before the latest reply must not
@@ -145,9 +169,9 @@ sample({
 });
 
 $lookups.on(fetchWordTranslationFx.doneData, (all, translation) => ({ ...all, [translation.source]: translation }));
-// Dictionary installs/updates/removals flip $dictReady; cached entries resolved under the
-// old availability (install hints, or entries from a removed dictionary) are invalidated.
-$lookups.reset($dictReady.updates);
+// Dictionary installs/updates/removals bump the generation; cached entries resolved under the
+// old dictionary (install hints, or entries from a removed/replaced dictionary) are invalidated.
+$lookups.reset($dictGeneration.updates);
 // Any resolved lookup tells us for free whether the local dictionary is currently serving — unless
 // a newer status reply arrived while it was in flight.
 const currentLookupDone = sample({

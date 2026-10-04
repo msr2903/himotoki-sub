@@ -2,6 +2,7 @@
  * Offscreen document: hosts onnxruntime-web (Himotoki split model) and the SQLite dictionary worker.
  */
 import { split, resetModelCache } from "@src/split";
+import { dictCall } from "./dictBridge";
 
 let ready: Promise<void> | null = null;
 // onnxruntime-web rejects overlapping run() calls on one session ("Session already started"),
@@ -49,41 +50,6 @@ async function mapPool<T, R>(
 
   await Promise.all(workers);
   return results;
-}
-
-/* ---------------- dictionary worker bridge ---------------- */
-
-let dictWorker: Worker | null = null;
-let dictSeq = 0;
-const dictPending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
-
-function getDictWorker(): Worker {
-  if (!dictWorker) {
-    dictWorker = new Worker(new URL("./dict.worker.ts", import.meta.url), { type: "module" });
-    dictWorker.onmessage = (event: MessageEvent<{ id: number; ok: boolean; data?: unknown; error?: string }>) => {
-      const { id, ok, data, error } = event.data;
-      const pending = dictPending.get(id);
-      if (!pending) return;
-      dictPending.delete(id);
-      if (ok) pending.resolve(data);
-      else pending.reject(new Error(error || "dictionary worker error"));
-    };
-    dictWorker.onerror = (event) => {
-      const error = new Error(event.message || "dictionary worker crashed");
-      for (const pending of dictPending.values()) pending.reject(error);
-      dictPending.clear();
-      dictWorker = null;
-    };
-  }
-  return dictWorker;
-}
-
-function dictCall(op: string, payload: Record<string, unknown>): Promise<unknown> {
-  const id = ++dictSeq;
-  return new Promise((resolve, reject) => {
-    dictPending.set(id, { resolve, reject });
-    getDictWorker().postMessage({ id, op, ...payload });
-  });
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

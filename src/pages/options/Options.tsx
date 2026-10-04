@@ -341,9 +341,11 @@ function useSummaries(): Partial<Record<PanelId, string>> {
         ? "Installed"
         : dictState === "downloading" || dictState === "importing" || dictState === "booting"
           ? "Installing…"
-          : dictState
-            ? "Not downloaded"
-            : undefined,
+          : dictState === "unsupported"
+            ? "Not available in this browser"
+            : dictState
+              ? "Not downloaded"
+              : undefined,
     data: known ? `${known.toLocaleString()} known word${known === 1 ? "" : "s"}` : "Known words, history and export",
     advanced: dictUrl || clientId ? "Custom endpoints" : "Default endpoints",
   };

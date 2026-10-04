@@ -1,82 +1,83 @@
 import { FC, useEffect, useRef, useState } from "react";
 
-export type DictStatus = {
-  state: "booting" | "missing" | "downloading" | "importing" | "ready" | "error";
-  received: number;
-  total: number;
-  error: string;
-  revision: string;
-  title: string;
-  terms: number;
-  bytes: number;
-  verified?: "ok" | "skipped" | "";
-};
+import { createDictStatusPoller, isDictBusy, type DictStatus, type DictStatusPoller } from "./dictPolling";
+
+export type { DictStatus } from "./dictPolling";
 
 type DictManifest = { revision?: string; gzipBytes?: number; title?: string } | null;
 
 const formatMb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(0)} MB`;
-const isBusy = (s: DictStatus | null) => s?.state === "downloading" || s?.state === "importing" || s?.state === "booting";
+const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /** Offline dictionary status / download / remove. Used by the popup and the options page. */
 export const DictionaryPanel: FC<{ compact?: boolean }> = ({ compact }) => {
   const [dict, setDict] = useState<DictStatus | null>(null);
   const [manifest, setManifest] = useState<DictManifest>(null);
+  // Install/remove failures (shown until the next action) and status-request failures (cleared as
+  // soon as the worker answers again) are kept apart so a successful poll cannot hide an install error.
   const [error, setError] = useState<string | null>(null);
-  const pollRef = useRef<number | null>(null);
-
-  const refresh = async (): Promise<DictStatus | null> => {
-    const resp = await chrome.runtime.sendMessage({ type: "himotokiDictStatus" });
-    if (resp?.ok) {
-      setDict(resp.data as DictStatus);
-      return resp.data as DictStatus;
-    }
-    setError(resp?.error || "Could not reach the dictionary worker");
-    return null;
-  };
-
-  const stopPolling = () => {
-    if (pollRef.current != null) {
-      window.clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-  };
-
-  const pollWhileBusy = () => {
-    stopPolling();
-    pollRef.current = window.setInterval(async () => {
-      const status = await refresh();
-      if (!isBusy(status)) stopPolling();
-    }, 500);
-  };
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const pollerRef = useRef<DictStatusPoller | null>(null);
+  const mountedRef = useRef(false);
 
   useEffect(() => {
-    void refresh().then((status) => {
-      if (isBusy(status)) pollWhileBusy();
+    mountedRef.current = true;
+    const poller = createDictStatusPoller({
+      request: () => chrome.runtime.sendMessage({ type: "himotokiDictStatus" }),
+      onStatus: setDict,
+      onError: setStatusError,
     });
-    void chrome.runtime.sendMessage({ type: "himotokiDictManifest" }).then((resp) => {
-      if (resp?.ok) setManifest((resp.data as DictManifest) ?? null);
-    });
-    return stopPolling;
+    pollerRef.current = poller;
+    void poller.refresh();
+    void chrome.runtime
+      .sendMessage({ type: "himotokiDictManifest" })
+      .then((resp) => {
+        if (mountedRef.current && resp?.ok) setManifest((resp.data as DictManifest) ?? null);
+      })
+      .catch(() => undefined);
+    return () => {
+      mountedRef.current = false;
+      poller.dispose();
+      if (pollerRef.current === poller) pollerRef.current = null;
+    };
   }, []);
 
   const handleInstall = () => {
     setError(null);
     setDict((d) => (d ? { ...d, state: "downloading", received: 0, total: 0 } : d));
-    void chrome.runtime.sendMessage({ type: "himotokiDictInstall" }).then((resp) => {
-      if (!resp?.ok) setError(resp?.error || "Dictionary install failed");
-      void refresh();
-    });
-    pollWhileBusy();
+    // The background fetches the manifest before the worker starts, so the first polls can still
+    // see "missing": keep polling until the install request itself settles.
+    const poller = pollerRef.current;
+    poller?.setInstallPending(true);
+    void chrome.runtime
+      .sendMessage({ type: "himotokiDictInstall" })
+      .then(
+        (resp) => {
+          if (mountedRef.current && !resp?.ok) setError(resp?.error || "Dictionary install failed");
+        },
+        (e) => {
+          if (mountedRef.current) setError(messageOf(e) || "Dictionary install failed");
+        },
+      )
+      .finally(() => {
+        poller?.setInstallPending(false);
+        void poller?.refresh();
+      });
   };
 
   const handleRemove = async () => {
     setError(null);
-    const resp = await chrome.runtime.sendMessage({ type: "himotokiDictRemove" });
-    if (!resp?.ok) setError(resp?.error || "Could not remove dictionary");
-    await refresh();
+    const poller = pollerRef.current;
+    try {
+      const resp = await chrome.runtime.sendMessage({ type: "himotokiDictRemove" });
+      if (mountedRef.current && !resp?.ok) setError(resp?.error || "Could not remove dictionary");
+    } catch (e) {
+      if (mountedRef.current) setError(messageOf(e) || "Could not remove dictionary");
+    }
+    await poller?.refresh();
   };
 
-  const busy = isBusy(dict);
+  const busy = isDictBusy(dict);
   const percent = dict && dict.total > 0 ? Math.min(100, Math.round((dict.received / dict.total) * 100)) : null;
   const updateAvailable =
     dict?.state === "ready" && Boolean(manifest?.revision) && Boolean(dict.revision) && manifest!.revision !== dict.revision;
@@ -84,7 +85,7 @@ export const DictionaryPanel: FC<{ compact?: boolean }> = ({ compact }) => {
 
   return (
     <div className="es-dict-panel">
-      {!dict && !error && <p className="es-popup-hint">Checking…</p>}
+      {!dict && !error && !statusError && <p className="es-popup-hint">Checking…</p>}
       {dict?.state === "ready" && (
         <>
           <p className="es-popup-hint">
@@ -115,8 +116,9 @@ export const DictionaryPanel: FC<{ compact?: boolean }> = ({ compact }) => {
       {(dict?.state === "missing" || dict?.state === "error") && (
         <>
           <p className="es-popup-hint">
-            Download Jitendex ({downloadMb}) for instant lookups without the network. Until then, words are looked up
-            online.
+            {dict.state === "error"
+              ? `The dictionary could not be loaded. Download Jitendex again (${downloadMb}) to look up words.`
+              : `Download Jitendex (${downloadMb}) to look up words. Word meanings, readings and furigana need this dictionary; whole-line translation works without it.`}
           </p>
           <button className="es-popup-btn es-popup-btn-primary" onClick={handleInstall}>
             Download dictionary
@@ -142,7 +144,15 @@ export const DictionaryPanel: FC<{ compact?: boolean }> = ({ compact }) => {
           </div>
         </>
       )}
-      {(error || dict?.error) && <div className="es-popup-error">{error || dict?.error}</div>}
+      {dict?.state === "unsupported" && (
+        <p className="es-popup-hint">
+          The offline dictionary cannot run in this browser, so word meanings, readings and furigana are unavailable.
+          Whole-line translation still works.
+        </p>
+      )}
+      {(error || statusError || dict?.error) && (
+        <div className="es-popup-error">{error || statusError || dict?.error}</div>
+      )}
     </div>
   );
 };
