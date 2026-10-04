@@ -2,6 +2,7 @@ import { AccountPanel } from "@src/pages/shared/AccountPanel";
 import { DictionaryPanel } from "@src/pages/shared/DictionaryPanel";
 import { useEffect, useState } from "react";
 import { originMatchPattern } from "@src/shared/runtimeConfig";
+import { isKinopubPage } from "@src/shared/serviceHosts";
 
 async function getTab() {
   const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
@@ -13,13 +14,14 @@ const Popup = () => {
 
   useEffect(() => {
     void getTab().then((tab) => {
-      if (!tab?.url) return;
-      try {
-        const host = new URL(tab.url).hostname;
-        if (["kinopub.net", "kino.pub", "kinopub.cc"].includes(host)) setKinopubUrl(tab.url);
-      } catch {
-        // Browser internal tabs do not have a supported site URL.
-      }
+      // activeTab exposes the tab's URL and title while the popup is open, so a mirror on an unlisted
+      // host is recognised by its title. The action is pointless once the origin is granted.
+      if (!tab?.url || !isKinopubPage(tab.url, tab.title)) return;
+      const origin = originMatchPattern(tab.url);
+      if (!origin) return;
+      void chrome.permissions.contains({ origins: [origin] }).then((granted) => {
+        if (!granted) setKinopubUrl(tab.url!);
+      });
     });
   }, []);
 

@@ -10,9 +10,8 @@ import Udemy from "@src/streamings/udemy";
 import Kinopoisk from "@src/streamings/kinopoisk";
 import Amazon from "@src/streamings/amazon";
 import Inoriginal from "@src/streamings/inoriginal";
+import { KINOPUB_HOSTS, KINOPUB_TITLE, isAmazonVideoHost } from "@src/shared/serviceHosts";
 
-const KINOPUB_HOSTS = ["kinopub.net", "kino.pub", "kinopub.cc", "moviesjoy.is"];
-const isAmazonVideoHost = (host: string) => host === "www.primevideo.com" || /^www\.amazon\.[a-z.]+$/.test(host);
 
 const markPage = (id: string) => document.querySelector("html")?.setAttribute("id", id);
 
@@ -55,7 +54,7 @@ export const getCurrentService = (): Service => {
   if (host === "inoriginal.online") return new Inoriginal();
 
   const titleContent = document.querySelector("title")?.textContent;
-  if (titleContent?.includes("Кинопаб") || document.querySelector('meta[content="Кинопаб"]') != null) {
+  if (titleContent?.includes(KINOPUB_TITLE) || document.querySelector(`meta[content="${KINOPUB_TITLE}"]`) != null) {
     return kinopub();
   }
   if (document.querySelector("body div")?.id === "plex") return new Plex();
