@@ -1,3 +1,4 @@
+import { createVideoClockBinding } from "@src/utils/videoClock";
 import { createRoot, Root } from "react-dom/client";
 import refreshOnUpdate from "virtual:reload-on-update-in-view";
 
@@ -70,10 +71,8 @@ const mountSettings = () => {
     getCurrentVideoFx();
     if (!videoWatchAttached) {
       videoWatchAttached = true;
-      $video.watch((video) => {
-        video?.removeEventListener("timeupdate", handleTimeUpdate as EventListener);
-        video?.addEventListener("timeupdate", handleTimeUpdate as EventListener);
-      });
+      // One listener, always on the current video: a replaced element stops driving the clock.
+      $video.watch(createVideoClockBinding(handleTimeUpdate));
     }
     settingsRoot = createRoot(settingNode);
     settingsRoot.render(<Settings contentContainer={contentContainer} />);

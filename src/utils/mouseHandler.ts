@@ -1,14 +1,9 @@
 import { $streaming } from "@src/models/streamings";
-import { $mouseActions, listeningPeekToggled } from "@src/models/settings";
+import { $enabled, $mouseActions, listeningPeekToggled } from "@src/models/settings";
 import { $video, loopLineToggled, moveKeyPressed, replayLinePressed, slowReplayRequested } from "@src/models/videos";
 import type { TMouseAction } from "@src/models/types";
 import { isPointInRect, mouseButtonOf } from "@src/shared/mouseActions";
-
-const isEditable = (target: EventTarget | null): boolean => {
-  const el = target as HTMLElement | null;
-  if (!el || typeof el.closest !== "function") return false;
-  return Boolean(el.closest("input, textarea, select, [contenteditable=''], [contenteditable='true']"));
-};
+import { eventOrigin, isEditableTarget, isInteractiveTarget, type TElementLike } from "@src/shared/inputTargets";
 
 const runMouseAction = (action: TMouseAction) => {
   switch (action) {
@@ -46,6 +41,8 @@ const runMouseAction = (action: TMouseAction) => {
 
 /** The assigned action for this press, or undefined when the browser should handle it as usual. */
 const actionFor = (event: MouseEvent): TMouseAction | undefined => {
+  // Disabled: the overlay is hidden, so the buttons go back to the site and browser.
+  if (!$enabled.getState()) return undefined;
   const button = mouseButtonOf(event.button);
   if (!button) return undefined;
   const action = $mouseActions[button].getState();
@@ -54,7 +51,11 @@ const actionFor = (event: MouseEvent): TMouseAction | undefined => {
   // Only over the video (subtitles included): elsewhere the buttons keep doing back/forward,
   // open-in-new-tab and auto-scroll.
   if (!video || !isPointInRect(event.clientX, event.clientY, video.getBoundingClientRect())) return undefined;
-  if (isEditable(event.target)) return undefined;
+  // Links, menus and dialogs layered over the player (e.g. the DeepL key link in the settings modal)
+  // keep their own behaviour; the walk stops at the element that holds the video.
+  const origin = eventOrigin(event);
+  const holdsVideo = (el: TElementLike) => typeof (el as Node).contains === "function" && (el as Node).contains(video);
+  if (isEditableTarget(origin) || isInteractiveTarget(origin, holdsVideo)) return undefined;
   return action;
 };
 

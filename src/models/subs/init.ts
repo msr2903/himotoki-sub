@@ -1,4 +1,4 @@
-import { sample, split } from "effector";
+import { createStore, sample, split } from "effector";
 import {
   $currentSubs,
   $rawSubs,
@@ -32,6 +32,7 @@ import {
   computeCoverageFx,
 } from ".";
 import { appendRawSubs } from "./appendRawSubs";
+import { autoPauseStep, rebindLoopedCue, type TAutoPauseTrack } from "./cuePlayback";
 import { $streaming } from "../streamings";
 import {
   $video,
@@ -42,7 +43,7 @@ import {
   loopLineToggled,
   loopCleared,
 } from "../videos";
-import { $autoPause, $secondarySubs, $translateLanguage } from "../settings";
+import { $autoPause, $enabled, $secondarySubs, $translateLanguage } from "../settings";
 import { $dictGeneration, $dictReady } from "../translations";
 import type { Captions, TSub } from "../types";
 import { debug } from "patronum";
@@ -76,17 +77,41 @@ sample({
   fn: ({ subs, video }, _) => ({ subs, video }),
   target: updateCurrentSubsFx,
 });
-sample({
+// Auto-pause at the end of each line. Time updates are sparse (≈250 ms), so besides the lead window
+// before the end it also pauses when normal playback crosses the end (see autoPauseStep).
+const $autoPauseTrack = createStore<TAutoPauseTrack | null>(null);
+const autoPauseChecked = sample({
   clock: videoTimeUpdate,
-  source: { currentSubs: $currentSubs, video: $video, autoPause: $autoPause, looped: $loopedCue },
-  fn: ({ currentSubs, video, autoPause }, _) => ({ currentSubs, video, autoPause }),
-  filter: ({ currentSubs, video, autoPause, looped }) => {
-    if (looped || !currentSubs[0] || !video || !autoPause || video.paused || video.ended) {
-      return false;
-    }
-    const timeDiff = currentSubs[0].end - video.currentTime * 1000;
-    return timeDiff < 250 && timeDiff > 0;
+  source: {
+    currentSubs: $currentSubs,
+    video: $video,
+    autoPause: $autoPause,
+    enabled: $enabled,
+    looped: $loopedCue,
+    track: $autoPauseTrack,
   },
+  filter: ({ video }) => video != null,
+  fn: ({ currentSubs, video, autoPause, enabled, looped, track }) => ({
+    currentSubs,
+    video,
+    autoPause,
+    ...autoPauseStep(track, {
+      time: video!.currentTime * 1000,
+      end: currentSubs[0]?.end ?? null,
+      rate: video!.playbackRate,
+      seeking: video!.seeking,
+      active: enabled && autoPause && !looped && !video!.paused && !video!.ended,
+    }),
+  }),
+});
+// Explicit navigation is a seek, not playback running through a line end.
+$autoPauseTrack
+  .on(autoPauseChecked, (_, { track }) => track)
+  .reset(moveKeyPressed, moveToTimeRequested, resetSubs, $video.updates);
+sample({
+  clock: autoPauseChecked,
+  filter: ({ pause }) => pause,
+  fn: ({ currentSubs, video, autoPause }) => ({ currentSubs, video, autoPause }),
   target: autoPauseFx,
 });
 
@@ -302,6 +327,8 @@ sample({
   target: loopedCueSet,
 });
 $loopedCue.on(loopedCueSet, (_, cue) => cue).reset(loopCleared, resetSubs, moveKeyPressed);
+// New captions (track switch, custom import, delay resync): follow the same line or stop looping.
+$loopedCue.on($subs.updates, rebindLoopedCue);
 
 // While looping, seek back to the cue start whenever playback leaves the cue window.
 sample({

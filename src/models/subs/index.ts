@@ -87,7 +87,7 @@ export const updateCurrentSecondarySubsFx = createEffect<
 >(({ subs, video, delayMs }) => {
   if (!video) return [];
   const time = video.currentTime * 1000 - delayMs;
-  return subs.filter((cue) => Number(cue.start) <= time && Number(cue.end) >= time);
+  return getCurrentSubs(subs, time);
 });
 
 /** The cue currently being looped for shadowing (null when not looping). */

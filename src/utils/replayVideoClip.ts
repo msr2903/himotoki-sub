@@ -1,4 +1,10 @@
-/** Stop at media time, so replay works at any speed and through buffering or popup dismissal. */
+import { watchMediaWindow } from "./mediaWindow";
+
+/**
+ * Replay [start, end) and pause once at its end, in media time, so replay works at any speed and
+ * through buffering or popup dismissal. Seeking away (backwards, or forward past the end) hands the
+ * video back to the user without pausing the newly chosen scene.
+ */
 let cancelClip: (() => void) | null = null;
 
 export const cancelVideoClip = () => {
@@ -14,25 +20,15 @@ export const replayVideoClip = (
 ) => {
   cancelVideoClip();
   if (end <= start) return;
+  const stop = watchMediaWindow(video, start, end, (reason) => {
+    if (cancelClip === cleanup) cancelClip = null;
+    if (reason === "end") video.pause();
+  });
   const cleanup = () => {
-    video.removeEventListener("timeupdate", onTime);
-    video.removeEventListener("ended", cleanup);
-    video.removeEventListener("error", cleanup);
+    stop();
     if (cancelClip === cleanup) cancelClip = null;
   };
-  const onTime = () => {
-    if (video.seeking) return;
-    if (video.currentTime * 1000 >= end) {
-      video.pause();
-      cleanup();
-    } else if (video.currentTime * 1000 < start - 500) {
-      cleanup();
-    }
-  };
   cancelClip = cleanup;
-  video.addEventListener("timeupdate", onTime);
-  video.addEventListener("ended", cleanup);
-  video.addEventListener("error", cleanup);
   seek(start);
   void video.play().catch(cleanup);
 };

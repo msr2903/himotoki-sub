@@ -4,7 +4,7 @@ import { TMoveDirection } from "../types";
 import { replayVideoClip } from "@src/utils/replayVideoClip";
 import { moveVideoToTime } from "@src/utils/moveVideoToTime";
 import { $streaming } from "../streamings";
-import { SLOW_REPLAY_RATE } from "@src/shared/playbackRate";
+import { startSlowReplay } from "@src/utils/slowReplay";
 
 const TIME_SEEK_TIME = 5000;
 
@@ -17,6 +17,8 @@ export const wasPausedChanged = createEvent<boolean>();
 $wasPaused.on(wasPausedChanged, (_, wasPaused) => wasPaused);
 
 $video.on(getCurrentVideoFx.doneData, (_, video) => video);
+// A hover pause belongs to the video it paused; a replacement video must not be resumed for it.
+$wasPaused.reset($video.updates);
 getCurrentVideoFx.use(async () => document.querySelector("video")!);
 
 type TMoveFX = {
@@ -101,23 +103,14 @@ export const slowReplayFx = createEffect<
     video: StoreValue<typeof $video>;
     currentSubs: StoreValue<typeof $currentSubs>;
     streaming: StoreValue<typeof $streaming>;
-    userRate: number;
+    /** Read when the replay ends, so a speed chosen meanwhile is the one restored. */
+    userRate: () => number;
   },
   void
 >(({ video, currentSubs, streaming, userRate }) => {
   if (!video || currentSubs.length === 0) return;
   const cue = currentSubs[0];
-  video.playbackRate = SLOW_REPLAY_RATE;
-  moveVideoToTime(video, streaming, cue.start);
-  void video.play();
-  const durationMs = Math.max(300, (cue.end - cue.start) / SLOW_REPLAY_RATE);
-  window.setTimeout(() => {
-    try {
-      video.playbackRate = userRate;
-    } catch {
-      // ignore
-    }
-  }, durationMs + 80);
+  startSlowReplay(video, cue.start, cue.end, (time) => moveVideoToTime(video, streaming, time), userRate);
 });
 
 export const replayCueRequested = createEvent<{ start: number; end: number }>();
