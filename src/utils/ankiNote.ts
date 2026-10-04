@@ -28,7 +28,7 @@ export type AnkiNoteInput = {
   meanings?: string[];
   /** Sentence the word appeared in; the keyword is bolded inside it. */
   contextSentence?: string;
-  /** Surface to bold inside the context sentence (usually the headword). */
+  /** Surface to bold inside the context sentence (the form used in the subtitle; see pickSentenceKeyword). */
   keyword?: string;
   /** JLPT levels (e.g. ["n5"]). */
   jlpt?: string[];
@@ -75,6 +75,19 @@ export const boldKeyword = (sentence: string, keyword?: string): string => {
   const escapedKeyword = htmlEscape(keyword);
   if (!escapedKeyword) return escaped;
   return escaped.split(escapedKeyword).join(`<b>${escapedKeyword}</b>`);
+};
+
+/**
+ * The form to bold inside the context sentence: the first candidate that actually occurs in it. The
+ * subtitle surface comes first (食べた in 朝ご飯を食べた。), then the dictionary forms as fallbacks. Pure.
+ */
+export const pickSentenceKeyword = (
+  sentence: string | undefined,
+  candidates: ReadonlyArray<string | undefined | null>,
+): string | undefined => {
+  const forms = candidates.map((c) => c?.trim()).filter((c): c is string => Boolean(c));
+  if (!sentence) return forms[0];
+  return forms.find((form) => sentence.includes(form)) ?? forms[0];
 };
 
 /** Map a theme to the wrapper class used by the card templates ("" = auto). */
@@ -234,3 +247,51 @@ export const HIMOTOKI_CARD_CSS = `
   --c-accent-soft: rgba(47, 157, 144, 0.12);
 }
 `;
+
+/* ---------- Note-type migration ---------- */
+
+/** FNV-1a (32-bit, hex) of a card design string, ignoring line endings and outer whitespace. */
+export const cardDesignHash = (design: string): string => {
+  const text = design.replace(/\r\n/g, "\n").trim();
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+};
+
+/**
+ * Hashes of earlier built-in designs, which a save may silently migrate to the current one. Anything
+ * else in the user's note type is a customization and is left untouched. When changing the CSS or
+ * templates above, add the hash of the previous version here.
+ */
+const PREVIOUS_BUILTIN_CSS = new Set([
+  "6e654ba8", // d9fad25: before the numbered senses list (.hm-senses)
+]);
+/** `${hash(Front)}:${hash(Back)}`; the templates have not changed since the note type was introduced. */
+const PREVIOUS_BUILTIN_TEMPLATES = new Set<string>([]);
+
+/**
+ * Decide which parts of an existing "Himotoki" note type to update. `templates` is AnkiConnect's
+ * modelTemplates result (`{ [name]: { Front, Back } }`) and `css` its modelStyling css. Only an
+ * unmodified earlier built-in design is updated; current, customized or unreadable content is not. Pure.
+ */
+export const planModelUpdate = (templates: unknown, css: unknown): { templates: boolean; styling: boolean } => {
+  const styling =
+    typeof css === "string" &&
+    cardDesignHash(css) !== cardDesignHash(HIMOTOKI_CARD_CSS) &&
+    PREVIOUS_BUILTIN_CSS.has(cardDesignHash(css));
+
+  let templatesOutdated = false;
+  if (templates && typeof templates === "object") {
+    const names = Object.keys(templates);
+    const card = (templates as Record<string, { Front?: unknown; Back?: unknown }>)[HIMOTOKI_CARD_TEMPLATE_NAME];
+    if (names.length === 1 && card && typeof card.Front === "string" && typeof card.Back === "string") {
+      const key = `${cardDesignHash(card.Front)}:${cardDesignHash(card.Back)}`;
+      const current = `${cardDesignHash(HIMOTOKI_FRONT_TEMPLATE)}:${cardDesignHash(HIMOTOKI_BACK_TEMPLATE)}`;
+      templatesOutdated = key !== current && PREVIOUS_BUILTIN_TEMPLATES.has(key);
+    }
+  }
+  return { templates: templatesOutdated, styling };
+};

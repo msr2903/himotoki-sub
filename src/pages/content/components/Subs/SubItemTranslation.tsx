@@ -98,6 +98,8 @@ export const SubItemTranslation: FC<{
   const [entryIndex, setEntryIndex] = useState(0);
   const [showConj, setShowConj] = useState(false);
   const popupRef = useRef<HTMLDivElement | null>(null);
+  // One save at a time: a repeated click while the cue audio records or Anki answers is ignored.
+  const savingRef = useRef(false);
 
   useEffect(() => {
     setService(getLearningService(learningService));
@@ -197,12 +199,14 @@ export const SubItemTranslation: FC<{
   // Save to a specific service (defaults to the selected one, used by the per-sense "+").
   const handleAddWord = async (sense: TWordTranslationItem, target: TLearningService = learningService) => {
     const svc = getLearningService(target);
-    if (!svc) return;
+    if (!svc || savingRef.current) return;
+    savingRef.current = true;
     // Rich Anki cards: capture a video-frame screenshot (instant) and the cue's audio (best-effort;
     // seeks/plays the video briefly, then restores it). Both degrade to null when not capturable.
     const useRich = target === "anki" && ankiRichCards;
     let image = null;
     let audio = null;
+    // Both captures never throw; the guard is released when the save settles.
     if (useRich && video) {
       const base = `himotoki-${Date.now()}`;
       image = captureVideoFrame(video, base);
@@ -213,6 +217,7 @@ export const SubItemTranslation: FC<{
         partOfSpeech: sense.partOfSpeech,
         context: miningContext.contextSentence,
         ...miningContext,
+        surface: text,
         reading: current.reading,
         jlpt: current.jlpt,
         meanings: current.translations?.length ? current.translations.map((s) => s.word) : [sense.word],
@@ -236,7 +241,10 @@ export const SubItemTranslation: FC<{
         }
         toast.success(value);
       })
-      .catch((error) => toast.error(typeof error === "string" ? error : error?.message || String(error)));
+      .catch((error) => toast.error(typeof error === "string" ? error : error?.message || String(error)))
+      .finally(() => {
+        savingRef.current = false;
+      });
   };
 
   const handlePlaySound = () => {

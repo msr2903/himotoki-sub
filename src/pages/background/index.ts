@@ -17,6 +17,7 @@ import {
 } from "@src/shared/wordStatusOps";
 import { dictCall } from "@src/pages/offscreen/dictBridge";
 import { detectDictHost, unsupportedDictReply } from "./dictHost";
+import { postJsonWithTimeout } from "@src/utils/postJson";
 
 /** Firebase session for Save to Himotoki (see utils/himotokiAccount.ts). */
 const HIMOTOKI_SESSION_KEY = "himotokiSession";
@@ -71,6 +72,7 @@ const DICT_OPS: Record<string, string> = {
   himotokiLookupBatch: "lookupBatch",
   himotokiRepairSegments: "repair",
   himotokiConjTable: "conjTable",
+  himotokiHeadwords: "headwords",
 };
 
 import "webext-dynamic-content-scripts";
@@ -318,20 +320,8 @@ chrome.runtime.onMessage.addListener(function (message, _sender, sendResponse) {
 
   // Generic JSON POST used by the Anki (AnkiConnect) learning service.
   if (message.type === "post") {
-    fetch(message.url, {
-      method: "POST",
-      body: JSON.stringify(message.data),
-    })
-      .then((resp) => {
-        if (!resp.ok) {
-          throw new Error(`HTTP error! status: ${resp.status}`);
-        }
-        return resp.json();
-      })
-      .then((data) => sendResponse(data))
-      .catch((error) => {
-        sendResponse({ error: error.message || error });
-      });
+    // Bounded (headers + body); an expired deadline aborts the fetch and replies { error, timeout }.
+    void postJsonWithTimeout(message.url, message.data, message.timeoutMs).then((data) => sendResponse(data));
   }
 
   // Keep the channel open only for a type we actually handle; otherwise let it close immediately so

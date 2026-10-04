@@ -4,6 +4,8 @@ export type TAditionalData = {
   context?: string;
   partOfSpeech?: string;
   contextSentence?: string;
+  /** Subtitle form the word was mined from (e.g. 食べた); bolded in the sentence on a rich Anki card. */
+  surface?: string;
   sourceUrl?: string;
   videoTitle?: string;
   timestampMs?: number;
