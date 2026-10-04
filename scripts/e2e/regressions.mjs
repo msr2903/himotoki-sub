@@ -27,7 +27,6 @@ try {
   // Let settings rehydrate before changing them.
   await page.waitForTimeout(200);
   await checkTranslationPerformance(page);
-  await checkCaptionMarkupIsInert();
   const checks = await page.evaluate(async () => {
     const { subs: s, settings: st, videos: v, translations: tr, $videoStats, knownKeyOf, replayVideoClip, cancelVideoClip } = window.audit;
     const check = (condition, label) => { if (!condition) throw new Error(label); passed.push(label); };
@@ -312,6 +311,8 @@ try {
   }
   await options.goto(optionsUrl);
   await options.screenshot({ path: "/tmp/himotoki-audit-options-mobile.png", fullPage: true });
+  // Opens its own tab, so it runs after the hover-driven checks on the audit page.
+  await checkCaptionMarkupIsInert();
   const popup = await ctx.newPage();
   popup.on("pageerror", (e) => errors.push(String(e)));
   await popup.goto(`chrome-extension://${new URL(sw.url()).host}/src/pages/popup/index.html`);
