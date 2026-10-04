@@ -46,6 +46,7 @@ import {
 import { $autoPause, $enabled, $secondarySubs, $translateLanguage } from "../settings";
 import { $dictGeneration, $dictReady } from "../translations";
 import type { Captions, TSub } from "../types";
+import type Service from "@src/streamings/service";
 import { debug } from "patronum";
 import { cancelVideoClip } from "@src/utils/replayVideoClip";
 import { notifyError, notifyInfo } from "@src/pages/content/notify";
@@ -141,9 +142,21 @@ const sameCaptions = (a: Captions, b: Captions): boolean =>
   a.length === b.length &&
   a.every((cue, i) => cue.text === b[i]!.text && cue.start === b[i]!.start && cue.end === b[i]!.end);
 
+// Only the latest caption request counts. A newer request or a reset makes an in-flight one stale,
+// so a slow previous video/track can neither replace newer captions nor restore cleared ones.
+const $currentSubsRequest = createStore<{ streaming: Service; language: string } | null>(null)
+  .on(fetchSubsFx, (_, params) => params)
+  .reset(resetSubs);
+const currentSubsFetched = sample({
+  clock: fetchSubsFx.done,
+  source: $currentSubsRequest,
+  filter: (current, { params }) => current === params,
+  fn: (_, done) => done,
+});
+
 // A requested track that comes back empty is the most common "nothing happens" report; say so.
 sample({
-  clock: fetchSubsFx.done,
+  clock: currentSubsFetched,
   filter: ({ params, result }) => Boolean(params.language) && params.language !== ES_CUSTOM_SUB_LABEL && result.length === 0,
   fn: ({ params }) => params.language,
 }).watch((language) => {
@@ -160,7 +173,7 @@ sample({
 // append reducer below. (It used to be here too, and — running first — clobbered
 // $rawSubs with the lone cue, so the append handler never accumulated anything.)
 $rawSubs.on(
-  [fetchSubsFx.doneData, subsResyncFx.doneData, updateCustomSubsFx.doneData],
+  [currentSubsFetched.map(({ result }) => result), subsResyncFx.doneData, updateCustomSubsFx.doneData],
   (oldSubs, subs) => (sameCaptions(oldSubs, subs) ? oldSubs : subs)
 );
 
@@ -171,12 +184,19 @@ $rawSubs.on(rawSubsAdded, appendRawSubs);
 $rawSubs.reset(resetSubs);
 $sentenceOpen.reset(resetSubs);
 
+// Keys already resolved against a dictionary generation, so captions that grow one cue at a time
+// look up only their new words. Filled further below, once the removal signal exists.
+type TCoverageResolved = { generation: number; keys: Map<string, string | null> } | null;
+const $coverageResolved = createStore<TCoverageResolved>(null);
+const knownCoverage = (resolved: TCoverageResolved, generation: number) =>
+  resolved?.generation === generation ? resolved.keys : undefined;
+
 // Resolve every distinct word's key once the subtitles are ready, for coverage stats.
 sample({
   clock: $subs,
-  source: $dictGeneration,
+  source: { generation: $dictGeneration, resolved: $coverageResolved },
   filter: (_, subs) => subs.length > 0,
-  fn: (generation, subs) => ({ subs, generation }),
+  fn: ({ generation, resolved }, subs) => ({ subs, generation, known: knownCoverage(resolved, generation) }),
   target: computeCoverageFx,
 });
 // The dictionary became available or was replaced (captions unchanged): rescan the loaded captions.
@@ -209,6 +229,14 @@ const currentCoverageFailed = sample({
   source: { subs: $subs, generation: $dictGeneration },
   filter: isCurrentCoverage,
 });
+$coverageResolved
+  .on(computeCoverageFx.done, (resolved, { params, result }) => {
+    if (!result) return resolved;
+    const keys = new Map(knownCoverage(resolved, params.generation));
+    for (const surface of Object.keys(result)) keys.set(surface, result[surface]!);
+    return { generation: params.generation, keys };
+  })
+  .reset(resetSubs, coverageDictRemoved);
 $coverageKeys.on(currentCoverageDone, (_, map) => map ?? {}).reset(resetSubs, $subs.updates, coverageDictRemoved);
 $coverageStatus
   .on(computeCoverageFx, () => "loading")
@@ -217,8 +245,11 @@ $coverageStatus
   .on(coverageDictRemoved, () => "missing")
   .reset(resetSubs);
 
+// Pass the current list along so cues it already holds unchanged are not converted again (#144).
 sample({
   clock: $rawSubs,
+  source: $subs,
+  fn: (previous, rawSubs) => ({ rawSubs, previous }),
   target: processRawSubsFx,
 });
 
@@ -229,24 +260,25 @@ sample({
 sample({
   clock: processRawSubsFx.done,
   source: $rawSubs,
-  filter: (rawSubs, done) => !("error" in done) && rawSubs === done.params,
+  filter: (rawSubs, done) => !("error" in done) && rawSubs === done.params.rawSubs,
   fn: (_, done) => ("result" in done ? done.result : []),
   target: $subs,
 });
 sample({
   clock: processJapaneseSubsFx.done,
   source: $rawSubs,
-  filter: (rawSubs, done) => !("error" in done) && rawSubs === done.params,
+  filter: (rawSubs, done) => !("error" in done) && rawSubs === done.params.rawSubs,
   fn: (_, done) => ("result" in done ? done.result : []),
   target: $subs,
 });
 $subs.reset(resetSubs);
 
-// After the Segmenter paint, upgrade all cues via the local ONNX split.
+// After the Segmenter paint, upgrade the cues it has not already analysed via the local ONNX split.
 sample({
-  clock: processRawSubsFx.doneData,
+  clock: processRawSubsFx.done,
   source: $rawSubs,
-  filter: (rawSubs) => Boolean(rawSubs?.length),
+  filter: (rawSubs, { params }) => Boolean(rawSubs?.length) && rawSubs === params.rawSubs,
+  fn: (rawSubs, { result }) => ({ rawSubs, previous: result }),
   target: processJapaneseSubsFx,
 });
 
@@ -254,15 +286,26 @@ sample({
 
 // Fetch the secondary track when the primary captions arrive, or when the mode / language changes.
 sample({
-  clock: [fetchSubsFx.doneData, $secondarySubs.updates, $translateLanguage.updates],
+  clock: [currentSubsFetched, $secondarySubs.updates, $translateLanguage.updates],
   source: { streaming: $streaming, mode: $secondarySubs, language: $translateLanguage, rawSubs: $rawSubs },
   filter: ({ mode, rawSubs, streaming }) => mode === "track" && rawSubs.length > 0 && streaming.name !== "stub",
   fn: ({ streaming, language }) => ({ streaming, language }),
   target: fetchSecondarySubsFx,
 });
 
+// Same rule for the second line: only the latest request for the current captions and settings.
+const $currentSecondaryRequest = createStore<{ streaming: Service; language: string } | null>(null)
+  .on(fetchSecondarySubsFx, (_, params) => params)
+  .reset(resetSubs, fetchSubsFx, $secondarySubs.updates, $translateLanguage.updates);
+const currentSecondaryFetched = sample({
+  clock: fetchSecondarySubsFx.done,
+  source: $currentSecondaryRequest,
+  filter: (current, { params }) => current === params,
+  fn: (_, { result }) => result,
+});
+
 $secondaryRawSubs
-  .on(fetchSecondarySubsFx.doneData, (_, subs) => subs)
+  .on(currentSecondaryFetched, (_, subs) => subs)
   .reset(resetSubs)
   .on($secondarySubs.updates, (subs, mode) => (mode === "track" ? subs : []));
 

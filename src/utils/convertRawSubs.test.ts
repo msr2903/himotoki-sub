@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { chunkCue, splitReadingLine } from "./convertRawSubs";
+import { chunkCue, splitReadingLine, splitReadingLines } from "./convertRawSubs";
 
 describe("splitReadingLine", () => {
   it("splits a genuine kanji line + kana reading line", () => {
@@ -39,6 +39,27 @@ describe("splitReadingLine", () => {
   it("does nothing when the first line has no kanji", () => {
     const cue = "こんにちは\nこんにちはみなさん";
     expect(splitReadingLine(cue).readingLine).toBeNull();
+  });
+});
+
+describe("kanji-only first lines (#119)", () => {
+  it("keeps a second speaker under a kanji-only line", () => {
+    expect(splitReadingLine("何？\nはい。")).toEqual({ body: "何？\nはい。", readingLine: null });
+  });
+
+  it("trusts a kanji-only line's reading only in a track with verified reading lines", () => {
+    const track = ["皆さんは朝起きたら何をしますか\nみなさんはあさおきたらなにをしますか", "日本語\nにほんご"];
+    expect(splitReadingLines(track).map((r) => r.readingLine)).toEqual([
+      "みなさんはあさおきたらなにをしますか",
+      "にほんご",
+    ]);
+    // Without that evidence both lines stay.
+    expect(splitReadingLines(["日本語\nにほんご", "何？\nはい。"]).map((r) => r.readingLine)).toEqual([null, null]);
+  });
+
+  it("still rejects a kana line too short to read every kanji", () => {
+    const track = ["朝起きたら何をしますか\nあさおきたらなにをしますか", "日本語学校\nはい"];
+    expect(splitReadingLines(track)[1]).toEqual({ body: "日本語学校\nはい", readingLine: null });
   });
 });
 

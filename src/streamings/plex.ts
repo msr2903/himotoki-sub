@@ -2,6 +2,7 @@ import { esRenderSetings } from "@src/models/settings";
 import Service from "./service";
 import { parse } from "subtitle";
 import { esSubsChanged, rawSubsAdded } from "@src/models/subs";
+import { readCaptionParts, waitForElement, watchCaptionSource } from "./captionObserver";
 
 class Plex implements Service {
   name = "plex";
@@ -17,26 +18,17 @@ class Plex implements Service {
   }
 
   public init(): void {
-    waitForElement(() => {
+    waitForElement(".libjass-subs", (subtitleSource) => {
       esSubsChanged("en");
-      const subtitleSource = document.querySelector(".libjass-subs");
       const videoElement = document.querySelector("video");
-      const subtitleObserver = new MutationObserver(() => {
-        const subtitleParts = subtitleSource.querySelectorAll("span span");
-
-        const subtitleContent = [...subtitleParts].map((el) => getText(el)).join("\n");
-        console.log("subtitleContent", subtitleContent);
-        const startTime = videoElement.currentTime;
-        const captions = [
-          {
-            start: startTime * 1000,
-            end: (startTime + 100) * 1000,
-            text: subtitleContent,
-          },
-        ];
-        rawSubsAdded(captions);
+      if (!videoElement) return;
+      watchCaptionSource({
+        source: subtitleSource,
+        // libjass nests styled spans; each rendered run is read once.
+        read: () => readCaptionParts(subtitleSource, "span span", { runs: true }),
+        currentTime: () => videoElement.currentTime,
+        emit: rawSubsAdded,
       });
-      subtitleObserver.observe(subtitleSource, { childList: true, subtree: true });
     });
   }
 
@@ -65,28 +57,6 @@ class Plex implements Service {
   public isOnFlight() {
     return true;
   }
-}
-
-function getText(node: ChildNode) {
-  if (node.nodeType === Node.TEXT_NODE) {
-    return node.textContent;
-  }
-  if (node.nodeName === "BR") {
-    return "\n";
-  }
-
-  const result = [...node.childNodes].map((el) => getText(el)).join("");
-  return result;
-}
-
-function waitForElement(callBack) {
-  window.setTimeout(function () {
-    if (document.querySelector(".libjass-subs")) {
-      callBack();
-    } else {
-      waitForElement(callBack);
-    }
-  }, 300);
 }
 
 export default Plex;

@@ -55,15 +55,21 @@ export const updateCurrentSubsFx = createEffect<{ subs: TSub[]; video: UnitValue
 export const rawSubsAdded = createEvent<Captions>();
 export const updateCustomSubsFx = createEffect<Captions, Captions>((subs) => subs);
 
+/**
+ * `previous` is the last converted list: cues it already holds unchanged are reused, so captions
+ * that grow one cue at a time process each cue once instead of the whole transcript every time.
+ */
+type TConvertParams = { rawSubs: Captions; previous: TSub[] };
+
 /** Immediate paint using Intl.Segmenter, before the ONNX model has run. */
-export const processRawSubsFx = createEffect<Captions, TSub[]>(async (rawSubs) => {
+export const processRawSubsFx = createEffect<TConvertParams, TSub[]>(async ({ rawSubs, previous }) => {
   if (!rawSubs?.length) return [];
-  return convertJapaneseSubsFallback(rawSubs);
+  return convertJapaneseSubsFallback(rawSubs, previous);
 });
 
-/** Full-transcript local ONNX split (upgrades every cue). */
-export const processJapaneseSubsFx = createEffect<Captions, TSub[]>(
-  async (rawSubs) => convertJapaneseSubsWithLocalSplit(rawSubs),
+/** Local ONNX split of every cue not already analysed in `previous`. */
+export const processJapaneseSubsFx = createEffect<TConvertParams, TSub[]>(
+  async ({ rawSubs, previous }) => convertJapaneseSubsWithLocalSplit(rawSubs, previous),
 );
 
 /* ---------- Second subtitle line (subtitle track mode) ---------- */
@@ -100,21 +106,28 @@ export const loopedCueSet = createEvent<TSub | null>();
  */
 export const $coverageKeys = createStore<Record<string, string | null>>({});
 export const $coverageStatus = createStore<"idle" | "loading" | "ready" | "missing" | "error">("idle");
-/** `generation` is the dictionary generation the job started under (see $dictGeneration). */
+/**
+ * `generation` is the dictionary generation the job started under (see $dictGeneration). `known`
+ * holds keys already resolved against that generation; only the other surfaces are looked up.
+ */
 export const computeCoverageFx = createEffect<
-  { subs: TSub[]; generation: number },
+  { subs: TSub[]; generation: number; known?: ReadonlyMap<string, string | null> },
   Record<string, string | null> | null
->(async ({ subs }) => {
+>(async ({ subs, known }) => {
   const surfaces = new Set<string>();
   for (const sub of subs) {
     for (const item of sub.items) {
       if (item.type === "word") surfaces.add(item.cleanedText || item.text);
     }
   }
-  const list = [...surfaces];
-  if (!list.length) return {};
   // Prototype-free: a surface like "__proto__" or "constructor" is an ordinary key here.
   const map: Record<string, string | null> = Object.create(null);
+  const list: string[] = [];
+  for (const surface of surfaces) {
+    if (known?.has(surface)) map[surface] = known.get(surface)!;
+    else list.push(surface);
+  }
+  if (!list.length) return map;
   // Yield between batches so large videos do not monopolize the dictionary worker.
   for (let offset = 0; offset < list.length; offset += 64) {
     const batch = list.slice(offset, offset + 64);
