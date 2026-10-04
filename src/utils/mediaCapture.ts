@@ -58,12 +58,70 @@ type CapturableVideo = HTMLVideoElement & {
   mozCaptureStream?: () => MediaStream;
 };
 
+/** How long the seek to the cue start / the start of playback may take before audio is omitted. */
+const SEEK_TIMEOUT_MS = 4000;
+const PLAY_TIMEOUT_MS = 4000;
+/** Wall-clock slack on top of the clip length for buffering before a stalled capture gives up. */
+const STALL_SLACK_MS = 5000;
+const POLL_MS = 50;
+/** A pause this close to the clip end (auto-pause stops 250 ms early) still counts as complete. */
+const END_TOLERANCE_SEC = 0.35;
+/** The seek must land this close to the cue start, or the clip would hold the wrong audio. */
+const SEEK_TOLERANCE_SEC = 1;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Resolve true when `promise` settles successfully within `ms`, false on rejection or timeout. */
+const settlesWithin = (promise: Promise<unknown>, ms: number): Promise<boolean> =>
+  new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), ms);
+    promise.then(
+      () => {
+        clearTimeout(timer);
+        resolve(true);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(false);
+      },
+    );
+  });
+
+/** Captures run one at a time: each restores the player before the next one snapshots it. */
+let captureQueue: Promise<unknown> = Promise.resolve();
+
 /**
- * Record the cue's audio from the video by seeking to its start, playing for the cue duration, then
- * restoring the previous position and paused state. Returns null when the browser cannot capture the
- * media stream. Times are in seconds.
+ * Record the cue's audio from the video by seeking to its start, playing until media time reaches
+ * its end, then restoring the previous position, speed and paused state. Returns null when the
+ * browser cannot capture the media stream, playback does not start or stalls, or the user takes
+ * over the player mid-capture (their seek, pause and speed change are kept). Times are in seconds.
  */
-export const captureCueAudio = async (
+export const captureCueAudio = (
+  video: HTMLVideoElement,
+  startSec: number,
+  endSec: number,
+  baseName: string,
+): Promise<TCapturedMedia | null> => {
+  const run = captureQueue.then(() => captureNow(video, startSec, endSec, baseName));
+  captureQueue = run.catch(() => null).then(() => settlePlayer(video));
+  return run;
+};
+
+/**
+ * Let the restore's own seek / pause / ratechange events land before the next capture starts
+ * listening, so they are not mistaken for user actions.
+ */
+const settlePlayer = async (video: HTMLVideoElement): Promise<void> => {
+  if (video.seeking) {
+    await settlesWithin(
+      new Promise<void>((resolve) => video.addEventListener("seeked", () => resolve(), { once: true })),
+      SEEK_TIMEOUT_MS,
+    );
+  }
+  await sleep(POLL_MS);
+};
+
+const captureNow = async (
   video: HTMLVideoElement,
   startSec: number,
   endSec: number,
@@ -74,37 +132,93 @@ export const captureCueAudio = async (
   const mime = pickAudioMime();
   if (!capture || !mime) return null;
 
-  const durationMs = Math.min(MAX_AUDIO_MS, Math.max(MIN_AUDIO_MS, (endSec - startSec) * 1000));
+  const clipMs = Math.min(MAX_AUDIO_MS, Math.max(MIN_AUDIO_MS, (endSec - startSec) * 1000));
+  const stopAtSec = startSec + clipMs / 1000;
   const prevTime = video.currentTime;
   const wasPaused = video.paused;
-  // The wait below is wall-clock, so the clip must play at 1x: at 0.5x it would cover only half
-  // the cue, at 2x it would overrun into the next line. Restored in finally.
   const prevRate = video.playbackRate;
+  const endTolerance = Math.min(END_TOLERANCE_SEC, clipMs / 3000);
 
+  // Player changes this capture did not make belong to the user (or the page) and must survive the
+  // restore. Each of our own seeks / speed changes fires exactly one event, which is discounted.
+  let ownSeeks = 0;
+  let ownRateChanges = 0;
+  let seekDone: (() => void) | null = null;
+  let userSeeked = false;
+  let userRate = false;
+  let userPaused = false;
+  const onSeeking = () => {
+    if (ownSeeks > 0) ownSeeks--;
+    else userSeeked = true;
+  };
+  const onRateChange = () => {
+    if (ownRateChanges > 0) ownRateChanges--;
+    else userRate = true;
+  };
+  const onSeeked = () => seekDone?.();
+  const onPause = () => {
+    // Auto-pause (or the player) stopping right at the cue end is a completed clip, not a takeover.
+    if (video.currentTime < stopAtSec - endTolerance) userPaused = true;
+  };
+  video.addEventListener("seeking", onSeeking);
+  video.addEventListener("seeked", onSeeked);
+  video.addEventListener("ratechange", onRateChange);
+  video.addEventListener("pause", onPause);
+  const userTookOver = () => userSeeked || userPaused;
+
+  let stream: MediaStream | null = null;
+  let recorder: MediaRecorder | null = null;
   try {
-    const stream = capture.call(v);
+    stream = capture.call(v);
     const audioTracks = stream.getAudioTracks();
     if (!audioTracks.length) return null;
-    const audioStream = new MediaStream(audioTracks);
-    const recorder = new MediaRecorder(audioStream, { mimeType: mime });
+    recorder = new MediaRecorder(new MediaStream(audioTracks), { mimeType: mime });
     const chunks: Blob[] = [];
     recorder.ondataavailable = (e) => {
       if (e.data && e.data.size) chunks.push(e.data);
     };
 
-    video.currentTime = startSec;
-    try {
-      video.playbackRate = 1;
-    } catch {
-      // ignore — recording still works, just at the user's speed
+    // Record at 1x so the clip sounds natural; the stop point is media time, so speed and
+    // buffering cannot shorten or lengthen the clip.
+    if (video.playbackRate !== 1) {
+      try {
+        ownRateChanges++;
+        video.playbackRate = 1;
+      } catch {
+        ownRateChanges--;
+      }
     }
-    await video.play().catch(() => {});
+    ownSeeks++;
+    video.currentTime = startSec;
+    const seeked = video.seeking ? new Promise<void>((resolve) => (seekDone = resolve)) : Promise.resolve();
+    if (!(await settlesWithin(seeked, SEEK_TIMEOUT_MS)) || userTookOver()) return null;
+    if (Math.abs(video.currentTime - startSec) > SEEK_TOLERANCE_SEC) return null;
+
+    if (!(await settlesWithin(Promise.resolve(video.play()), PLAY_TIMEOUT_MS)) || userTookOver()) return null;
     recorder.start();
-    await new Promise((r) => setTimeout(r, durationMs));
-    await new Promise<void>((resolve) => {
-      recorder.onstop = () => resolve();
-      recorder.stop();
-    });
+
+    const deadline = Date.now() + clipMs + STALL_SLACK_MS;
+    let reached = false;
+    while (!userTookOver()) {
+      const t = video.currentTime;
+      if (t >= stopAtSec || ((video.paused || video.ended) && t >= stopAtSec - endTolerance)) {
+        reached = true;
+        break;
+      }
+      if (video.ended || Date.now() >= deadline) break;
+      await sleep(POLL_MS);
+    }
+
+    const rec = recorder;
+    await settlesWithin(
+      new Promise<void>((resolve) => {
+        rec.onstop = () => resolve();
+        rec.stop();
+      }),
+      2000,
+    );
+    // Stalled playback or a user takeover leaves a clip that does not hold the cue: omit it.
+    if (!reached || userTookOver()) return null;
 
     const ext = mime.includes("ogg") ? "ogg" : "webm";
     const blob = new Blob(chunks, { type: mime });
@@ -115,11 +229,31 @@ export const captureCueAudio = async (
   } catch {
     return null;
   } finally {
-    // Restore playback position, speed and paused state.
     try {
-      video.currentTime = prevTime;
-      video.playbackRate = prevRate;
-      if (wasPaused) video.pause();
+      if (recorder && recorder.state !== "inactive") recorder.stop();
+    } catch {
+      // ignore
+    }
+    // captureStream() created these tracks for this capture alone; release them on every exit.
+    stream?.getTracks().forEach((track) => {
+      try {
+        track.stop();
+      } catch {
+        // ignore
+      }
+    });
+    video.removeEventListener("seeking", onSeeking);
+    video.removeEventListener("seeked", onSeeked);
+    video.removeEventListener("ratechange", onRateChange);
+    video.removeEventListener("pause", onPause);
+    // Restore only what this capture still owns: a user seek keeps its position (and play state),
+    // a user pause stays paused, a user speed change keeps its speed.
+    try {
+      if (!userSeeked) {
+        video.currentTime = prevTime;
+        if (wasPaused) video.pause();
+      }
+      if (!userRate && video.playbackRate !== prevRate) video.playbackRate = prevRate;
     } catch {
       // ignore
     }
